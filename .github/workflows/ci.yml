@@ -1,0 +1,78 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: kms
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-node-version: '3.11'
+        cache: 'pip'
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr libtesseract-dev libpq-dev gcc
+
+    - name: Install Python dependencies
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest httpx
+
+    - name: Run Pytest
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kms
+        SECRET_KEY: testsecretkeyforciworkflows
+      run: |
+        cd backend
+        pytest
+
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: frontend/package.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm install
+
+    - name: Compile and Build check
+      run: |
+        cd frontend
+        npm run build

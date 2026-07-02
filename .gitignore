@@ -1,0 +1,62 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_packages/
+
+# Python Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+bin/
+lib/
+include/
+pyvenv.cfg
+
+# Python cache & testing
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.nox/
+.tox/
+
+# Local configuration files
+.env
+.env.*
+*.local
+alembic.env
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# User data and uploads
+backend/app/uploads/
+backend/uploads/
+uploads/
+*.db
+*.sqlite
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
