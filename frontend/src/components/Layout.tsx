@@ -48,8 +48,8 @@ export default function Layout() {
             <FileText className="h-4.5 w-4.5" />
           </div>
           <div>
-            <span className="font-extrabold text-slate-900 text-sm tracking-tight block">Enterprise KMS</span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5">Secure Document AI</span>
+            <span className="font-extrabold text-slate-900 text-sm tracking-tight block">Fast Trade DMS</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5">Fast Trade Technologies</span>
           </div>
         </div>
 

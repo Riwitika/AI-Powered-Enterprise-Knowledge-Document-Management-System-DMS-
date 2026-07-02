@@ -35,8 +35,8 @@ export default function Login() {
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <span className="font-extrabold text-white text-base tracking-tight block">Enterprise KMS</span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5">Secure Knowledge & Document Management</span>
+            <span className="font-extrabold text-white text-base tracking-tight block">Fast Trade DMS</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5">AI-Powered Enterprise Knowledge & Document Management System</span>
           </div>
         </div>
 
@@ -80,7 +80,7 @@ export default function Login() {
 
         {/* Footer */}
         <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-500">
-          <span>© 2026 Kamakhya Aerospace</span>
+          <span>© 2026 Fast Trade Technologies Pvt. Ltd.</span>
           <span className="flex items-center gap-1">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> AES-256 Bit Encryption Active
           </span>
