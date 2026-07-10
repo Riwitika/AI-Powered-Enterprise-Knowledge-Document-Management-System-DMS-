@@ -3,8 +3,6 @@ import { useAuthStore } from '../stores/authStore';
 import {
   LayoutDashboard,
   FolderTree,
-  MessageSquare,
-  Search,
   ShieldCheck,
   Users,
   LogOut,
@@ -28,9 +26,7 @@ export default function Layout() {
 
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Document Tree', path: '/documents', icon: FolderTree },
-    { name: 'AI Assistant', path: '/chat', icon: MessageSquare },
-    { name: 'Knowledge Search', path: '/search', icon: Search },
+    { name: 'Document Workspace', path: '/documents', icon: FolderTree },
     { name: 'Sharing Rules', path: '/permissions', icon: ShieldCheck },
   ];
 
