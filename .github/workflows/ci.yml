@@ -48,7 +48,7 @@ jobs:
 
     - name: Run Pytest
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kms
+        DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/kms
         SECRET_KEY: testsecretkeyforciworkflows
       run: |
         cd backend
