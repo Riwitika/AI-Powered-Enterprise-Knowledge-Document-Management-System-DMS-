@@ -4,8 +4,13 @@ import { FileText, ShieldAlert, Lock, Mail, ChevronRight, Server, ArrowRight, Sh
 
 export default function Login() {
   const login = useAuthStore((state) => state.login);
+  const register = useAuthStore((state) => state.register);
+  
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [departmentId, setDepartmentId] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -14,9 +19,21 @@ export default function Login() {
     setError(null);
     setIsLoading(true);
     try {
-      await login(email, password);
+      if (isRegisterMode) {
+        await register({
+          email,
+          password,
+          full_name: fullName,
+          department_id: Number(departmentId),
+          role_name: 'employee'
+        });
+        // Auto-login after registration
+        await login(email, password);
+      } else {
+        await login(email, password);
+      }
     } catch (err: any) {
-      setError(err?.message || 'Invalid email or password');
+      setError(err?.message || (isRegisterMode ? 'Failed to create account' : 'Invalid email or password'));
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +104,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side: Login Panel */}
+      {/* Right side: Login / Register Panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-slate-50 relative">
         <div className="w-full max-w-md space-y-8 bg-white border border-slate-200/80 p-8 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
           
@@ -97,11 +114,31 @@ export default function Login() {
               <FileText className="h-5 w-5" />
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              System Gateway
+              {isRegisterMode ? 'Create Corporate Account' : 'System Gateway'}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Provide corporate credentials to access the knowledge base
+              {isRegisterMode ? 'Sign up to register access to your department hub' : 'Provide corporate credentials to access the knowledge base'}
             </p>
+          </div>
+
+          {/* Toggle Tabs */}
+          <div className="flex border-b border-slate-200">
+            <button
+              onClick={() => { setIsRegisterMode(false); setError(null); }}
+              className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition-all ${
+                !isRegisterMode ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-650'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => { setIsRegisterMode(true); setError(null); }}
+              className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition-all ${
+                isRegisterMode ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-650'
+              }`}
+            >
+              Register Access
+            </button>
           </div>
 
           {/* Error Alert */}
@@ -113,8 +150,25 @@ export default function Login() {
           )}
 
           {/* Form */}
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-4">
+              {isRegisterMode && (
+                <div>
+                  <label htmlFor="full-name" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                    Full Name
+                  </label>
+                  <input
+                    id="full-name"
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                    placeholder="Jane Doe"
+                  />
+                </div>
+              )}
+
               <div>
                 <label htmlFor="email-address" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
                   Corporate Email
@@ -134,6 +188,26 @@ export default function Login() {
                   />
                 </div>
               </div>
+
+              {isRegisterMode && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                    Corporate Department
+                  </label>
+                  <select
+                    value={departmentId}
+                    onChange={(e) => setDepartmentId(e.target.value)}
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="1">Corporate</option>
+                    <option value="2">Engineering</option>
+                    <option value="3">Human Resources</option>
+                    <option value="4">Finance</option>
+                    <option value="5">Legal</option>
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
                   Security Password
@@ -144,7 +218,7 @@ export default function Login() {
                     id="password"
                     name="password"
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete={isRegisterMode ? "new-password" : "current-password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -160,23 +234,25 @@ export default function Login() {
               disabled={isLoading}
               className="glow-btn flex w-full justify-center items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors mt-6"
             >
-              {isLoading ? 'Verifying Credentials...' : 'Sign in'}
+              {isLoading ? (isRegisterMode ? 'Creating Account...' : 'Verifying Credentials...') : (isRegisterMode ? 'Register Access' : 'Sign in')}
               {!isLoading && <ArrowRight className="h-3.5 w-3.5" />}
             </button>
           </form>
           
           {/* Seed accounts reference panel */}
-          <div className="rounded-xl bg-slate-50 border border-slate-200/60 p-4 space-y-1.5 text-[11px] text-slate-500">
-            <span className="font-semibold text-slate-700 uppercase tracking-wider block text-[9px] mb-1">Developer Seeding Info</span>
-            <div className="flex justify-between">
-              <span>Super Admin Email:</span>
-              <span className="font-mono text-blue-600">admin@enterprise.com</span>
+          {!isRegisterMode && (
+            <div className="rounded-xl bg-slate-50 border border-slate-200/60 p-4 space-y-1.5 text-[11px] text-slate-500">
+              <span className="font-semibold text-slate-700 uppercase tracking-wider block text-[9px] mb-1">Developer Seeding Info</span>
+              <div className="flex justify-between">
+                <span>Super Admin Email:</span>
+                <span className="font-mono text-blue-600">admin@enterprise.com</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Default Password:</span>
+                <span className="font-mono text-blue-600">adminpassword</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Default Password:</span>
-              <span className="font-mono text-blue-600">adminpassword</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

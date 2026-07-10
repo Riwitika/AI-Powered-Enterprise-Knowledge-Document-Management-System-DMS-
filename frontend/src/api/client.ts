@@ -124,7 +124,6 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
 
   // Router matching
   if (path === "/auth/login") {
-    // accept any credentials but set session
     const body = options.body as FormData;
     const username = body.get("username") || "admin@enterprise.com";
     const user = users.find((u: any) => u.email === username) || users[0];
@@ -132,11 +131,33 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
     return { access_token: "mock-token", refresh_token: "mock-refresh" };
   }
   
+  if (path === "/auth/register") {
+    const payload = JSON.parse(options.body as string);
+    const newUser = {
+      id: `u-${Date.now()}`,
+      full_name: payload.full_name,
+      email: payload.email,
+      role: { name: "employee" },
+      department: depts.find((d: any) => d.id === Number(payload.department_id)) || depts[0]
+    };
+    users.push(newUser);
+    localStorage.setItem("kms_users", JSON.stringify(users));
+    return newUser;
+  }
+  
   if (path === "/auth/me") {
-    return JSON.parse(localStorage.getItem("kms_active_user") || "null") || users[0];
+    const userJson = localStorage.getItem("kms_active_user");
+    if (!userJson) {
+      throw new ApiError(401, "Not authenticated");
+    }
+    return JSON.parse(userJson);
   }
   
   if (path === "/auth/refresh") {
+    const userJson = localStorage.getItem("kms_active_user");
+    if (!userJson) {
+      throw new ApiError(401, "No session to refresh");
+    }
     return { access_token: "mock-refreshed-token" };
   }
   
