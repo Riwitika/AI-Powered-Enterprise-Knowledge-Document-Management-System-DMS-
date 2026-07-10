@@ -21,7 +21,7 @@ export class ApiError extends Error {
 // ----------------- CLIENT-SIDE DATABASE SIMULATOR (MOCK FALLBACK) -----------------
 // This executes if the backend server is down or throws a 500 error, ensuring a seamless preview.
 const initMockDB = () => {
-  if (!localStorage.getItem("kms_mock_initialized_v3")) {
+  if (!localStorage.getItem("kms_mock_initialized")) {
     const defaultFolders = [
       { id: 1, name: "Company Guidelines", parent_id: null, documents: [] },
       { id: 2, name: "Engineering & Specs", parent_id: null, documents: [] },
@@ -32,171 +32,58 @@ const initMockDB = () => {
       {
         id: "doc-1",
         folder_id: 1,
-        name: "Summer Internship Assignment",
-        description: "AI-Powered Enterprise Knowledge & Document Management System project overview and requirements.",
-        file_path: "/uploads/internship_assignment.docx",
-        file_type: "docx",
-        category: "Assignment",
+        name: "Security Protocols Guide",
+        description: "Comprehensive operating procedures for network access controls, threat logging, and system audits.",
+        file_path: "/uploads/security.pdf",
+        file_type: "pdf",
+        category: "SOP",
         access_level: "organization",
         current_version: 1,
-        ai_summary: "Objective and guidelines for the Fast Trade Technologies summer internship assignment to design and prototype an AI-powered Enterprise DMS. Outlines user roles, document tree, granular permissions, advanced search, and RAG chatbot features.",
-        ai_keywords: ["internship", "assignment", "dms", "requirements", "fast-trade"],
-        created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-        content: `
-          <div class="internship-assignment">
-            <h1 style="font-size: 1.5rem; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem; color: #0f172a;">SUMMER INTERNSHIP ASSIGNMENT</h1>
-            <h2 style="font-size: 1.15rem; font-weight: 700; color: #2563eb; margin-bottom: 0.75rem;">AI-Powered Enterprise Knowledge & Document Management System (DMS)</h2>
-            
-            <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; border: 1px solid #e2e8f0;">
-              <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 0.5rem; font-weight: 600; color: #64748b; width: 35%;">Assigned By:</td>
-                <td style="padding: 0.5rem; font-weight: 500; color: #334155;">Fast Trade Technologies Pvt. Ltd.</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 0.5rem; font-weight: 600; color: #64748b;">Internship Duration:</td>
-                <td style="padding: 0.5rem; font-weight: 500; color: #334155;">45 Days</td>
-              </tr>
-              <tr>
-                <td style="padding: 0.5rem; font-weight: 600; color: #64748b;">Objective:</td>
-                <td style="padding: 0.5rem; font-weight: 500; color: #334155;">Design and prototype an AI-powered Enterprise DMS to store, organize, search, and interact with company documents.</td>
-              </tr>
-            </table>
-
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin-top: 1.25rem; color: #0f172a; border-left: 3px solid #2563eb; padding-left: 0.5rem;">1. BUSINESS PROBLEM & SOLUTION</h3>
-            <p style="font-size: 0.85rem; color: #475569; leading-relaxed: 1.5;">Currently, organizations face document clutter, siloed team knowledge, long onboarding loops, and lack smart query interfaces. This system bridges these gaps by combining classic folder hierarchies with advanced vector-based RAG engines.</p>
-
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin-top: 1.25rem; color: #0f172a; border-left: 3px solid #2563eb; padding-left: 0.5rem;">2. CORE MODULES & ARCHITECTURE</h3>
-            <ul style="font-size: 0.85rem; color: #475569; padding-left: 1.25rem; margin-top: 0.5rem; space-y: 0.5rem;">
-              <li><strong>Module 1 (User Hub):</strong> Authentication gateways, profiles, and role distributions (Super Admin, Admin, Manager, Employee, Guest).</li>
-              <li><strong>Module 2 (Document Repository):</strong> Handlers for uploading, cataloging, downloading, version histories, and archiving.</li>
-              <li><strong>Module 3 (Hierarchical Tree):</strong> Nesting directories mapping Corporate, Engineering, HR, Sales, and Legal structures.</li>
-              <li><strong>Module 4 (Access Rules):</strong> Restricting documents via clearance policies (Private, View, Edit, Department, Org-Wide, Custom).</li>
-            </ul>
-
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin-top: 1.25rem; color: #0f172a; border-left: 3px solid #2563eb; padding-left: 0.5rem;">3. EVALUATION CRITERIA WEIGHTS</h3>
-            <ul style="font-size: 0.85rem; color: #475569; padding-left: 1.25rem; margin-top: 0.5rem;">
-              <li>Research Quality: 20%</li>
-              <li>AI Architecture & RAG: 20%</li>
-              <li>Documentation (BRD/FRD): 15%</li>
-              <li>Product Understanding: 15%</li>
-              <li>UI/UX & DB Designs: 20%</li>
-              <li>Innovation Details: 10%</li>
-            </ul>
-          </div>
-        `
+        ai_summary: "This document establishes standard operating guidelines for network security. Key topics include multi-factor authentication, incident report timelines, security logging parameters, and administrator access levels.",
+        ai_keywords: ["mfa", "audit", "security", "threat-logs"],
+        created_at: new Date(Date.now() - 86400000 * 3).toISOString()
       },
       {
         id: "doc-2",
-        folder_id: 1,
-        name: "DMS Technical Architecture Spec",
-        description: "Comprehensive product proposal, database schemas, and stack choices for the AI-powered DMS.",
-        file_path: "/uploads/dms_architecture.pdf",
-        file_type: "pdf",
+        folder_id: 2,
+        name: "Sensor Component Design Spec",
+        description: "Engineering blueprint detailing technical specifications and power distributions for the sensor modules.",
+        file_path: "/uploads/spec.docx",
+        file_type: "docx",
         category: "Specification",
-        access_level: "organization",
-        current_version: 1,
-        ai_summary: "Detailed product roadmap and technology recommendations. Details why React (frontend) and FastAPI (backend) are chosen, and outlines Weaviate/PostgreSQL/SQLite dual-portability database schemas.",
-        ai_keywords: ["react", "fastapi", "weaviate", "sqlite", "database-design"],
-        created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-        content: `
-          <div class="architecture-spec">
-            <h1 style="font-size: 1.5rem; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem; color: #0f172a;">TECHNICAL ARCHITECTURE SPECIFICATION</h1>
-            <h2 style="font-size: 1.15rem; font-weight: 700; color: #2563eb; margin-bottom: 0.75rem;">Technology Stack & Choice Recommendations</h2>
-            
-            <p style="font-size: 0.85rem; color: #475569; leading-relaxed: 1.5;">To build the prototype for Fast Trade Technologies, we chose a high-performance stack with dual-portability support for easy testing without complex Docker setups:</p>
-            
-            <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; border: 1px solid #e2e8f0;">
-              <thead>
-                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                  <th style="padding: 0.5rem; font-weight: 600; text-align: left;">Layer</th>
-                  <th style="padding: 0.5rem; font-weight: 600; text-align: left;">Technology Chosen</th>
-                  <th style="padding: 0.5rem; font-weight: 600; text-align: left;">Justification</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 0.5rem; font-weight: 600;">Frontend</td>
-                  <td style="padding: 0.5rem; font-family: monospace;">React.js + TailwindCSS</td>
-                  <td style="padding: 0.5rem;">Component reusability, quick loading, and responsive corporate theme layouts.</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 0.5rem; font-weight: 600;">Backend</td>
-                  <td style="padding: 0.5rem; font-family: monospace;">Python FastAPI</td>
-                  <td style="padding: 0.5rem;">Fast async processing, clean OpenAPI docs integration, and quick AI math compatibility.</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 0.5rem; font-weight: 600;">Relational DB</td>
-                  <td style="padding: 0.5rem; font-family: monospace;">PostgreSQL / SQLite</td>
-                  <td style="padding: 0.5rem;">PostgreSQL with pgvector for prod; local SQLite connection fallback for zero-dependency starts.</td>
-                </tr>
-                <tr>
-                  <td style="padding: 0.5rem; font-weight: 600;">Vector Search</td>
-                  <td style="padding: 0.5rem; font-family: monospace;">NumPy Cosine Fallback</td>
-                  <td style="padding: 0.5rem;">Allows complete local RAG searches using in-memory matrices without requiring a live cloud vector database.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        `
+        access_level: "department",
+        current_version: 2,
+        ai_summary: "Detailed specifications for flight sensor component integration. Covers power requirements, dimensions, thermal thresholds, and physical mounting templates.",
+        ai_keywords: ["sensors", "flight-spec", "thermal-limit", "schematics"],
+        created_at: new Date(Date.now() - 86400000 * 1).toISOString()
       },
       {
         id: "doc-3",
-        folder_id: 2,
-        name: "AI RAG Search Integration SOP",
-        description: "Step-by-step Standard Operating Procedure explaining document text extraction and embedding creation.",
-        file_path: "/uploads/rag_sop.docx",
-        file_type: "docx",
-        category: "SOP",
-        access_level: "department",
-        current_version: 1,
-        ai_summary: "SOP detailing how files (PDF, DOCX) are ingested, parsed into chunks, converted to sentence-transformer embeddings, and loaded into local memory vectors.",
-        ai_keywords: ["sop", "rag-flow", "embeddings", "pdf-extraction", "chunks"],
-        created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-        content: `
-          <div class="rag-sop">
-            <h1 style="font-size: 1.5rem; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem; color: #0f172a;">AI RAG SEARCH INTEGRATION SOP</h1>
-            <h2 style="font-size: 1.15rem; font-weight: 700; color: #2563eb; margin-bottom: 0.75rem;">Standard Operating Procedure for Ingestion Pipelines</h2>
-            
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin-top: 1.25rem; color: #0f172a;">Pipeline Ingestion Flowchart Steps:</h3>
-            <ol style="font-size: 0.85rem; color: #475569; padding-left: 1.25rem; space-y: 0.25rem;">
-              <li><strong>Extraction:</strong> Read raw text files using PyMuPDF (PDFs) or python-docx (DOCX).</li>
-              <li><strong>Chunking:</strong> Divide document contents into overlapping sections of 500 characters.</li>
-              <li><strong>Embedding:</strong> Pass text chunks to the sentence-transformer model (all-MiniLM-L6-v2) to generate 384-dimensional vectors.</li>
-              <li><strong>Storage:</strong> Store the vectors and text inside the local SQLite database.</li>
-              <li><strong>Querying:</strong> Compute similarity using NumPy cosine distance formulas and feed matching references to the LLM context.</li>
-            </ol>
-          </div>
-        `
-      },
-      {
-        id: "doc-4",
         folder_id: 3,
-        name: "Enterprise RBAC Permissions Policy",
-        description: "Official guidelines detailing access matrices, sharing clearances, and department boundaries.",
-        file_path: "/uploads/permissions_policy.docx",
+        name: "Onboarding Handbook 2026",
+        description: "General instructions and setup details for newly recruited engineering personnel.",
+        file_path: "/uploads/onboard.docx",
         file_type: "docx",
         category: "Handbook",
         access_level: "organization",
         current_version: 1,
-        ai_summary: "Corporate security policies explaining how employee and manager permissions are isolated between department directories.",
-        ai_keywords: ["permissions", "rbac", "security", "clearance"],
-        created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-        content: `
-          <div class="permissions-policy">
-            <h1 style="font-size: 1.5rem; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem; color: #0f172a;">ENTERPRISE PERMISSIONS & RBAC POLICY</h1>
-            <h2 style="font-size: 1.15rem; font-weight: 700; color: #2563eb; margin-bottom: 0.75rem;">Role-Based Access Control Boundaries</h2>
-            
-            <p style="font-size: 0.85rem; color: #475569; leading-relaxed: 1.5;">This policy establishes safety guidelines for isolating files by department and user authority roles:</p>
-            
-            <ul style="font-size: 0.85rem; color: #475569; padding-left: 1.25rem;">
-              <li><strong>Super Admin:</strong> Global read, write, user management, and authorization overrides.</li>
-              <li><strong>Admin:</strong> Operational oversight and file approval rights.</li>
-              <li><strong>Department Manager:</strong> Read/Write controls restricted to their own corporate folder branches (e.g. Legal folders can only be controlled by Legal Managers).</li>
-              <li><strong>Employee:</strong> Read-only access to department-level assets, and full controls over their own uploaded private files.</li>
-              <li><strong>Guest:</strong> Access restricted purely to organization-wide public guidelines.</li>
-            </ul>
-          </div>
-        `
+        ai_summary: "Welcome guide for new staff. Details active directories, office keycards, workspace setup parameters, and human resource contact rosters.",
+        ai_keywords: ["onboarding", "setup", "it-support", "contacts"],
+        created_at: new Date(Date.now() - 86400000 * 5).toISOString()
+      },
+      {
+        id: "doc-4",
+        folder_id: 4,
+        name: "NDAS and NDA Template",
+        description: "Standard non-disclosure agreement layout approved by the legal department.",
+        file_path: "/uploads/nda.docx",
+        file_type: "docx",
+        category: "Contract",
+        access_level: "private",
+        current_version: 1,
+        ai_summary: "Legal non-disclosure agreement layout. Covers proprietary definitions, term limits, exclusions, jurisdiction variables, and penalty clauses.",
+        ai_keywords: ["nda", "legal", "disclosure", "contract-clause"],
+        created_at: new Date(Date.now() - 86400000 * 10).toISOString()
       }
     ];
     const defaultUsers = [
@@ -218,7 +105,7 @@ const initMockDB = () => {
     localStorage.setItem("kms_depts", JSON.stringify(defaultDepts));
     localStorage.setItem("kms_chat", JSON.stringify([]));
     localStorage.setItem("kms_permissions", JSON.stringify([]));
-    localStorage.setItem("kms_mock_initialized_v3", "true");
+    localStorage.setItem("kms_mock_initialized", "true");
   }
 };
 
