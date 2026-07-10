@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { 
@@ -65,6 +65,10 @@ export default function DocumentTree() {
   const [globalAiQuestion, setGlobalAiQuestion] = useState('');
   const [globalChatHistory, setGlobalChatHistory] = useState<Message[]>([]);
 
+  // Rich Text Editor States
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+
   // Queries
   const { data: folderTree, isLoading: treeLoading } = useQuery({
     queryKey: ['folder-tree'],
@@ -92,6 +96,13 @@ export default function DocumentTree() {
     queryKey: ['ai-conversations'],
     queryFn: api.ai.conversations
   });
+
+  useEffect(() => {
+    if (selectedDoc) {
+      setEditTitle(selectedDoc.name);
+      setEditContent(selectedDoc.content || `<p>This is the content of <strong>${selectedDoc.name}</strong>. Feel free to edit this document layout, make bullet points, and save changes!</p>`);
+    }
+  }, [selectedDoc]);
 
   // Mutations
   const createFolderMutation = useMutation({
@@ -135,6 +146,30 @@ export default function DocumentTree() {
       refetchVersions();
     }
   });
+
+  const saveDocMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => 
+      api.documents.update(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+    }
+  });
+
+  const handleSaveDocumentContent = () => {
+    if (!selectedDocId) return;
+    const editableDiv = document.getElementById('doc-editor-body');
+    const htmlContent = editableDiv ? editableDiv.innerHTML : editContent;
+    
+    saveDocMutation.mutate({
+      id: selectedDocId,
+      payload: {
+        name: editTitle,
+        content: htmlContent
+      }
+    });
+  };
 
   const askGlobalMutation = useMutation({
     mutationFn: api.ai.ask,
@@ -258,6 +293,10 @@ export default function DocumentTree() {
     } finally {
       setDocAiLoading(false);
     }
+  };
+
+  const applyStyle = (command: string, value = '') => {
+    document.execCommand(command, false, value);
   };
 
   const handleAskGlobalAI = (e: React.FormEvent, customQ?: string) => {
@@ -677,14 +716,36 @@ export default function DocumentTree() {
               <div className="space-y-6 flex-1 flex flex-col">
                 
                 {/* Title area & header */}
-                <div className="border-b border-slate-200 pb-5">
+                <div className="border-b border-slate-200 pb-4">
                   <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest block mb-1">Fast Trade Technologies Document Hub</span>
-                      <h2 className="text-2xl font-extrabold text-slate-900 leading-snug">{selectedDoc.name}</h2>
+                    <div className="flex-1">
+                      <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-widest block mb-1">Fast Trade Technologies Document Hub</span>
+                      {/* Editable Document Title Input */}
+                      <input 
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Document Title"
+                        className="text-2xl font-extrabold text-slate-950 border-none p-0 focus:outline-none focus:ring-0 w-full bg-transparent placeholder-slate-300 tracking-tight leading-none"
+                      />
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
+                      {/* Save Status Telemetry indicator */}
+                      <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                        {saveDocMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                            <span>Saving changes...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            <span>Saved to system base</span>
+                          </>
+                        )}
+                      </span>
+
                       <button
                         onClick={() => setSelectedDocId(null)}
                         className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
@@ -695,9 +756,77 @@ export default function DocumentTree() {
                     </div>
                   </div>
                   
-                  <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
+                  <p className="text-[10px] text-slate-400 mt-2 uppercase font-bold tracking-widest">
                     Category: <span className="text-slate-700 font-extrabold">{selectedDoc.category || 'General'}</span> • Format: <span className="text-slate-700 font-extrabold">.{selectedDoc.file_type}</span>
                   </p>
+                </div>
+
+                {/* Google Doc-Style Text Formatting Ribbon */}
+                <div className="border border-slate-200 rounded-lg bg-slate-50 p-1.5 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-1">
+                    <button 
+                      type="button"
+                      onClick={() => applyStyle('bold')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-xs font-extrabold text-slate-800 border border-transparent hover:border-slate-300/50 w-7 h-7 flex items-center justify-center transition-all active:bg-slate-300"
+                      title="Bold"
+                    >
+                      B
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => applyStyle('italic')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-xs font-bold italic text-slate-800 border border-transparent hover:border-slate-300/50 w-7 h-7 flex items-center justify-center transition-all active:bg-slate-300"
+                      title="Italic"
+                    >
+                      I
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => applyStyle('underline')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-xs font-bold underline text-slate-800 border border-transparent hover:border-slate-300/50 w-7 h-7 flex items-center justify-center transition-all active:bg-slate-300"
+                      title="Underline"
+                    >
+                      U
+                    </button>
+                    <div className="h-4 w-[1px] bg-slate-200 mx-1.5" />
+                    <button 
+                      type="button"
+                      onClick={() => applyStyle('insertUnorderedList')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-xs text-slate-800 border border-transparent hover:border-slate-300/50 w-7 h-7 flex items-center justify-center transition-all active:bg-slate-300 font-bold"
+                      title="Bullet List"
+                    >
+                      • List
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => applyStyle('insertOrderedList')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-xs text-slate-800 border border-transparent hover:border-slate-300/50 w-7 h-7 flex items-center justify-center transition-all active:bg-slate-300 font-bold"
+                      title="Numbered List"
+                    >
+                      1. List
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveDocumentContent}
+                    disabled={saveDocMutation.isPending}
+                    className="glow-btn bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1 text-[10px] font-bold shadow-sm flex items-center gap-1 disabled:opacity-50 transition-colors"
+                  >
+                    {saveDocMutation.isPending ? 'Saving...' : 'Save File'}
+                  </button>
+                </div>
+
+                {/* Google Doc-Style Text Paper Editor Area */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Document Contents</h3>
+                  <div 
+                    id="doc-editor-body"
+                    contentEditable
+                    dangerouslySetInnerHTML={{ __html: editContent }}
+                    onBlur={(e) => setEditContent(e.currentTarget.innerHTML)}
+                    className="min-h-[400px] max-h-[500px] overflow-y-auto border border-slate-200 rounded-lg p-6 bg-slate-50/20 text-xs leading-relaxed text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all font-sans custom-scrollbar"
+                  />
                 </div>
 
                 {/* Google Doc-Style Version Registry Table */}
