@@ -25,6 +25,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/kms
       - SECRET_KEY=enterprise-kms-super-secret-key-321
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - UPLOAD_DIR=/app/uploads
     ports:
       - "8000:8000"
     volumes:

@@ -18,8 +18,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     
-    # Storage Configuration
-    UPLOAD_DIR: str = "/app/uploads"
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")
     
     model_config = SettingsConfigDict(
         env_file=".env",
