@@ -22,6 +22,13 @@ def register(
     payload: RegisterRequest,
     db: Session = Depends(get_db)
 ):
+    # Domain validation for corporate emails
+    if not payload.email.lower().endswith("@efasttrade.com"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only corporate email addresses ending in @efasttrade.com are allowed to register."
+        )
+
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == payload.email).first()
     if existing_user:

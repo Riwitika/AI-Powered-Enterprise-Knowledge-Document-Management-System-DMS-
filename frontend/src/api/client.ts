@@ -133,6 +133,9 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
   
   if (path === "/auth/register") {
     const payload = JSON.parse(options.body as string);
+    if (!payload.email.toLowerCase().endsWith('@efasttrade.com')) {
+      throw new ApiError(400, "Only corporate email addresses ending in @efasttrade.com are allowed to register.");
+    }
     const newUser = {
       id: `u-${Date.now()}`,
       full_name: payload.full_name,

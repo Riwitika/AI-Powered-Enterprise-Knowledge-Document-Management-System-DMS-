@@ -18,6 +18,13 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+    
+    if (isRegisterMode && !email.toLowerCase().endsWith('@efasttrade.com')) {
+      setError('Only corporate email addresses ending in @efasttrade.com are allowed to register.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isRegisterMode) {
         await register({
