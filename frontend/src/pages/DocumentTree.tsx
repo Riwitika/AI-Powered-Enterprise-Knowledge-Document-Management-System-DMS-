@@ -905,15 +905,7 @@ export default function DocumentTree() {
                 </p>
               </div>
 
-              {/* General details info */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-2 text-xs text-slate-600">
-                <h3 className="font-extrabold text-slate-900 flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-blue-650" /> Welcome to the Document Workspace
-                </h3>
-                <p className="leading-relaxed">
-                  This system houses all organizational SOPs, Policies, technical specifications, and internal guidelines for **Fast Trade Technologies**. Click on a folder tab in the left explorer column to expand files, perform RAG questions globally, or select a document below to open its dedicated editing workspace.
-                </p>
-              </div>
+
 
               {/* Master Document Registry Table (Matching Google Docs screenshots) */}
               <div className="space-y-3.5 flex-1 flex flex-col">
