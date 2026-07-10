@@ -952,7 +952,9 @@ export default function DocumentTree() {
                                 Approved
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-slate-500 font-medium">Piyush Mathur</td>
+                            <td className="px-6 py-4 text-slate-500 font-medium">
+                              {index % 2 === 0 ? "Riwitika Gupta" : "Arnim Goyal"}
+                            </td>
                             <td className="px-6 py-4 text-right">
                               <button 
                                 onClick={() => setSelectedDocId(doc.id)}
