@@ -77,25 +77,25 @@ export default function Login() {
             <div className="space-y-3">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-[10px] font-bold text-blue-400 border border-blue-500/20">
                 <Server className="h-3 w-3" />
-                <span>Secure Corporate Gateway Active</span>
+                <span>Enterprise Core Directory Node</span>
               </span>
               <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-white">
-                Intelligence <br />
+                Global Trade <br />
                 <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                  Structured & Secured
+                  Knowledge Hub
                 </span>
               </h1>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                A unified repository built with granular role-based privileges, revision registries, and embedded document-level artificial intelligence.
+                The secure digital depository for Fast Trade Technologies. Search tariff procedures, compliance SOPs, legal templates, and exchange regulations.
               </p>
             </div>
 
             {/* Core Features */}
             <div className="space-y-4 pt-4 border-t border-white/[0.05]">
               {[
-                { title: 'Vector RAG Search', desc: 'Secure semantic search over indexed documents.', badge: 'AI Native' },
-                { title: 'Granular Access Policies', desc: 'Department-isolated sharing and RBAC clearances.', badge: 'Secure' },
-                { title: 'Isolated Document AI', desc: 'Embedded text editor with context-anchored chat tools.', badge: 'Rich UI' }
+                { title: 'Compliance & Tariffs SOPs', desc: 'Instant search over customs checklists and regulatory guides.', badge: 'Compliance' },
+                { title: 'Isolated Brokerage Clearances', desc: 'Secure folder permissions mapped by business division.', badge: 'RBAC Active' },
+                { title: 'Document RAG Intelligence', desc: 'Context-aware semantic summaries and prompt assistants.', badge: 'AI Powered' }
               ].map((f, i) => (
                 <div key={i} className="flex gap-3 items-start">
                   <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-white/[0.03] text-blue-400 border border-white/[0.08]">
@@ -118,7 +118,7 @@ export default function Login() {
             <span>© 2026 Fast Trade Technologies</span>
             <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              AES-255 Bit Encryption
+              Secured Connection
             </span>
           </div>
         </div>
