@@ -11,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [departmentId, setDepartmentId] = useState('1');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +26,12 @@ export default function Login() {
       return;
     }
 
+    if (isRegisterMode && inviteCode !== 'FASTTRADE-SECURE-2026') {
+      setError('Invalid Corporate Invite Code. Please contact your system administrator.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isRegisterMode) {
         await register({
@@ -32,7 +39,8 @@ export default function Login() {
           password,
           full_name: fullName,
           department_id: Number(departmentId),
-          role_name: 'employee'
+          role_name: 'employee',
+          invite_code: inviteCode
         });
         // Auto-login after registration
         await login(email, password);
@@ -233,6 +241,23 @@ export default function Login() {
                   </div>
                 )}
 
+                {isRegisterMode && (
+                  <div>
+                    <label htmlFor="invite-code" className="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                      Corporate Invite Code
+                    </label>
+                    <input
+                      id="invite-code"
+                      type="text"
+                      required
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                      className="block w-full rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:bg-slate-900/80 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                      placeholder="FASTTRADE-SECURE-2026"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label htmlFor="password" className="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
                     Security Password
@@ -265,19 +290,28 @@ export default function Login() {
             </form>
             
             {/* Developer Seeding Box */}
-            {!isRegisterMode && (
-              <div className="rounded-xl bg-slate-950/60 border border-slate-900 p-4 space-y-1.5 text-[10px] text-slate-500">
-                <span className="font-extrabold text-slate-450 uppercase tracking-widest block text-[9px] mb-1">Developer Seeding Info</span>
+            <div className="rounded-xl bg-slate-950/60 border border-slate-900 p-4 space-y-1.5 text-[10px] text-slate-500">
+              <span className="font-extrabold text-slate-450 uppercase tracking-widest block text-[9px] mb-1">
+                {isRegisterMode ? 'Corporate Security Clearance' : 'Developer Seeding Info'}
+              </span>
+              {isRegisterMode ? (
                 <div className="flex justify-between">
-                  <span>Super Admin Email:</span>
-                  <span className="font-mono text-blue-400">admin@enterprise.com</span>
+                  <span>Invitation Access Key:</span>
+                  <span className="font-mono text-emerald-400 font-bold">FASTTRADE-SECURE-2026</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Default Password:</span>
-                  <span className="font-mono text-blue-400">adminpassword</span>
-                </div>
-              </div>
-            )}
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span>Super Admin Email:</span>
+                    <span className="font-mono text-blue-400">admin@enterprise.com</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Default Password:</span>
+                    <span className="font-mono text-blue-400">adminpassword</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

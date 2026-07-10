@@ -136,6 +136,13 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
     if (!payload.email.toLowerCase().endsWith('@efasttrade.com')) {
       throw new ApiError(400, "Only corporate email addresses ending in @efasttrade.com are allowed to register.");
     }
+    if (payload.invite_code !== 'FASTTRADE-SECURE-2026') {
+      throw new ApiError(400, "Invalid Corporate Invite Code. Please contact your system administrator.");
+    }
+    const exists = users.some((u: any) => u.email.toLowerCase() === payload.email.toLowerCase());
+    if (exists) {
+      throw new ApiError(400, "A user with this email address is already registered.");
+    }
     const newUser = {
       id: `u-${Date.now()}`,
       full_name: payload.full_name,

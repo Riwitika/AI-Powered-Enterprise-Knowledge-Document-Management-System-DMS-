@@ -80,6 +80,7 @@ class RegisterRequest(BaseModel):
     full_name: str
     role_name: Optional[str] = None
     department_id: Optional[int] = None
+    invite_code: Optional[str] = None
 
 # ----------------- DOCUMENT -----------------
 class DocumentBase(BaseModel):

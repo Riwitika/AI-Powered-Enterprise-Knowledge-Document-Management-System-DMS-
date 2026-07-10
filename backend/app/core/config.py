@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Enterprise KMS"
-    API_V1_STR: str = "/api"
+    API_V1_STR: str = "/api/v1"
     
     # Database configuration
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/kms"

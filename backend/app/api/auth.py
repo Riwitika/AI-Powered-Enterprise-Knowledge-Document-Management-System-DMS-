@@ -29,6 +29,13 @@ def register(
             detail="Only corporate email addresses ending in @efasttrade.com are allowed to register."
         )
 
+    # Invite code validation
+    if payload.invite_code != "FASTTRADE-SECURE-2026":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Corporate Invite Code. Please contact your system administrator."
+        )
+
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == payload.email).first()
     if existing_user:
