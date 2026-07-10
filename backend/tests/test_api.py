@@ -44,7 +44,7 @@ def db_session():
 
 
 def test_auth_flow(db_session):
-    email = "tester@test.com"
+    email = "tester@efasttrade.com"
     password = "testpassword123"
     
     # 1. Clean up existing test user
@@ -56,7 +56,8 @@ def test_auth_flow(db_session):
         "email": email,
         "password": password,
         "full_name": "Test User",
-        "role_name": "employee"
+        "role_name": "employee",
+        "invite_code": "FASTTRADE-SECURE-2026"
     }
     response = client.post("/api/auth/register", json=reg_data)
     assert response.status_code == 200
