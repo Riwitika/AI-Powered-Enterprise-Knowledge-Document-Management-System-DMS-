@@ -119,11 +119,49 @@ def get_related_documents(
         return []
         
     # Find nearest chunks from other documents
-    related_chunks = db.query(DocumentChunk).filter(
-        DocumentChunk.document_id.in_(allowed_ids)
-    ).order_by(
-        DocumentChunk.embedding.cosine_distance(avg_embedding)
-    ).limit(5).all()
+    try:
+        related_chunks = db.query(DocumentChunk).filter(
+            DocumentChunk.document_id.in_(allowed_ids)
+        ).order_by(
+            DocumentChunk.embedding.cosine_distance(avg_embedding)
+        ).limit(5).all()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"pgvector query for related docs failed (possibly SQLite): {e}")
+        try:
+            import json
+            all_chunks = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id.in_(allowed_ids)
+            ).all()
+            
+            def cosine_similarity(v1, v2):
+                if not v1 or not v2: return 0.0
+                if isinstance(v1, str):
+                    try: v1 = json.loads(v1)
+                    except: return 0.0
+                if isinstance(v2, str):
+                    try: v2 = json.loads(v2)
+                    except: return 0.0
+                a = np.array(v1)
+                b = np.array(v2)
+                dot = np.dot(a, b)
+                norma = np.linalg.norm(a)
+                normb = np.linalg.norm(b)
+                if norma == 0 or normb == 0: return 0.0
+                return float(dot / (norma * normb))
+                
+            chunks_with_score = []
+            for c in all_chunks:
+                if c.embedding:
+                    score = cosine_similarity(c.embedding, avg_embedding)
+                    chunks_with_score.append((c, score))
+            chunks_with_score.sort(key=lambda x: x[1], reverse=True)
+            related_chunks = [x[0] for x in chunks_with_score[:5]]
+        except Exception as py_err:
+            logging.getLogger(__name__).error(f"Python related docs similarity failed: {py_err}")
+            related_chunks = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id.in_(allowed_ids)
+            ).limit(5).all()
     
     # Resolve to unique documents
     related_docs_map = {}

@@ -9,9 +9,52 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+import os
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
+
+db_url = os.getenv("DATABASE_URL", "sqlite:///./kms.db")
+is_sqlite = db_url.startswith("sqlite")
+
+if is_sqlite:
+    from sqlalchemy.types import TypeDecorator, String as SQLAlchemyString
+    import uuid
+    
+    class SQLiteUUID(TypeDecorator):
+        impl = SQLAlchemyString(36)
+        cache_ok = True
+        
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            
+        def process_bind_param(self, value, dialect):
+            if value is None:
+                return value
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            return value
+            
+        def process_result_value(self, value, dialect):
+            if value is None:
+                return value
+            try:
+                return uuid.UUID(value)
+            except ValueError:
+                return value
+                
+    UUID = SQLiteUUID
+    
+    class SQLiteARRAY(Text):
+        def __init__(self, item_type=None):
+            super().__init__()
+    ARRAY = SQLiteARRAY
+    
+    class SQLiteVector(Text):
+        def __init__(self, dimensions=None):
+            super().__init__()
+    Vector = SQLiteVector
+else:
+    from sqlalchemy.dialects.postgresql import UUID, ARRAY
+    from pgvector.sqlalchemy import Vector
 
 from app.db.session import Base
 

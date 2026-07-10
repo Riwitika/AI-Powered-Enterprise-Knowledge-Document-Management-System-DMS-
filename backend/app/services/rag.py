@@ -120,7 +120,6 @@ def retrieve_relevant_chunks(
     # Generate query embedding
     query_embedding = embedding_service.get_embedding(query)
     
-    # Query database for the closest chunks using cosine distance
     try:
         chunks = db.query(DocumentChunk).filter(
             DocumentChunk.document_id.in_(accessible_doc_ids)
@@ -129,17 +128,44 @@ def retrieve_relevant_chunks(
         ).limit(limit).all()
         return chunks
     except Exception as e:
-        logger.error(f"pgvector query failed: {e}")
-        # Fallback to plain keyword contains search on chunks if pgvector is not initialized or fails
-        logger.info("Attempting fallback text search on chunks...")
-        words = query.split()
-        if not words:
-            return []
-        # Find some chunks that match words
-        fallback_chunks = db.query(DocumentChunk).filter(
-            DocumentChunk.document_id.in_(accessible_doc_ids)
-        ).limit(limit).all()
-        return fallback_chunks
+        logger.error(f"pgvector query failed (possibly using SQLite): {e}")
+        logger.info("Attempting dynamic in-memory cosine similarity math fallback...")
+        try:
+            import numpy as np
+            import json
+            
+            all_chunks = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id.in_(accessible_doc_ids)
+            ).all()
+            
+            def cosine_similarity(v1, v2):
+                if not v1 or not v2: return 0.0
+                if isinstance(v1, str):
+                    try: v1 = json.loads(v1)
+                    except: return 0.0
+                if isinstance(v2, str):
+                    try: v2 = json.loads(v2)
+                    except: return 0.0
+                a = np.array(v1)
+                b = np.array(v2)
+                dot = np.dot(a, b)
+                norma = np.linalg.norm(a)
+                normb = np.linalg.norm(b)
+                if norma == 0 or normb == 0: return 0.0
+                return float(dot / (norma * normb))
+                
+            chunks_with_score = []
+            for c in all_chunks:
+                if c.embedding:
+                    score = cosine_similarity(c.embedding, query_embedding)
+                    chunks_with_score.append((c, score))
+            chunks_with_score.sort(key=lambda x: x[1], reverse=True)
+            return [x[0] for x in chunks_with_score[:limit]]
+        except Exception as py_err:
+            logger.error(f"In-memory math fallback failed: {py_err}")
+            return db.query(DocumentChunk).filter(
+                DocumentChunk.document_id.in_(accessible_doc_ids)
+            ).limit(limit).all()
 
 def answer_query(
     db: Session,
