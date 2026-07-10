@@ -24,6 +24,10 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(scope="module")
 def db_session():
     # Make sure tables exist
+    if engine.url.drivername.startswith("postgresql"):
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     

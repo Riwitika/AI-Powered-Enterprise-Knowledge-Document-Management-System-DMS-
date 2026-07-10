@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 # This acts as a robust fallback to ensure the DB works immediately.
 try:
     logger.info("Initializing database tables...")
+    if engine.url.drivername.startswith("postgresql"):
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     init_db(db)
