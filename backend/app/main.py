@@ -53,4 +53,5 @@ app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", 
 
 @app.get("/")
 def read_root():
+    # Hot-reload seed trigger comment
     return {"message": "Welcome to the Enterprise KMS API. Go to /docs for Swagger documentation."}
