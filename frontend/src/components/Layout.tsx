@@ -75,16 +75,16 @@ export default function Layout() {
           {/* Folder row button */}
           <button
             onClick={(e) => toggleFolder(node.id, e)}
-            style={{ paddingLeft: `${8 + depth * 8}px` }}
-            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-655 hover:bg-slate-100 ${
+            style={{ paddingLeft: `${8 + depth * 12}px` }}
+            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent ${
               isExpanded ? 'font-bold text-slate-900 bg-slate-50/40' : 'font-medium'
             }`}
           >
             <span className="flex items-center gap-1.5 min-w-0 text-[11px]">
               {isExpanded ? (
-                <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+                <ChevronDown className="h-3 w-3 text-blue-500 shrink-0 font-bold" />
               ) : (
-                <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
+                <ChevronRight className="h-3 w-3 text-slate-400 shrink-0 hover:text-slate-800" />
               )}
               <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500 fill-amber-500/10' : 'text-amber-600 fill-amber-600/5'}`} />
               <span className="truncate">{node.name}</span>
@@ -93,7 +93,7 @@ export default function Layout() {
 
           {/* Children: Subfolders and Files */}
           {isExpanded && (
-            <div className="space-y-0.5 border-l border-slate-100/80 ml-3 pl-1">
+            <div className="space-y-0.5 border-l border-slate-200/50 ml-3 pl-1.5 transition-all">
               {/* Recursive sub_folders */}
               {node.sub_folders && node.sub_folders.length > 0 && renderSidebarTree(node.sub_folders, depth + 1)}
               
@@ -104,11 +104,11 @@ export default function Layout() {
                   <Link
                     key={doc.id}
                     to={`/documents?open=${doc.id}`}
-                    style={{ paddingLeft: `${14 + depth * 8}px` }}
-                    className={`flex items-center gap-1.5 py-1 px-2 rounded-md text-[10px] font-semibold transition-all truncate block ${
+                    style={{ paddingLeft: `${14 + depth * 12}px` }}
+                    className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[10px] font-bold transition-all truncate block border-l-2 ${
                       isActive 
-                        ? 'bg-blue-50 text-blue-700 font-extrabold shadow-[inset_1px_0_0_#2563eb]' 
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-blue-50/80 text-blue-600 border-blue-650 shadow-sm font-extrabold' 
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-850 border-l-2 border-transparent hover:border-slate-200'
                     }`}
                   >
                     <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -126,8 +126,8 @@ export default function Layout() {
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
       
-      {/* 1. Sidebar Nav (20% width equivalent) */}
-      <aside className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0 relative z-20 shadow-sm">
+      {/* 1. Sidebar Nav (280px width) */}
+      <aside className="w-[280px] border-r border-slate-200 bg-white flex flex-col shrink-0 relative z-20 shadow-sm">
         {/* Brand / Logo */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-200 shrink-0 bg-slate-900 text-white">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-black shadow-md">

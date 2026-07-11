@@ -50,6 +50,7 @@ export default function DocumentTree() {
 
   // Selected Document ID
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [isAiCollapsed, setIsAiCollapsed] = useState(false);
   
   // Folder/Document creation states
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -681,6 +682,16 @@ export default function DocumentTree() {
                       <Share2 className="h-3.5 w-3.5" />
                       <span>Share</span>
                     </button>
+                    {/* Collapsible toggle for AI Panel */}
+                    <button
+                      onClick={() => setIsAiCollapsed(!isAiCollapsed)}
+                      className={`p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-455 hover:text-slate-800 rounded-lg transition-colors flex items-center justify-center shrink-0 ${
+                        !isAiCollapsed ? 'bg-blue-50/50 text-blue-650 border-blue-200' : ''
+                      }`}
+                      title={isAiCollapsed ? "Expand AI Panel" : "Collapse AI Panel"}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </button>
 
                     <button
                       onClick={() => setSelectedDocId(null)}
@@ -869,9 +880,9 @@ export default function DocumentTree() {
               </div>
 
               {/* Large Page Editor Canvas Container */}
-              <div className="flex-1 overflow-y-auto p-8 flex justify-center items-start custom-scrollbar">
+              <div className="flex-1 overflow-y-auto pt-10 pb-8 px-4 flex justify-center items-start custom-scrollbar bg-slate-100/40">
                 <div 
-                  className="bg-white border border-slate-200 shadow-[0_4px_16px_rgba(0,0,0,0.02)] min-h-[750px] p-16 w-full max-w-3xl focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-sm cursor-text rounded-md"
+                  className="bg-white border border-slate-200 shadow-[0_4px_16px_rgba(0,0,0,0.02)] min-h-[750px] p-16 w-full max-w-5xl focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-sm cursor-text rounded-md"
                   style={{ transform: `scale(${Number(zoomPercent)/100})`, transformOrigin: 'top center' }}
                 >
                   <div
@@ -931,8 +942,8 @@ export default function DocumentTree() {
         )}
       </main>
 
-      {/* 3. RIGHT PANEL (22% width) - Merged AI Sidebar Assistant */}
-      <aside className="w-[22%] border-l border-slate-200 flex flex-col h-full bg-white shrink-0 select-none">
+      {/* 3. RIGHT PANEL (18% width) - Collapsible AI Sidebar */}
+      <aside className={`${isAiCollapsed ? 'w-0 border-none' : 'w-[18%] border-l border-slate-200'} flex flex-col h-full bg-white shrink-0 select-none transition-all duration-300 overflow-hidden`}>
         
         {/* Navigation tabs for AI assistant info panels */}
         <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/20">
