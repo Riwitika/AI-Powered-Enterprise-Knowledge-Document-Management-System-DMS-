@@ -853,12 +853,16 @@ export default function DocumentTree() {
                         placeholder="Untitled Document"
                         className="text-base font-extrabold text-slate-900 border-none p-0 focus:outline-none focus:ring-0 bg-transparent placeholder-slate-350 truncate tracking-tight leading-none block w-64"
                       />
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-450 font-bold mt-1 uppercase tracking-wider">
-                        <span>{selectedDoc.category || 'General'}</span>
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-450 font-bold mt-1.5 uppercase tracking-wider select-none">
+                        <span>Owner: {selectedDoc.owner?.full_name || 'System Administrator'}</span>
                         <span>•</span>
-                        <span>v{selectedDoc.current_version}</span>
+                        <span>Dept: {selectedDoc.department?.name || 'Corporate'}</span>
                         <span>•</span>
-                        <span className="text-slate-500">{selectedDoc.access_level} scope</span>
+                        <span>Last Edited: {new Date(selectedDoc.created_at).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>Version: v{selectedDoc.current_version}</span>
+                        <span>•</span>
+                        <span className="text-slate-500">Status: {selectedDoc.status || 'Active'}</span>
                       </div>
                     </div>
                   </div>
