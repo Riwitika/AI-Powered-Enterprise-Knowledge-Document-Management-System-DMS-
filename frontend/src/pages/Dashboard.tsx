@@ -11,7 +11,10 @@ import {
   ChevronRight,
   Sparkles,
   ArrowRight,
-  FolderTree
+  FolderTree,
+  HardDrive,
+  Cpu,
+  Activity
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -90,16 +93,32 @@ export default function Dashboard() {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   };
 
+  // Mock telemetry parameters for the user's Dashboard extensions
+  const mockStorageUsage = 42.8; // in MB
+  const mockStorageLimit = 10240; // 10 GB limit in MB
+  const storagePercentage = (mockStorageUsage / mockStorageLimit) * 100;
+
+  const mockAiLimit = 500;
+  const aiQueriesPercentage = (((metrics?.ai_questions_asked_count || 0) + 42) / mockAiLimit) * 100;
+
+  const simulatedActivities = [
+    { id: 1, user: "Riwitika Gupta", action: "modified Onboarding Handbook 2026", time: "10 mins ago" },
+    { id: 2, user: "Jane Doe", action: "granted access to Security Protocols Guide", time: "1 hour ago" },
+    { id: 3, user: "System Administrator", action: "added user Sarah Connor", time: "3 hours ago" },
+    { id: 4, user: "Arnim Goyal", action: "created Legal Contracts folder", time: "1 day ago" }
+  ];
+
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative font-sans">
+      
       {/* Welcome banner header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">System Overview</h1>
-          <p className="text-slate-500 text-xs mt-0.5">Real-time telemetry and metadata indicators from the security KMS repository.</p>
+          <p className="text-slate-500 text-xs mt-0.5 font-medium">Real-time telemetry and metadata indicators from the security KMS repository.</p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex gap-3 select-none">
           <Link 
             to="/documents" 
             className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-sm flex items-center gap-1.5 w-fit transition-colors border border-blue-500"
@@ -126,7 +145,7 @@ export default function Dashboard() {
           return (
             <div
               key={card.name}
-              className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] group hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] transition-all"
+              className="overflow-hidden rounded-xl bg-white border border-slate-200 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] group hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] transition-all select-none"
             >
               <div className="flex items-center">
                 <div className={`flex h-11 w-11 items-center justify-center rounded-lg border ${card.color} shrink-0`}>
@@ -135,7 +154,7 @@ export default function Dashboard() {
                 <div className="ml-4 min-w-0">
                   <p className="truncate text-[10px] font-bold text-slate-400 uppercase tracking-widest">{card.name}</p>
                   <p className="mt-0.5 text-xl font-extrabold text-slate-900 tracking-tight leading-none">{card.value}</p>
-                  <span className="text-[10px] text-slate-400 font-semibold mt-1 block">{card.description}</span>
+                  <span className="text-[10px] text-slate-455 font-semibold mt-1 block">{card.description}</span>
                 </div>
               </div>
             </div>
@@ -143,10 +162,12 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* 3-Column Grid for Metrics details */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent Uploads List */}
-        <div className="lg:col-span-2 rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[400px]">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-3.5 shrink-0">
+        
+        {/* Col 1: Recent File Ingests */}
+        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[400px]">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-3.5 shrink-0 select-none">
             <div className="flex items-center gap-2">
               <Clock className="h-4.5 w-4.5 text-blue-600" />
               <h2 className="font-bold text-slate-800 text-sm">Recent File Ingests</h2>
@@ -171,7 +192,7 @@ export default function Dashboard() {
                       </div>
                       <div className="min-w-0">
                         <Link 
-                          to={`/documents/${doc.id}`}
+                          to={`/documents?open=${doc.id}`}
                           className="truncate text-xs font-bold text-slate-800 hover:text-blue-600 block"
                         >
                           {doc.name}
@@ -187,7 +208,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="ml-4 shrink-0">
+                    <div className="ml-4 shrink-0 select-none">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${getAccessLevelColor(doc.access_level)}`}>
                         {doc.access_level}
                       </span>
@@ -196,7 +217,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-8 space-y-2">
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-8 space-y-2 select-none">
                 <FileText className="h-10 w-10 text-slate-200" />
                 <p>No documents uploaded yet.</p>
                 <Link to="/documents" className="text-blue-600 hover:underline font-bold">Go to Document Tree</Link>
@@ -205,9 +226,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Documents by Department */}
+        {/* Col 2: Documents by Department */}
         <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[400px]">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0 select-none">
             <TrendingUp className="h-4.5 w-4.5 text-blue-600" />
             <h2 className="font-bold text-slate-800 text-sm">Distribution by Dept</h2>
           </div>
@@ -230,8 +251,8 @@ export default function Dashboard() {
                   return (
                     <div key={dept} className="space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="font-bold text-slate-700">{dept}</span>
-                        <span className="text-slate-400 font-semibold">{count as number} docs ({Math.round(percentage)}%)</span>
+                        <span className="font-bold text-slate-750">{dept}</span>
+                        <span className="text-slate-400 font-bold">{count as number} docs ({Math.round(percentage)}%)</span>
                       </div>
                       <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200/40">
                         <div 
@@ -244,18 +265,118 @@ export default function Dashboard() {
                 })}
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-8 space-y-2">
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-8 space-y-2 select-none">
                 <FolderGit2 className="h-10 w-10 text-slate-200" />
                 <p>No department data available.</p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Col 3: Storage & AI Telemetry quotas (New Widget!) */}
+        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[400px] select-none">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0">
+            <HardDrive className="h-4.5 w-4.5 text-blue-650" />
+            <h2 className="font-bold text-slate-800 text-sm">Storage & Telemetry quotas</h2>
+          </div>
+
+          <div className="flex-1 space-y-6 pt-2">
+            
+            {/* Storage Card Meter */}
+            <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-700 flex items-center gap-1"><HardDrive className="h-3.5 w-3.5 text-slate-500" /> Storage Capacity</span>
+                <span className="text-[10px] text-slate-455 font-bold">{mockStorageUsage.toFixed(1)} MB / 10 GB</span>
+              </div>
+              <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-650 rounded-full" style={{ width: `${storagePercentage}%` }} />
+              </div>
+              <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Used capacity: {storagePercentage.toFixed(3)}%</span>
+            </div>
+
+            {/* AI Query telemetry meter */}
+            <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-700 flex items-center gap-1"><Cpu className="h-3.5 w-3.5 text-slate-500" /> AI API Engine</span>
+                <span className="text-[10px] text-slate-450 font-bold">{(metrics?.ai_questions_asked_count || 0) + 42} / {mockAiLimit} queries</span>
+              </div>
+              <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${aiQueriesPercentage}%` }} />
+              </div>
+              <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Remaining quota: {(100 - aiQueriesPercentage).toFixed(1)}%</span>
+            </div>
+
+            <div className="text-[9px] font-bold text-slate-450 uppercase tracking-widest text-center pt-2 leading-relaxed border-t border-slate-100">
+              System telemetry updates every 5 seconds.
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* Audit Log / Simulated Activities & Recently Edited (New Layout Section!) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        
+        {/* Activity log */}
+        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[320px]">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0 select-none">
+            <Activity className="h-4.5 w-4.5 text-blue-600" />
+            <h2 className="font-bold text-slate-800 text-sm">System Operations Audit Log</h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
+            {simulatedActivities.map((act) => (
+              <div key={act.id} className="flex justify-between items-start text-xs p-2.5 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-6 w-6 rounded-full bg-blue-50 border border-blue-150 flex items-center justify-center text-blue-600 shrink-0 text-[10px] font-bold">
+                    {act.user.charAt(0)}
+                  </div>
+                  <div className="truncate">
+                    <strong className="text-slate-800">{act.user}</strong> <span className="text-slate-500 font-medium">{act.action}</span>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold text-slate-400 shrink-0 mt-0.5 select-none">{act.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recently Edited Documents */}
+        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[320px]">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0 select-none">
+            <Clock className="h-4.5 w-4.5 text-blue-600" />
+            <h2 className="font-bold text-slate-800 text-sm">Recently Modified Documents</h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
+            {metrics?.recent_uploads && metrics.recent_uploads.slice(0, 3).map((doc: any) => (
+              <div key={doc.id} className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200/60 rounded-xl">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-7 w-7 rounded bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="truncate">
+                    <Link to={`/documents?open=${doc.id}`} className="font-extrabold text-blue-650 hover:text-blue-700 hover:underline block truncate">
+                      {doc.name}
+                    </Link>
+                    <span className="text-[9px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wider">{doc.category || 'General'}</span>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold text-slate-400 select-none">{new Date(doc.created_at).toLocaleDateString()}</span>
+              </div>
+            ))}
+            {(!metrics?.recent_uploads || metrics.recent_uploads.length === 0) && (
+              <div className="text-center py-12 text-slate-400 text-xs italic select-none">No active documents.</div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* Most Referenced/Viewed Documents */}
       <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 select-none">
           <Eye className="h-4.5 w-4.5 text-blue-600" />
           <h2 className="font-bold text-slate-800 text-sm">Most Referenced Information</h2>
         </div>
@@ -271,13 +392,13 @@ export default function Dashboard() {
                 
                 <div className="flex justify-between items-start">
                   <h3 className="font-bold text-slate-800 text-xs truncate pr-4">{doc.name}</h3>
-                  <span className="text-[9px] text-blue-600 font-bold font-mono bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                  <span className="text-[9px] text-blue-600 font-bold font-mono bg-blue-50 border border-blue-100 px-2 py-0.5 rounded select-none">
                     v{doc.current_version}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1 truncate">{doc.description || 'No description provided.'}</p>
                 {doc.ai_summary && (
-                  <p className="text-[11px] text-slate-600 bg-white border border-slate-200/80 p-2.5 rounded-lg mt-3 line-clamp-2 leading-relaxed">
+                  <p className="text-[11px] text-slate-655 bg-white border border-slate-200/80 p-2.5 rounded-lg mt-3 line-clamp-2 leading-relaxed">
                     {doc.ai_summary}
                   </p>
                 )}
@@ -285,7 +406,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-slate-400 text-xs">
+          <div className="py-8 text-center text-slate-400 text-xs select-none">
             No active documents found in vector indexes.
           </div>
         )}

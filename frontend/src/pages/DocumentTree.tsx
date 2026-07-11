@@ -334,6 +334,31 @@ export default function DocumentTree() {
     }
   });
 
+  // Helper to build breadcrumb paths
+  const getBreadcrumbs = () => {
+    if (!selectedDoc || !folderTree) return ['Root'];
+    const path: string[] = [];
+    let currentFolderId = selectedDoc.folder_id;
+    
+    // Flatten folders to easily search by ID
+    const allFolders: Record<number, any> = {};
+    const flatten = (nodes: any[]) => {
+      for (const node of nodes) {
+        allFolders[node.id] = node;
+        if (node.sub_folders) flatten(node.sub_folders);
+      }
+    };
+    if (folderTree) flatten(folderTree);
+
+    while (currentFolderId && allFolders[currentFolderId]) {
+      const folder = allFolders[currentFolderId];
+      path.unshift(folder.name);
+      currentFolderId = folder.parent_id;
+    }
+    path.unshift('Root');
+    return path;
+  };
+
   // Action helpers
   const handleSaveDocumentContent = () => {
     if (!selectedDocId) return;
@@ -521,9 +546,15 @@ export default function DocumentTree() {
 
   const triggerAIShortcut = (action: string) => {
     if (!selectedDocId) return;
-    const q = `${action} the following document text:\n"${document.getElementById('doc-editor-body')?.innerText || editContent}"`;
+    let finalAction = action;
+    if (action === 'Translate') {
+      const lang = prompt("Enter target language (e.g. Spanish, French, German):", "Spanish");
+      if (!lang) return;
+      finalAction = `Translate to ${lang}`;
+    }
+    const q = `${finalAction} the following document text:\n"${document.getElementById('doc-editor-body')?.innerText || editContent}"`;
     setRightPanelTab('ai');
-    setDocChatHistory(prev => [...prev, { q: `${action} Request`, a: 'Thinking...' }]);
+    setDocChatHistory(prev => [...prev, { q: `${finalAction} Request`, a: 'Thinking...' }]);
     askDocMutation.mutate({ id: selectedDocId, q });
   };
 
@@ -805,6 +836,16 @@ export default function DocumentTree() {
                       <FileText className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
+                      {/* Breadcrumbs */}
+                      <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 select-none">
+                        {getBreadcrumbs().map((b: string, idx: number, arr: string[]) => (
+                          <span key={idx} className="flex items-center gap-1">
+                            <span>{b}</span>
+                            {idx < arr.length - 1 && <ChevronRight className="h-2.5 w-2.5 text-slate-350" />}
+                          </span>
+                        ))}
+                      </div>
+
                       <input 
                         type="text"
                         value={editTitle}
@@ -957,9 +998,31 @@ export default function DocumentTree() {
                     <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
                     {/* Lists */}
-                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Bulleted List"><List className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Numbered List"><ListOrdered className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center animate-all" title="Bulleted List"><List className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center animate-all" title="Numbered List"><ListOrdered className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[9px] font-bold px-1.5 h-6.5 flex items-center justify-center hover:text-slate-900" title="Checklist">☑ Checklist</button>
                     
+                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+                    {/* Line spacing */}
+                    <select
+                      onChange={(e) => {
+                        const editor = document.getElementById('doc-editor-body');
+                        if (editor) {
+                          editor.style.lineHeight = e.target.value;
+                          setEditContent(editor.innerHTML);
+                        }
+                      }}
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1 py-0.5 text-[9px] font-bold text-slate-600 focus:outline-none w-16"
+                      defaultValue="1.5"
+                      title="Line Spacing"
+                    >
+                      <option value="1.0">Single</option>
+                      <option value="1.15">1.15</option>
+                      <option value="1.5">1.5</option>
+                      <option value="2.0">Double</option>
+                    </select>
+
                     <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
                     {/* Insert Options */}
@@ -1242,11 +1305,11 @@ export default function DocumentTree() {
               <div className="flex-1 flex flex-col h-full overflow-hidden">
                 {/* AI Interactive Assistant shortcuts */}
                 <div className="grid grid-cols-2 gap-1.5 pb-3 border-b border-slate-100 shrink-0 select-none">
-                  {['Summarize', 'Rewrite', 'Improve', 'Explain', 'Create SOP'].map((act) => (
+                  {['Summarize', 'Rewrite', 'Improve Writing', 'Explain', 'Translate', 'Generate Training Notes'].map((act) => (
                     <button
                       key={act}
                       onClick={() => triggerAIShortcut(act)}
-                      className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-[9px] font-extrabold text-slate-650 hover:text-slate-900 transition-all text-center uppercase tracking-wider"
+                      className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-[9px] font-extrabold text-slate-655 hover:text-slate-900 transition-all text-center uppercase tracking-wider"
                     >
                       {act}
                     </button>
@@ -1290,6 +1353,33 @@ export default function DocumentTree() {
                         </div>
                       </div>
                     ))
+                  )}
+
+                  {/* Follow-up Questions Suggestions */}
+                  {docChatHistory.length > 0 && !docAiLoading && (
+                    <div className="pt-2 pb-1 space-y-1.5 select-none border-t border-slate-100">
+                      <span className="text-[8px] uppercase tracking-wider font-extrabold text-slate-400 block">Suggested Follow-ups:</span>
+                      <div className="flex flex-col gap-1.5">
+                        {[
+                          "Summarize the key requirements from this section.",
+                          "Identify any potential compliance or security issues.",
+                          "What are the next operational steps described here?"
+                        ].map((suggestion, sIdx) => (
+                          <button
+                            key={sIdx}
+                            onClick={() => {
+                              setDocAiQuestion('');
+                              setDocChatHistory(prev => [...prev, { q: suggestion, a: 'Thinking...' }]);
+                              askDocMutation.mutate({ id: selectedDocId!, q: suggestion });
+                            }}
+                            className="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-2 text-[10px] text-slate-655 font-bold hover:text-slate-900 transition-all flex items-center justify-between"
+                          >
+                            <span className="truncate pr-2">{suggestion}</span>
+                            <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
