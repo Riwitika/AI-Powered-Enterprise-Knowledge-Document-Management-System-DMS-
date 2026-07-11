@@ -29,8 +29,17 @@ def grant_permission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    # Only document owner or admins can modify permissions
+    # Retrieve doc and verify edit permission first
     doc = verify_document_access(document_id, current_user, db, required_access="edit")
+    
+    # Restrict to document owner or admins only
+    is_owner = (doc.owner_id == current_user.id)
+    is_admin = (current_user.role and current_user.role.name in ["super_admin", "admin"])
+    if not (is_owner or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the document owner or an administrator can modify document permissions."
+        )
     
     # Must specify either user_id or department_id, not both/neither
     if (payload.user_id is None) == (payload.department_id is None):
@@ -92,8 +101,17 @@ def revoke_permission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    # Only document owner or admins can modify permissions
-    verify_document_access(document_id, current_user, db, required_access="edit")
+    # Retrieve doc and verify access
+    doc = verify_document_access(document_id, current_user, db, required_access="view")
+    
+    # Restrict to document owner or admins only
+    is_owner = (doc.owner_id == current_user.id)
+    is_admin = (current_user.role and current_user.role.name in ["super_admin", "admin"])
+    if not (is_owner or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the document owner or an administrator can revoke document permissions."
+        )
     
     if (user_id is None) == (department_id is None):
         raise HTTPException(

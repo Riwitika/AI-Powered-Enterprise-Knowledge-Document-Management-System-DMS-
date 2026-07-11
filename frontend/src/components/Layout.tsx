@@ -16,6 +16,7 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Folder
 } from 'lucide-react';
 
@@ -23,6 +24,8 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [showRecentDropdown, setShowRecentDropdown] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -35,6 +38,7 @@ export default function Layout() {
   // Workspace Tree Sidebar Expanded states
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({
+    0: true,
     1: true // Auto-expand "Company Knowledge" root folder on load!
   });
 
@@ -128,34 +132,37 @@ export default function Layout() {
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
       
-      {/* 1. Sidebar Nav (280px width) */}
-      <aside className="w-[280px] border-r border-slate-200 bg-white flex flex-col shrink-0 relative z-20 shadow-sm">
+      {/* 1. Sidebar Nav (280px width or 68px collapsed) */}
+      <aside className={`${isSidebarCollapsed ? 'w-[68px]' : 'w-[280px]'} border-r border-slate-200 bg-white flex flex-col shrink-0 relative z-20 shadow-sm transition-all duration-300`}>
         {/* Brand / Logo */}
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-200 shrink-0 bg-slate-900 text-white">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-black shadow-md">
+        <div className={`h-16 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-2' : 'px-6'} border-b border-slate-200 shrink-0 bg-slate-900 text-white`}>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-black shadow-md shrink-0">
             <FileText className="h-4.5 w-4.5" />
           </div>
-          <div>
-            <span className="font-extrabold text-white text-sm tracking-tight block">Fast Trade DMS</span>
-            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block -mt-0.5">Enterprise KMS</span>
-          </div>
+          {!isSidebarCollapsed && (
+            <div>
+              <span className="font-extrabold text-white text-sm tracking-tight block">Fast Trade DMS</span>
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block -mt-0.5">Enterprise KMS</span>
+            </div>
+          )}
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-4 py-5 space-y-1.5 bg-white overflow-y-auto custom-scrollbar">
+        <nav className={`flex-1 ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-5 space-y-1.5 bg-white overflow-y-auto custom-scrollbar`}>
           
           {/* Dashboard Link */}
           <Link
             to="/"
-            className={`flex items-center gap-3 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+            className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3.5'} py-2.5 text-xs font-bold rounded-xl transition-all relative ${
               location.pathname === '/'
                 ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
             }`}
+            title="Dashboard"
           >
             <LayoutDashboard className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Dashboard</span>
-            {location.pathname === '/' && (
+            {!isSidebarCollapsed && <span>Dashboard</span>}
+            {location.pathname === '/' && !isSidebarCollapsed && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
             )}
           </Link>
@@ -169,26 +176,27 @@ export default function Layout() {
                   navigate('/documents');
                 }
               }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+              title="Document Workspace"
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-3.5'} py-2.5 text-xs font-bold rounded-xl transition-all relative ${
                 location.pathname === '/documents'
                   ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
               }`}
             >
-              <span className="flex items-center gap-3 min-w-0">
+              <span className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'} min-w-0`}>
                 <FolderTree className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/documents' ? 'text-blue-600' : 'text-slate-400'}`} />
-                <span>Document Workspace</span>
+                {!isSidebarCollapsed && <span>Document Workspace</span>}
               </span>
-              <ChevronDown className={`h-3.5 w-3.5 text-slate-450 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} />
+              {!isSidebarCollapsed && <ChevronDown className={`h-3.5 w-3.5 text-slate-450 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} />}
             </button>
 
             {/* Document Tree Hierarchy underneath */}
-            {workspaceExpanded && folderTree && folderTree.length > 0 && (
+            {workspaceExpanded && !isSidebarCollapsed && folderTree && folderTree.length > 0 && (
               <div className="pl-1 pr-0.5 py-1 space-y-0.5 border-l border-slate-100 ml-5 animate-in fade-in duration-200">
                 {renderSidebarTree(folderTree)}
               </div>
             )}
-            {workspaceExpanded && (!folderTree || folderTree.length === 0) && (
+            {workspaceExpanded && !isSidebarCollapsed && (!folderTree || folderTree.length === 0) && (
               <span className="text-[10px] text-slate-400 italic block pl-8 select-none py-1">No folders seeded</span>
             )}
           </div>
@@ -197,15 +205,16 @@ export default function Layout() {
           {isAdmin && (
             <Link
               to="/users"
-              className={`flex items-center gap-3 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+              className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3.5'} py-2.5 text-xs font-bold rounded-xl transition-all relative ${
                 location.pathname === '/users'
                   ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
               }`}
+              title="User Directory"
             >
               <Users className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/users' ? 'text-blue-600' : 'text-slate-400'}`} />
-              <span>User Directory</span>
-              {location.pathname === '/users' && (
+              {!isSidebarCollapsed && <span>User Directory</span>}
+              {location.pathname === '/users' && !isSidebarCollapsed && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
               )}
             </Link>
@@ -214,23 +223,27 @@ export default function Layout() {
         </nav>
 
         {/* User profile footer */}
-        <div className="border-t border-slate-200 p-4 shrink-0 bg-slate-50 flex items-center justify-between gap-3 relative">
+        <div className={`border-t border-slate-200 ${isSidebarCollapsed ? 'p-2 justify-center' : 'p-4 justify-between'} shrink-0 bg-slate-50 flex items-center gap-3 relative`}>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-full bg-slate-250 border border-slate-350 flex items-center justify-center text-slate-750 shrink-0 font-extrabold text-xs">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-800 leading-none">{user?.full_name}</p>
-              <span className="truncate text-[9px] font-bold text-slate-400 block uppercase tracking-wider mt-1">{user?.department?.name || 'KMS Operator'}</span>
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-slate-800 leading-none">{user?.full_name}</p>
+                <span className="truncate text-[9px] font-bold text-slate-400 block uppercase tracking-wider mt-1">{user?.department?.name || 'KMS Operator'}</span>
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleLogout}
-            title="Sign Out"
-            className="p-1.5 text-slate-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-all shrink-0"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          {!isSidebarCollapsed && (
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              className="p-1.5 text-slate-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-all shrink-0"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </aside>
 
@@ -241,6 +254,13 @@ export default function Layout() {
         <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-8 shrink-0 relative z-30 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
           {/* Logo & Section indicators */}
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors shrink-0"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-4.5 w-4.5" /> : <ChevronLeft className="h-4.5 w-4.5" />}
+            </button>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-150 px-3 py-0.5 text-[9px] font-bold text-blue-700 uppercase tracking-wider select-none">
               <Activity className="h-3 w-3 text-blue-600 animate-pulse" />
               {user?.role?.name?.replace('_', ' ') || 'employee'}

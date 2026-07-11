@@ -53,19 +53,31 @@ def upload_document(
         current_version=1,
         status="active"
     )
-    db.add(new_doc)
-    db.commit()
-    db.refresh(new_doc)
-    
-    # Save the first version
-    first_version = DocumentVersion(
-        document_id=new_doc.id,
-        version_number=1,
-        file_path=file_path,
-        uploaded_by=current_user.id
-    )
-    db.add(first_version)
-    db.commit()
+
+    try:
+        db.add(new_doc)
+        db.flush()
+        
+        # Save the first version
+        first_version = DocumentVersion(
+            document_id=new_doc.id,
+            version_number=1,
+            file_path=file_path,
+            uploaded_by=current_user.id
+        )
+        db.add(first_version)
+        db.commit()
+        db.refresh(new_doc)
+    except Exception as e:
+        db.rollback()
+        try:
+            storage.delete_file(file_path)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save document record: {str(e)}"
+        )
     
     # Trigger background text extraction, embedding & summary
     background_tasks.add_task(run_background_processing, new_doc.id)
@@ -120,10 +132,13 @@ def download_document(
 def update_document_metadata(
     document_id: UUID,
     payload: DocumentUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     doc = verify_document_access(document_id, current_user, db, required_access="edit")
+    
+    needs_reindex = False
     
     if payload.name is not None:
         doc.name = payload.name
@@ -141,9 +156,16 @@ def update_document_metadata(
         doc.access_level = payload.access_level
     if payload.status is not None:
         doc.status = payload.status
+    if payload.content is not None:
+        doc.content = payload.content
+        needs_reindex = True
         
     db.commit()
     db.refresh(doc)
+    
+    if needs_reindex:
+        background_tasks.add_task(run_background_processing, doc.id)
+        
     return doc
 
 
@@ -160,6 +182,8 @@ def archive_document(
     return doc
 
 
+from sqlalchemy.exc import IntegrityError
+
 @router.delete("/{document_id}")
 def delete_document(
     document_id: UUID,
@@ -175,8 +199,15 @@ def delete_document(
         pass
         
     # Cascade delete is handled by ORM/Database Cascade
-    db.delete(doc)
-    db.commit()
+    try:
+        db.delete(doc)
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete document due to active database constraints."
+        )
     return {"message": "Document deleted successfully"}
 
 
@@ -217,13 +248,24 @@ def upload_new_version(
         file_path=file_path,
         uploaded_by=current_user.id
     )
-    db.add(new_version)
-    
-    # Update document main row to point to new file path & version number
-    doc.file_path = file_path
-    doc.current_version = new_version_num
-    db.commit()
-    db.refresh(doc)
+
+    try:
+        db.add(new_version)
+        # Update document main row to point to new file path & version number
+        doc.file_path = file_path
+        doc.current_version = new_version_num
+        db.commit()
+        db.refresh(doc)
+    except Exception as e:
+        db.rollback()
+        try:
+            storage.delete_file(file_path)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save new document version: {str(e)}"
+        )
     
     # Re-run extraction + chunking + embeddings in background for new version
     background_tasks.add_task(run_background_processing, doc.id)

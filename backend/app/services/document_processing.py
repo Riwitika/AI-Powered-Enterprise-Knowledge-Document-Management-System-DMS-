@@ -20,7 +20,13 @@ def process_document_upload(document_id: UUID, db: Session) -> None:
 
     try:
         # 1. Extract Text
-        text = extract_document_text(doc.file_path, doc.file_type)
+        if doc.content and doc.content.strip():
+            text = doc.content
+        else:
+            text = extract_document_text(doc.file_path, doc.file_type)
+            doc.content = text
+            db.commit()
+
         if not text.strip():
             logger.warning(f"No text extracted from document {doc.name} ({document_id})")
             doc.ai_summary = "Empty document. No content to summarize."

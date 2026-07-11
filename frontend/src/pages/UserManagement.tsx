@@ -125,8 +125,7 @@ export default function UserManagement() {
                         (filterDept === 'none' && !u.department) || 
                         u.department?.name === filterDept;
     
-    // Simulate statuses: System Administrator and Jane Doe are 'Active', John Smith is 'Inactive' (just as realistic seed data)
-    const status = u.email === 'john@company.com' ? 'inactive' : 'active';
+    const status = u.is_active ? 'active' : 'inactive';
     const matchesStatus = filterStatus === 'all' || status === filterStatus;
 
     return matchesSearch && matchesRole && matchesDept && matchesStatus;
@@ -294,7 +293,7 @@ export default function UserManagement() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
                 {filteredUsers.map((u: any) => {
-                  const isActive = u.email !== 'john@company.com';
+                  const isActive = u.is_active;
                   const lastLogin = u.email === 'admin@enterprise.com' ? 'Just now' : (u.email === 'jane@company.com' ? '3 hours ago' : '5 days ago');
                   
                   return (

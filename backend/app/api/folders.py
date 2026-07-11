@@ -16,6 +16,8 @@ def list_folders(
     return db.query(Folder).all()
 
 
+from datetime import datetime, timezone
+
 @router.get("/tree", response_model=List[FolderTreeNode])
 def get_tree(
     db: Session = Depends(get_db),
@@ -30,6 +32,20 @@ def get_tree(
     
     # Get all active documents the user is allowed to access
     allowed_doc_ids = get_accessible_document_ids(current_user, db)
+    
+    if not allowed_doc_ids:
+        # Create virtual Workspace Root node with empty folders/docs
+        workspace_root = FolderTreeNode(
+            id=0,
+            name="Workspace Root",
+            parent_id=None,
+            created_by=None,
+            created_at=datetime.now(timezone.utc),
+            sub_folders=[],
+            documents=[]
+        )
+        return [workspace_root]
+        
     allowed_docs = db.query(Document).filter(
         Document.id.in_(allowed_doc_ids),
         Document.status == "active"
@@ -64,8 +80,25 @@ def get_tree(
             parent_node = folder_nodes.get(node.parent_id)
             if parent_node:
                 parent_node.sub_folders.append(node)
+
+    # Gather root-level documents (folder_id is None or not in folder_nodes)
+    root_documents = []
+    for doc in allowed_docs:
+        if doc.folder_id is None or doc.folder_id not in folder_nodes:
+            root_documents.append(DocumentResponse.model_validate(doc))
+
+    # Create virtual Workspace Root node
+    workspace_root = FolderTreeNode(
+        id=0,
+        name="Workspace Root",
+        parent_id=None,
+        created_by=None,
+        created_at=datetime.now(timezone.utc),
+        sub_folders=root_nodes,
+        documents=root_documents
+    )
                 
-    return root_nodes
+    return [workspace_root]
 
 
 @router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
@@ -144,6 +177,8 @@ def update_folder(
     return folder
 
 
+from sqlalchemy.exc import IntegrityError
+
 @router.delete("/{folder_id}")
 def delete_folder(
     folder_id: int,
@@ -176,6 +211,13 @@ def delete_folder(
             detail="Cannot delete folder containing active documents"
         )
         
-    db.delete(folder)
-    db.commit()
+    try:
+        db.delete(folder)
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete folder due to active database constraint references."
+        )
     return {"message": "Folder deleted successfully"}

@@ -56,7 +56,8 @@ def get_user(
     current_user: User = Depends(get_current_active_user)
 ):
     # Allow users to fetch their own details, or admin to fetch any user details
-    if current_user.id != user_id and current_user.role.name not in ["super_admin", "admin"]:
+    current_user_role = current_user.role.name if current_user.role else None
+    if current_user.id != user_id and current_user_role not in ["super_admin", "admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

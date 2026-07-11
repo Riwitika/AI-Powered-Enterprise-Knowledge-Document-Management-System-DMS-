@@ -60,3 +60,6 @@ uploads/
 *.njsproj
 *.sln
 *.swp
+
+# Scratch files
+scratch/

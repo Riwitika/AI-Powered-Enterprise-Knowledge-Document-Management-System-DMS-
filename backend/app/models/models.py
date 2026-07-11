@@ -43,14 +43,59 @@ if is_sqlite:
                 
     UUID = SQLiteUUID
     
-    class SQLiteARRAY(Text):
+    import json
+    from sqlalchemy.types import TypeDecorator, Text
+
+    class SQLiteARRAY(TypeDecorator):
+        impl = Text
+        cache_ok = True
+        
         def __init__(self, item_type=None):
             super().__init__()
+            
+        def process_bind_param(self, value, dialect):
+            if value is None:
+                return value
+            if isinstance(value, list):
+                return json.dumps(value)
+            return value
+            
+        def process_result_value(self, value, dialect):
+            if value is None:
+                return value
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    return value
+            return value
+            
     ARRAY = SQLiteARRAY
     
-    class SQLiteVector(Text):
+    class SQLiteVector(TypeDecorator):
+        impl = Text
+        cache_ok = True
+        
         def __init__(self, dimensions=None):
             super().__init__()
+            
+        def process_bind_param(self, value, dialect):
+            if value is None:
+                return value
+            if isinstance(value, list):
+                return json.dumps(value)
+            return value
+            
+        def process_result_value(self, value, dialect):
+            if value is None:
+                return value
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    return value
+            return value
+            
     Vector = SQLiteVector
 else:
     from sqlalchemy.dialects.postgresql import UUID, ARRAY
@@ -125,6 +170,7 @@ class Document(Base):
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     access_level = Column(String(30), nullable=False, default="private")
     current_version = Column(Integer, default=1)
+    content = Column(Text, nullable=True)
     ai_summary = Column(Text, nullable=True)
     ai_keywords = Column(ARRAY(String), nullable=True)
     status = Column(String(20), default="active")
@@ -145,7 +191,7 @@ class DocumentVersion(Base):
     __tablename__ = "document_versions"
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", on_delete="CASCADE"), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     version_number = Column(Integer, nullable=False)
     file_path = Column(String(500), nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -158,7 +204,7 @@ class DocumentVersion(Base):
 class DocumentTag(Base):
     __tablename__ = "document_tags"
 
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", on_delete="CASCADE"), primary_key=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True)
     tag = Column(String(50), primary_key=True)
 
     document = relationship("Document", back_populates="tags")
@@ -168,7 +214,7 @@ class Permission(Base):
     __tablename__ = "permissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", on_delete="CASCADE"), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     access_type = Column(String(30), nullable=False)  # view | edit
@@ -180,7 +226,7 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", on_delete="CASCADE"), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     embedding = Column(Vector(384))  # pgvector embedding column

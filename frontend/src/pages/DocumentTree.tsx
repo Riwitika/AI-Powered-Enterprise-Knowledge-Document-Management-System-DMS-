@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { UploadModal } from '../components/UploadModal';
+import { ShareModal } from '../components/ShareModal';
 import { 
-  Upload, 
   ChevronRight, 
   Send,
   Loader2,
@@ -31,9 +32,6 @@ import {
   Quote,
   Smile,
   Copy,
-  Check,
-  Calendar,
-  Lock,
   FileDown
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -92,8 +90,6 @@ export default function DocumentTree() {
   const [shareUserId, setShareUserId] = useState('');
   const [shareDeptId, setShareDeptId] = useState<number | ''>('');
   const [shareAccessType, setShareAccessType] = useState('view');
-  const [shareExpiration, setShareExpiration] = useState('');
-  const [shareDisableDownload, setShareDisableDownload] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Rename modal states
@@ -174,7 +170,17 @@ export default function DocumentTree() {
     if (selectedDoc) {
       setEditTitle(selectedDoc.name);
       const localContent = localStorage.getItem(`doc_content_${selectedDoc.id}`);
-      const initialText = localContent || selectedDoc.content || `<p>Welcome to <strong>${selectedDoc.name}</strong> workspace. Start document processing, summaries generation, and vector calculations.</p>`;
+      let initialText = selectedDoc.content || `<p>Welcome to <strong>${selectedDoc.name}</strong> workspace. Start document processing, summaries generation, and vector calculations.</p>`;
+      
+      if (localContent && localContent !== selectedDoc.content) {
+        const confirmRestore = window.confirm("A local draft was found. Would you like to restore it?");
+        if (confirmRestore) {
+          initialText = localContent;
+        } else {
+          localStorage.removeItem(`doc_content_${selectedDoc.id}`);
+        }
+      }
+      
       setEditContent(initialText);
       updateCounts(initialText);
       setRightPanelTab('summary');
@@ -184,6 +190,13 @@ export default function DocumentTree() {
   // Trigger auto-save on content/title changes
   useEffect(() => {
     if (selectedDocId && selectedDoc) {
+      // Immediate local draft caching on change
+      const editableDiv = document.getElementById('doc-editor-body');
+      const htmlContent = editableDiv ? editableDiv.innerHTML : editContent;
+      if (htmlContent !== selectedDoc.content || editTitle !== selectedDoc.name) {
+        localStorage.setItem(`doc_content_${selectedDocId}`, htmlContent);
+      }
+
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
@@ -220,7 +233,7 @@ export default function DocumentTree() {
   const createFolderMutation = useMutation({
     mutationFn: api.folders.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       setNewFolderName('');
       setShowNewFolder(false);
     }
@@ -229,7 +242,7 @@ export default function DocumentTree() {
   const updateFolderMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: any }) => api.folders.update(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       setShowRenameModal(false);
     }
   });
@@ -237,14 +250,14 @@ export default function DocumentTree() {
   const deleteFolderMutation = useMutation({
     mutationFn: api.folders.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
     }
   });
 
   const uploadDocMutation = useMutation({
     mutationFn: api.documents.upload,
     onSuccess: (newDoc) => {
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       setUploadFile(null);
@@ -260,11 +273,12 @@ export default function DocumentTree() {
 
   const deleteDocMutation = useMutation({
     mutationFn: api.documents.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       setSelectedDocId(null);
+      localStorage.removeItem(`doc_content_${deletedId}`);
     }
   });
 
@@ -280,10 +294,12 @@ export default function DocumentTree() {
   const saveDocMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: any }) => 
       api.documents.update(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['document', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      // Remove autosave draft after successful save
+      localStorage.removeItem(`doc_content_${variables.id}`);
     }
   });
 
@@ -665,6 +681,11 @@ export default function DocumentTree() {
                         <>
                           <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
                           <span>Saving Changes...</span>
+                        </>
+                      ) : selectedDoc && (editTitle !== selectedDoc.name || editContent !== (selectedDoc.content || '')) ? (
+                        <>
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          <span>Unsaved Changes</span>
                         </>
                       ) : (
                         <>
@@ -1345,168 +1366,25 @@ export default function DocumentTree() {
         </div>
       )}
 
-      {/* Share Permission Modal Dialog (Google Docs style) */}
-      {showShareModal && selectedDoc && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200 select-none">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative">
-            <button onClick={() => setShowShareModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-650 p-1 hover:bg-slate-50 rounded-lg transition-colors"><X className="h-4.5 w-4.5" /></button>
-            
-            <div className="space-y-1">
-              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                <Share2 className="h-5 w-5 text-blue-600" />
-                <span>Share "{selectedDoc.name}"</span>
-              </h3>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Configure collaborative access privileges</p>
-            </div>
-
-            {/* Grant Permission Form */}
-            <form onSubmit={handleGrantPermission} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[9px] font-bold text-slate-450 uppercase tracking-widest block mb-1.5">Add User Profile</label>
-                  <select
-                    value={shareUserId}
-                    onChange={(e) => {
-                      setShareUserId(e.target.value);
-                      if (e.target.value) setShareDeptId('');
-                    }}
-                    className="w-full bg-white border border-slate-250 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none"
-                  >
-                    <option value="">Select individual user...</option>
-                    {systemUsers?.filter((u: any) => u.id !== user?.id).map((u: any) => (
-                      <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-455 uppercase tracking-widest block mb-1.5">Add Department Group</label>
-                  <select
-                    value={shareDeptId}
-                    onChange={(e) => {
-                      setShareDeptId(e.target.value !== '' ? Number(e.target.value) : '');
-                      if (e.target.value) setShareUserId('');
-                    }}
-                    className="w-full bg-white border border-slate-250 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none"
-                  >
-                    <option value="">Select department...</option>
-                    {systemDepts?.map((d: any) => (
-                      <option key={d.id} value={d.id}>{d.name} Division</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold text-slate-450 uppercase tracking-widest">Access Role:</span>
-                  <select
-                    value={shareAccessType}
-                    onChange={(e) => setShareAccessType(e.target.value)}
-                    className="bg-white border border-slate-250 rounded-lg px-2 py-1 text-xs text-slate-700 focus:outline-none"
-                  >
-                    <option value="view">Viewer</option>
-                    <option value="comment">Commenter</option>
-                    <option value="edit">Editor</option>
-                    <option value="owner">Owner</option>
-                  </select>
-                </div>
-                
-                <button
-                  type="submit"
-                  disabled={!shareUserId && !shareDeptId}
-                  className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
-                >
-                  Invite Access
-                </button>
-              </div>
-            </form>
-
-            {/* Expire / Expiration options */}
-            <div className="flex items-center justify-between border-t border-slate-150 pt-3 text-[10px] text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-4.5 w-4.5 text-slate-400" />
-                <span>Expiration Date:</span>
-                <input 
-                  type="date"
-                  value={shareExpiration}
-                  onChange={(e) => setShareExpiration(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-750 focus:outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input 
-                  type="checkbox"
-                  id="disable-download"
-                  checked={shareDisableDownload}
-                  onChange={(e) => setShareDisableDownload(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="disable-download" className="cursor-pointer">Disable Download</label>
-              </div>
-            </div>
-
-            {/* List of active permissions */}
-            <div className="space-y-2 border-t border-slate-150 pt-4">
-              <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Collaborators & Permissions</span>
-              <div className="max-h-[160px] overflow-y-auto pr-1 space-y-1.5 custom-scrollbar">
-                {/* Default owner */}
-                <div className="flex items-center justify-between p-2.5 bg-slate-50/50 rounded-xl text-xs">
-                  <div>
-                    <span className="font-bold text-slate-900 block">{selectedDoc.owner?.full_name || 'System Administrator'}</span>
-                    <span className="text-[10px] text-slate-450 block">{selectedDoc.owner?.email || 'admin@enterprise.com'}</span>
-                  </div>
-                  <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Owner</span>
-                </div>
-
-                {docPermissions?.map((perm: any) => (
-                  <div key={perm.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs hover:bg-slate-100/70 transition-all">
-                    <div>
-                      {perm.user ? (
-                        <>
-                          <span className="font-bold text-slate-800 block">{perm.user.full_name}</span>
-                          <span className="text-[10px] text-slate-450 block">{perm.user.email}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-bold text-slate-800 block">{perm.department?.name} Department</span>
-                          <span className="text-[10px] text-slate-450 block">Division level access</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-bold text-slate-550 capitalize">{perm.access_type}</span>
-                      <button
-                        onClick={() => handleRevokePermission(perm)}
-                        className="text-[10px] text-red-600 hover:text-red-750 font-bold"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sharing link generation */}
-            <div className="border-t border-slate-150 pt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate flex-1">
-                <Lock className="h-4 w-4 text-slate-400 shrink-0" />
-                <span className="truncate bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-slate-600 font-mono text-[10px] flex-1">
-                  {window.location.origin}/documents/{selectedDoc.id}
-                </span>
-              </div>
-              <button
-                onClick={handleCopyShareLink}
-                className="bg-slate-100 hover:bg-slate-200 border border-slate-250 text-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm transition-all shrink-0 flex items-center gap-1.5 w-28 justify-center"
-              >
-                {linkCopied ? <Check className="h-4.5 w-4.5 text-emerald-600" /> : <Copy className="h-4.5 w-4.5" />}
-                <span>{linkCopied ? 'Copied' : 'Copy Link'}</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      <ShareModal
+        showShareModal={showShareModal}
+        setShowShareModal={setShowShareModal}
+        selectedDoc={selectedDoc}
+        shareUserId={shareUserId}
+        setShareUserId={setShareUserId}
+        shareDeptId={shareDeptId}
+        setShareDeptId={setShareDeptId}
+        shareAccessType={shareAccessType}
+        setShareAccessType={setShareAccessType}
+        systemUsers={systemUsers}
+        systemDepts={systemDepts}
+        currentUser={user}
+        docPermissions={docPermissions}
+        handleGrantPermission={handleGrantPermission}
+        handleRevokePermission={handleRevokePermission}
+        handleCopyShareLink={handleCopyShareLink}
+        linkCopied={linkCopied}
+      />
 
       {/* Rename modal dialog */}
       {showRenameModal && renameTarget && (
@@ -1616,99 +1494,21 @@ export default function DocumentTree() {
       )}
 
       {/* Upload File Modal */}
-      {showUpload && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadDocument} className="bg-white border border-slate-200 rounded-xl p-6 max-w-md w-full space-y-4 shadow-xl overflow-y-auto max-h-[90vh]">
-            <h3 className="font-bold text-slate-950 text-base">Upload Document</h3>
-            
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Select Document</label>
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-5 hover:bg-slate-50 cursor-pointer transition-colors text-center">
-                <Upload className="h-6 w-6 text-slate-400 mb-2" />
-                <span className="text-xs font-bold text-slate-600">{uploadFile ? uploadFile.name : 'Choose file or drag & drop'}</span>
-                <span className="text-[9px] text-slate-400 block mt-1">PDF, DOCX, XLSX, PPTX, TXT</span>
-                <input 
-                  type="file" 
-                  required
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setUploadFile(e.target.files[0]);
-                      setUploadName(e.target.files[0].name.split('.')[0]);
-                    }
-                  }}
-                  className="hidden" 
-                />
-              </label>
-            </div>
-
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Document Title</label>
-              <input 
-                type="text" 
-                value={uploadName}
-                onChange={(e) => setUploadName(e.target.value)}
-                placeholder="User Operations Guide"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800"
-              />
-            </div>
-
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Abstract Description</label>
-              <textarea 
-                value={uploadDesc}
-                onChange={(e) => setUploadDesc(e.target.value)}
-                placeholder="Summarize context and keywords..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 h-20 resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Category Tag</label>
-                <input 
-                  type="text" 
-                  value={uploadCat}
-                  onChange={(e) => setUploadCat(e.target.value)}
-                  placeholder="SOP, Manual, Contract"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Access Scope</label>
-                <select
-                  value={uploadAccess}
-                  onChange={(e) => setUploadAccess(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800"
-                >
-                  <option value="private">Private (Owner only)</option>
-                  <option value="view_only">View Only (Org read-only)</option>
-                  <option value="edit">Edit (Org edit access)</option>
-                  <option value="department">Department (My dept only)</option>
-                  <option value="organization">Organization (Full access)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button 
-                type="button" 
-                onClick={() => setShowUpload(false)}
-                className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit"
-                disabled={!uploadFile}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors"
-              >
-                Upload & Ingest
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <UploadModal
+        showUpload={showUpload}
+        setShowUpload={setShowUpload}
+        uploadFile={uploadFile}
+        setUploadFile={setUploadFile}
+        uploadName={uploadName}
+        setUploadName={setUploadName}
+        uploadDesc={uploadDesc}
+        setUploadDesc={setUploadDesc}
+        uploadCat={uploadCat}
+        setUploadCat={setUploadCat}
+        uploadAccess={uploadAccess}
+        setUploadAccess={setUploadAccess}
+        onSubmit={handleUploadDocument}
+      />
     </div>
   );
 }

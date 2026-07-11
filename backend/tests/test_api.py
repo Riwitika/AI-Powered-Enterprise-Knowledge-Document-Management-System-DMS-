@@ -63,7 +63,7 @@ def test_auth_flow(db_session):
         "role_name": "employee",
         "invite_code": "FASTTRADE-SECURE-2026"
     }
-    response = client.post("/api/auth/register", json=reg_data)
+    response = client.post("/api/v1/auth/register", json=reg_data)
     assert response.status_code == 200
     assert response.json()["email"] == email
     
@@ -72,7 +72,7 @@ def test_auth_flow(db_session):
         "username": email,
         "password": password
     }
-    response = client.post("/api/auth/login", data=login_data)
+    response = client.post("/api/v1/auth/login", data=login_data)
     assert response.status_code == 200
     tokens = response.json()
     assert "access_token" in tokens
@@ -81,7 +81,7 @@ def test_auth_flow(db_session):
     # 4. Get Me
     access_token = tokens["access_token"]
     headers = {"Authorization": f"Bearer {access_token}"}
-    response = client.get("/api/auth/me", headers=headers)
+    response = client.get("/api/v1/auth/me", headers=headers)
     assert response.status_code == 200
     assert response.json()["email"] == email
 
@@ -117,8 +117,8 @@ def test_document_crud_and_permissions(db_session):
     db_session.refresh(user_b)
 
     # Log in both users
-    token_a = client.post("/api/auth/login", data={"username": email_a, "password": "password"}).json()["access_token"]
-    token_b = client.post("/api/auth/login", data={"username": email_b, "password": "password"}).json()["access_token"]
+    token_a = client.post("/api/v1/auth/login", data={"username": email_a, "password": "password"}).json()["access_token"]
+    token_b = client.post("/api/v1/auth/login", data={"username": email_b, "password": "password"}).json()["access_token"]
     
     headers_a = {"Authorization": f"Bearer {token_a}"}
     headers_b = {"Authorization": f"Bearer {token_b}"}
@@ -135,7 +135,7 @@ def test_document_crud_and_permissions(db_session):
     }
     
     response = client.post(
-        "/api/documents/upload",
+        "/api/v1/documents/upload",
         headers=headers_a,
         data=upload_data,
         files={"file": file_tuple}
@@ -147,7 +147,7 @@ def test_document_crud_and_permissions(db_session):
     assert doc["access_level"] == "private"
 
     # 3. User B tries to view it (expect 403 Forbidden)
-    response = client.get(f"/api/documents/{doc_id}", headers=headers_b)
+    response = client.get(f"/api/v1/documents/{doc_id}", headers=headers_b)
     assert response.status_code == 403
 
     # 4. User A grants permission to User B
@@ -155,21 +155,21 @@ def test_document_crud_and_permissions(db_session):
         "user_id": str(user_b.id),
         "access_type": "view"
     }
-    response = client.post(f"/api/permissions/{doc_id}/grant", headers=headers_a, json=grant_payload)
+    response = client.post(f"/api/v1/permissions/{doc_id}/grant", headers=headers_a, json=grant_payload)
     assert response.status_code == 201
 
     # 5. User B tries to view it again (expect 200 Success now)
-    response = client.get(f"/api/documents/{doc_id}", headers=headers_b)
+    response = client.get(f"/api/v1/documents/{doc_id}", headers=headers_b)
     assert response.status_code == 200
     assert response.json()["name"] == "Secret Doc"
 
     # 6. User B tries to delete/update metadata (expect 403 Forbidden)
     update_payload = {"name": "Hacked Doc"}
-    response = client.put(f"/api/documents/{doc_id}", headers=headers_b, json=update_payload)
+    response = client.put(f"/api/v1/documents/{doc_id}", headers=headers_b, json=update_payload)
     assert response.status_code == 403
 
     # 7. User A deletes the document
-    response = client.delete(f"/api/documents/{doc_id}", headers=headers_a)
+    response = client.delete(f"/api/v1/documents/{doc_id}", headers=headers_a)
     assert response.status_code == 200
     
     # 8. Clean up users

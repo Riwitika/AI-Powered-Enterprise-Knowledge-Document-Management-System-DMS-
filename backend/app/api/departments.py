@@ -101,6 +101,8 @@ def update_department(
     return dept
 
 
+from sqlalchemy.exc import IntegrityError
+
 @router.delete("/{dept_id}")
 def delete_department(
     dept_id: int,
@@ -122,6 +124,13 @@ def delete_department(
             detail="Cannot delete a department that has sub-departments. Delete the sub-departments first."
         )
         
-    db.delete(dept)
-    db.commit()
+    try:
+        db.delete(dept)
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete department due to active constraint references in other tables."
+        )
     return {"message": "Department deleted successfully"}
