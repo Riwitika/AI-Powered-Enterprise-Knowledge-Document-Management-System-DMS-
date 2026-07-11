@@ -3,24 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { 
-  Folder, 
-  FolderPlus, 
-  File as FileIcon, 
   Upload, 
   ChevronRight, 
-  ChevronDown, 
   Send,
   Loader2,
   Tag,
-  Search,
   FileText,
-  FileSpreadsheet,
   Sparkles,
   HelpCircle,
-  FolderOpen,
   MessageSquare,
   ArrowRight,
-  BookOpen,
   X,
   Share2,
   Undo,
@@ -40,7 +32,6 @@ import {
   Smile,
   Copy,
   Check,
-  MoreVertical,
   Calendar,
   Lock,
   FileDown
@@ -59,8 +50,6 @@ export default function DocumentTree() {
 
   // Selected Document ID
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
-  const [treeSearchQuery, setTreeSearchQuery] = useState('');
   
   // Folder/Document creation states
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -125,8 +114,8 @@ export default function DocumentTree() {
   const autoSaveTimerRef = useRef<any>(null);
 
   // Queries
-  const { data: folderTree, isLoading: treeLoading } = useQuery({
-    queryKey: ['folder-tree'],
+  const { data: folderTree } = useQuery({
+    queryKey: ['folders-tree'],
     queryFn: api.folders.tree
   });
 
@@ -429,15 +418,7 @@ export default function DocumentTree() {
     askDocMutation.mutate({ id: selectedDocId, q });
   };
 
-  const handleContextMenu = (e: React.MouseEvent, type: 'folder' | 'file', id: number | string) => {
-    e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      type,
-      id
-    });
-  };
+
 
   const handleCreateNewBlankDocument = (folderId: number | null, customName?: string) => {
     const title = customName || "Untitled Document";
@@ -613,27 +594,6 @@ export default function DocumentTree() {
     setTimeout(() => setLinkCopied(false), 2000);
   };
 
-  // Directory tree utilities
-  const handleToggleFolder = (folderId: number) => {
-    setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
-  };
-
-  const getFileIcon = (fileType: string) => {
-    const ext = fileType.toLowerCase();
-    if (ext === 'pdf') return { Icon: FileText, color: 'text-red-500 bg-red-50 border-red-100' };
-    if (['doc', 'docx'].includes(ext)) return { Icon: FileText, color: 'text-blue-500 bg-blue-50 border-blue-100' };
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return { Icon: FileSpreadsheet, color: 'text-emerald-500 bg-emerald-50 border-emerald-100' };
-    return { Icon: FileIcon, color: 'text-slate-400 bg-slate-50 border-slate-100' };
-  };
-
-  const filterNode = (node: any, query: string): boolean => {
-    if (!query) return true;
-    const nameMatch = node.name.toLowerCase().includes(query.toLowerCase());
-    const hasSubFolderMatch = node.sub_folders?.some((sub: any) => filterNode(sub, query));
-    const hasDocMatch = node.documents?.some((doc: any) => doc.name.toLowerCase().includes(query.toLowerCase()));
-    return nameMatch || hasSubFolderMatch || hasDocMatch;
-  };
-
   // Close context menu on window click
   useEffect(() => {
     const closeMenu = () => setContextMenu(null);
@@ -641,187 +601,10 @@ export default function DocumentTree() {
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  // Recursive Tree Node Renderer
-  const renderTreeNode = (node: any, depth = 0) => {
-    const isExpanded = expandedFolders[node.id];
-    const isVisible = filterNode(node, treeSearchQuery);
-    
-    if (!isVisible) return null;
-    
-    const filteredDocs = node.documents?.filter((doc: any) => 
-      !treeSearchQuery || doc.name.toLowerCase().includes(treeSearchQuery.toLowerCase())
-    ) || [];
-
-    const filteredSubFolders = node.sub_folders?.filter((sub: any) => 
-      filterNode(sub, treeSearchQuery)
-    ) || [];
-
-    return (
-      <div key={node.id} style={{ marginLeft: `${depth > 0 ? 12 : 0}px` }} className="space-y-0.5">
-        {/* Folder row */}
-        <div 
-          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-100/70 cursor-pointer group transition-all"
-          onClick={() => handleToggleFolder(node.id)}
-          onContextMenu={(e) => handleContextMenu(e, 'folder', node.id)}
-        >
-          <div className="flex items-center gap-2 text-slate-700 min-w-0">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-450" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-450" />}
-            <Folder className={`h-4 w-4 shrink-0 ${isExpanded ? 'text-amber-500 fill-amber-500/20' : 'text-amber-600 fill-amber-600/10'}`} />
-            <span className="text-xs font-semibold truncate select-none">{node.name}</span>
-          </div>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = e.currentTarget.getBoundingClientRect();
-              setContextMenu({
-                x: rect.left,
-                y: rect.bottom + window.scrollY,
-                type: 'folder',
-                id: node.id
-              });
-            }}
-            className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-200 rounded text-slate-450 transition-all shrink-0"
-          >
-            <MoreVertical className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Nested elements */}
-        {isExpanded && (
-          <div className="border-l border-slate-200 pl-2.5 ml-3.5 space-y-0.5">
-            {filteredSubFolders.map((sub: any) => renderTreeNode(sub, depth + 1))}
-            
-            {filteredDocs.map((doc: any) => {
-              const fileConfig = getFileIcon(doc.file_type);
-              const DocIcon = fileConfig.Icon;
-              const isSelected = selectedDocId === doc.id;
-              
-              return (
-                <div
-                  key={doc.id}
-                  onClick={() => {
-                    setSelectedDocId(doc.id);
-                    setDocChatHistory([]);
-                  }}
-                  onContextMenu={(e) => handleContextMenu(e, 'file', doc.id)}
-                  className={`flex items-center justify-between py-1.5 px-2.5 rounded-lg cursor-pointer transition-all group ${
-                    isSelected 
-                      ? 'bg-blue-50 text-blue-700 font-bold border-l-2 border-blue-600' 
-                      : 'hover:bg-slate-100/60 text-slate-600 hover:text-slate-900 border-l-2 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <DocIcon className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className="text-[11px] truncate leading-none select-none">{doc.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[8px] text-slate-450 font-bold shrink-0 uppercase opacity-100 group-hover:opacity-0 transition-opacity">.{doc.file_type}</span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setContextMenu({
-                          x: rect.left,
-                          y: rect.bottom + window.scrollY,
-                          type: 'file',
-                          id: doc.id
-                        });
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-200 rounded text-slate-400 transition-all shrink-0"
-                    >
-                      <MoreVertical className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredSubFolders.length === 0 && filteredDocs.length === 0 && (
-              <div className="text-[10px] text-slate-400 italic py-1 pl-4">Empty Folder</div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="flex h-[calc(100vh-100px)] w-full overflow-hidden border border-slate-200 rounded-xl bg-white shadow-sm relative font-sans">
       
-      {/* 1. LEFT PANEL (20% width) - Enterprise Folder Catalog Tree */}
-      <aside className="w-1/5 border-r border-slate-200 flex flex-col h-full bg-slate-50/50 shrink-0 select-none">
-        {/* Catalog Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4.5 w-4.5 text-blue-600" />
-            <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">Document Catalog</span>
-          </div>
-          <div className="flex gap-1.5">
-            <button 
-              onClick={() => {
-                setNewFolderParentId(null);
-                setShowNewFolder(true);
-              }}
-              className="p-1.5 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-900 transition-all"
-              title="New Folder"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-            <button 
-              onClick={() => {
-                setUploadFolderId(null);
-                setShowUpload(true);
-              }}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all"
-              title="Upload File"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Tree filter input */}
-        <div className="px-4 pt-3 pb-2 border-b border-slate-200/50 shrink-0 bg-white">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
-              value={treeSearchQuery}
-              onChange={(e) => setTreeSearchQuery(e.target.value)}
-              placeholder="Search folders & files..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-4 py-2 text-xs focus:outline-none focus:bg-white focus:border-blue-500 transition-all text-slate-800"
-            />
-          </div>
-        </div>
-
-        {/* Collapsible tree view */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-          {treeLoading ? (
-            <div className="flex flex-col items-center justify-center h-48 space-y-2">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Loading Catalog...</p>
-            </div>
-          ) : folderTree && folderTree.length > 0 ? (
-            folderTree.map((root: any) => renderTreeNode(root))
-          ) : (
-            <div className="text-center py-12 space-y-2">
-              <FolderOpen className="h-8 w-8 text-slate-350 mx-auto" />
-              <p className="text-xs text-slate-500">Workspace catalog is empty.</p>
-              <button 
-                onClick={() => {
-                  setNewFolderParentId(null);
-                  setShowNewFolder(true);
-                }}
-                className="text-xs text-blue-600 hover:underline font-bold"
-              >
-                Create a folder
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* 2. CENTER PANEL (58% width) - Google Doc Editor Canvas */}
+      {/* CENTER PANEL (Editor Canvas) */}
       <main className="flex-1 bg-slate-100 flex flex-col h-full overflow-hidden relative">
         {selectedDocId ? (
           docLoading ? (

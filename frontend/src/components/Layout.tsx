@@ -14,7 +14,9 @@ import {
   Search,
   Bell,
   Clock,
-  ChevronDown
+  ChevronDown,
+  ChevronRight,
+  Folder
 } from 'lucide-react';
 
 export default function Layout() {
@@ -24,11 +26,17 @@ export default function Layout() {
 
   const [showRecentDropdown, setShowRecentDropdown] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [notifications, setNotifications] = useState([
+  const notifications = [
     { id: 1, text: "New document version uploaded by Riwitika", time: "5m ago" },
     { id: 2, text: "Access granted for Department SOP", time: "1h ago" }
-  ]);
+  ];
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Workspace Tree Sidebar Expanded states
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
+  const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({
+    1: true // Auto-expand "Company Knowledge" root folder on load!
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -44,19 +52,81 @@ export default function Layout() {
     enabled: !!user
   });
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Document Workspace', path: '/documents', icon: FolderTree },
-  ];
+  // Get recursive folder tree for sidebar navigation
+  const { data: folderTree } = useQuery({
+    queryKey: ['folders-tree'],
+    queryFn: api.folders.tree,
+    enabled: !!user
+  });
 
-  if (isAdmin) {
-    menuItems.push({ name: 'User Directory', path: '/users', icon: Users });
-  }
+  const toggleFolder = (folderId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+  };
+
+  // Recursive Sidebar Tree Renderer
+  const renderSidebarTree = (nodes: any[], depth = 0) => {
+    return nodes.map((node) => {
+      const isExpanded = !!expandedFolders[node.id];
+      
+      return (
+        <div key={node.id} className="space-y-0.5 select-none">
+          {/* Folder row button */}
+          <button
+            onClick={(e) => toggleFolder(node.id, e)}
+            style={{ paddingLeft: `${8 + depth * 8}px` }}
+            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-655 hover:bg-slate-100 ${
+              isExpanded ? 'font-bold text-slate-900 bg-slate-50/40' : 'font-medium'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 min-w-0 text-[11px]">
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+              ) : (
+                <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
+              )}
+              <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500 fill-amber-500/10' : 'text-amber-600 fill-amber-600/5'}`} />
+              <span className="truncate">{node.name}</span>
+            </span>
+          </button>
+
+          {/* Children: Subfolders and Files */}
+          {isExpanded && (
+            <div className="space-y-0.5 border-l border-slate-100/80 ml-3 pl-1">
+              {/* Recursive sub_folders */}
+              {node.sub_folders && node.sub_folders.length > 0 && renderSidebarTree(node.sub_folders, depth + 1)}
+              
+              {/* Files nested inside folder */}
+              {node.documents && node.documents.map((doc: any) => {
+                const isActive = location.search.includes(`open=${doc.id}`);
+                return (
+                  <Link
+                    key={doc.id}
+                    to={`/documents?open=${doc.id}`}
+                    style={{ paddingLeft: `${14 + depth * 8}px` }}
+                    className={`flex items-center gap-1.5 py-1 px-2 rounded-md text-[10px] font-semibold transition-all truncate block ${
+                      isActive 
+                        ? 'bg-blue-50 text-blue-700 font-extrabold shadow-[inset_1px_0_0_#2563eb]' 
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className="truncate">{doc.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
       
-      {/* 1. Sidebar Nav (20%) */}
+      {/* 1. Sidebar Nav (20% width equivalent) */}
       <aside className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0 relative z-20 shadow-sm">
         {/* Brand / Logo */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-200 shrink-0 bg-slate-900 text-white">
@@ -70,33 +140,81 @@ export default function Layout() {
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-4 py-6 space-y-1 bg-white overflow-y-auto">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex items-center gap-3 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${isActive
+        <nav className="flex-1 px-4 py-5 space-y-1.5 bg-white overflow-y-auto custom-scrollbar">
+          
+          {/* Dashboard Link */}
+          <Link
+            to="/"
+            className={`flex items-center gap-3 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+              location.pathname === '/'
+                ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+            }`}
+          >
+            <LayoutDashboard className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/' ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span>Dashboard</span>
+            {location.pathname === '/' && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
+            )}
+          </Link>
+
+          {/* Expandable Document Workspace Menu Link */}
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setWorkspaceExpanded(!workspaceExpanded);
+                if (location.pathname !== '/documents') {
+                  navigate('/documents');
+                }
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+                location.pathname === '/documents'
                   ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
-                  }`}
-              >
-                <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                <span>{item.name}</span>
-                {isActive && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
-                )}
-              </Link>
-            );
-          })}
+              }`}
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <FolderTree className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/documents' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span>Document Workspace</span>
+              </span>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-450 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Document Tree Hierarchy underneath */}
+            {workspaceExpanded && folderTree && folderTree.length > 0 && (
+              <div className="pl-1 pr-0.5 py-1 space-y-0.5 border-l border-slate-100 ml-5 animate-in fade-in duration-200">
+                {renderSidebarTree(folderTree)}
+              </div>
+            )}
+            {workspaceExpanded && (!folderTree || folderTree.length === 0) && (
+              <span className="text-[10px] text-slate-400 italic block pl-8 select-none py-1">No folders seeded</span>
+            )}
+          </div>
+
+          {/* User Directory Link (Admins only) */}
+          {isAdmin && (
+            <Link
+              to="/users"
+              className={`flex items-center gap-3 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+                location.pathname === '/users'
+                  ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+              }`}
+            >
+              <Users className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/users' ? 'text-blue-600' : 'text-slate-400'}`} />
+              <span>User Directory</span>
+              {location.pathname === '/users' && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
+              )}
+            </Link>
+          )}
+
         </nav>
 
         {/* User profile footer */}
         <div className="border-t border-slate-200 p-4 shrink-0 bg-slate-50 flex items-center justify-between gap-3 relative">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-700 shrink-0 font-extrabold text-xs">
+            <div className="h-8 w-8 rounded-full bg-slate-250 border border-slate-350 flex items-center justify-center text-slate-750 shrink-0 font-extrabold text-xs">
               {user?.full_name?.charAt(0) || 'U'}
             </div>
             <div className="min-w-0">
@@ -121,11 +239,11 @@ export default function Layout() {
         <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-8 shrink-0 relative z-30 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
           {/* Logo & Section indicators */}
           <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-150 px-3 py-0.5 text-[9px] font-bold text-blue-700 uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-150 px-3 py-0.5 text-[9px] font-bold text-blue-700 uppercase tracking-wider select-none">
               <Activity className="h-3 w-3 text-blue-600 animate-pulse" />
               {user?.role?.name?.replace('_', ' ') || 'employee'}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider select-none">
               <Layers className="h-3 w-3 text-slate-400" />
               RAG Vector Engine: Active
             </span>
@@ -148,103 +266,89 @@ export default function Layout() {
             
             {/* Recent Documents Quick Access */}
             <div className="relative">
-              <button 
-                onClick={() => setShowRecentDropdown(prev => !prev)}
-                className="flex items-center gap-1.5 text-xs font-bold text-slate-655 hover:text-slate-900 transition-all p-1"
-                title="Recent Documents"
+              <button
+                onClick={() => setShowRecentDropdown(!showRecentDropdown)}
+                className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition-colors p-2 text-xs font-bold select-none"
               >
-                <Clock className="h-4 w-4 text-slate-500" />
+                <Clock className="h-4.5 w-4.5" />
                 <span>Recent</span>
-                <ChevronDown className="h-3 w-3 text-slate-400" />
+                <ChevronDown className="h-3 w-3" />
               </button>
-              
-              {showRecentDropdown && (
-                <div className="absolute right-0 mt-2.5 bg-white border border-slate-200 shadow-xl rounded-xl py-1.5 w-64 z-50 text-xs text-slate-750">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-3.5 py-1.5 block border-b border-slate-100">Recently Ingested Documents</span>
-                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                    {metrics?.recent_uploads && metrics.recent_uploads.length > 0 ? (
-                      metrics.recent_uploads.map((doc: any) => (
-                        <button
-                          key={doc.id}
-                          onClick={() => {
-                            setShowRecentDropdown(false);
-                            navigate(`/documents?open=${doc.id}`);
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 font-semibold truncate block"
-                        >
-                          {doc.name}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="px-3.5 py-2 text-slate-400 italic block">No recent logs</span>
+
+              {showRecentDropdown && metrics?.recent_uploads && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-3.5 py-1 text-[9px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-100 select-none">
+                    Recently Ingested
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {metrics.recent_uploads.map((doc: any) => (
+                      <Link
+                        key={doc.id}
+                        to={`/documents?open=${doc.id}`}
+                        onClick={() => setShowRecentDropdown(false)}
+                        className="flex items-center gap-2 px-3.5 py-2 hover:bg-slate-50 text-slate-700 hover:text-blue-600 truncate transition-colors"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate font-semibold">{doc.name}</span>
+                      </Link>
+                    ))}
+                    {metrics.recent_uploads.length === 0 && (
+                      <div className="px-4 py-3 text-slate-400 text-center italic select-none">No recent files.</div>
                     )}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Notifications Menu */}
+            {/* Notification triggers */}
             <div className="relative">
-              <button 
-                onClick={() => setShowNotifications(prev => !prev)}
-                className="relative p-1.5 hover:bg-slate-50 rounded-lg text-slate-500 hover:text-slate-900 transition-all"
-                title="Notifications"
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-800 transition-all relative"
               >
                 <Bell className="h-4.5 w-4.5" />
-                {notifications.length > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-                )}
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white animate-pulse" />
               </button>
-              
+
               {showNotifications && (
-                <div className="absolute right-0 mt-2 bg-white border border-slate-200 shadow-xl rounded-xl py-1.5 w-72 z-50 text-xs text-slate-750">
-                  <div className="flex justify-between items-center px-3.5 py-1.5 border-b border-slate-100 shrink-0">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Telemetry Notifications</span>
-                    <button onClick={() => setNotifications([])} className="text-[9px] text-red-600 font-bold hover:underline">Clear all</button>
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-3.5 py-1 text-[9px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-100 select-none">
+                    Security Center
                   </div>
-                  <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto custom-scrollbar">
-                    {notifications.length > 0 ? (
-                      notifications.map((n) => (
-                        <div key={n.id} className="p-3 hover:bg-slate-50 flex flex-col gap-0.5">
-                          <span className="font-semibold text-slate-700">{n.text}</span>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{n.time}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="px-3.5 py-3 text-slate-400 italic text-center block">No new alerts</span>
-                    )}
+                  <div className="divide-y divide-slate-50">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="px-3.5 py-2.5 hover:bg-slate-50/50">
+                        <p className="text-slate-700 font-semibold leading-normal">{n.text}</p>
+                        <span className="text-[9px] text-slate-400 block mt-1 select-none">{n.time}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Profile Selector */}
+            {/* User Account menu */}
             <div className="relative">
-              <button 
-                onClick={() => setShowProfileDropdown(prev => !prev)}
-                className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-50 transition-all"
+              <button
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="flex items-center gap-1.5 hover:opacity-85 transition-opacity"
               >
-                <div className="h-7 w-7 rounded-full bg-blue-650 text-white flex items-center justify-center font-extrabold text-xs border border-blue-500">
+                <div className="h-7 w-7 rounded-full bg-blue-50 border border-blue-150 flex items-center justify-center text-blue-600 font-extrabold text-xs">
                   {user?.full_name?.charAt(0) || 'U'}
                 </div>
-                <div className="text-left hidden md:block">
-                  <span className="text-xs font-bold text-slate-800 leading-none block">{user?.full_name}</span>
-                  <span className="text-[9px] font-bold text-slate-400 tracking-wider block mt-0.5">{user?.email}</span>
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               </button>
-              
+
               {showProfileDropdown && (
-                <div className="absolute right-0 mt-2 bg-white border border-slate-200 shadow-xl rounded-xl py-1.5 w-48 z-50 text-xs text-slate-750">
-                  <div className="px-3.5 py-2 border-b border-slate-100 block">
-                    <span className="font-bold text-slate-800 block">{user?.full_name}</span>
-                    <span className="text-[9px] text-slate-400 block mt-0.5">{user?.email}</span>
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs text-left animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-3.5 py-2 border-b border-slate-100 select-none">
+                    <p className="font-extrabold text-slate-800 truncate">{user?.full_name}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">{user?.email}</p>
                   </div>
-                  <button 
+                  <button
                     onClick={handleLogout}
-                    className="w-full text-left px-3.5 py-2 hover:bg-red-50 text-red-650 hover:text-red-700 font-bold block"
+                    className="w-full text-left px-3.5 py-2.5 text-red-650 hover:bg-red-50 hover:text-red-700 font-extrabold flex items-center gap-2"
                   >
-                    Logout Account
+                    <LogOut className="h-3.5 w-3.5" /> Sign Out
                   </button>
                 </div>
               )}
@@ -253,10 +357,11 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Content View Canvas */}
-        <main className="flex-1 overflow-y-auto bg-slate-100">
+        {/* Page Render Container */}
+        <div className="flex-1 overflow-auto bg-slate-100/50 p-8">
           <Outlet />
-        </main>
+        </div>
+
       </div>
     </div>
   );
