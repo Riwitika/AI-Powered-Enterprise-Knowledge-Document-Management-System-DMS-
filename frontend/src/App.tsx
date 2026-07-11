@@ -9,7 +9,6 @@ import DocumentTree from './pages/DocumentTree';
 import DocumentViewer from './pages/DocumentViewer';
 import AIChat from './pages/AIChat';
 import Search from './pages/Search';
-import Permissions from './pages/Permissions';
 import UserManagement from './pages/UserManagement';
 
 const queryClient = new QueryClient({
@@ -86,7 +85,6 @@ export default function App() {
             <Route path="documents/:id" element={<DocumentViewer />} />
             <Route path="chat" element={<AIChat />} />
             <Route path="search" element={<Search />} />
-            <Route path="permissions" element={<Permissions />} />
             <Route path="users" element={<UserManagement />} />
           </Route>
 

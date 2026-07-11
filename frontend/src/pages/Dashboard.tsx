@@ -10,7 +10,8 @@ import {
   TrendingUp,
   ChevronRight,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  FolderTree
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -98,14 +99,24 @@ export default function Dashboard() {
           <p className="text-slate-500 text-xs mt-0.5">Real-time telemetry and metadata indicators from the security KMS repository.</p>
         </div>
         
-        <Link 
-          to="/chat" 
-          className="glow-btn bg-slate-900 hover:bg-slate-800 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-sm flex items-center gap-1.5 w-fit transition-colors"
-        >
-          <Sparkles className="h-4 w-4 text-blue-400" />
-          <span>Consult AI Assistant</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex gap-3">
+          <Link 
+            to="/documents" 
+            className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-sm flex items-center gap-1.5 w-fit transition-colors border border-blue-500"
+          >
+            <FolderTree className="h-4 w-4" />
+            <span>Open Workspace</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link 
+            to="/chat" 
+            className="glow-btn bg-slate-900 hover:bg-slate-800 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-sm flex items-center gap-1.5 w-fit transition-colors"
+          >
+            <Sparkles className="h-4 w-4 text-blue-400" />
+            <span>Consult AI Assistant</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
 
       {/* Metric Cards Grid */}
