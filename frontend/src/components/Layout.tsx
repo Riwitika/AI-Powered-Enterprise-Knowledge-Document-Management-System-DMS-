@@ -76,24 +76,24 @@ export default function Layout() {
           <button
             onClick={(e) => toggleFolder(node.id, e)}
             style={{ paddingLeft: `${8 + depth * 12}px` }}
-            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent ${
+            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent min-w-0 ${
               isExpanded ? 'font-bold text-slate-900 bg-slate-50/40' : 'font-medium'
             }`}
           >
-            <span className="flex items-center gap-1.5 min-w-0 text-[11px]">
+            <span className="flex items-center gap-1.5 min-w-0 text-[11px] flex-1">
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3 text-blue-500 shrink-0 font-bold" />
               ) : (
                 <ChevronRight className="h-3 w-3 text-slate-400 shrink-0 hover:text-slate-800" />
               )}
               <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500 fill-amber-500/10' : 'text-amber-600 fill-amber-600/5'}`} />
-              <span className="truncate">{node.name}</span>
+              <span className="truncate block min-w-0 flex-1">{node.name}</span>
             </span>
           </button>
 
           {/* Children: Subfolders and Files */}
           {isExpanded && (
-            <div className="space-y-0.5 border-l border-slate-200/50 ml-3 pl-1.5 transition-all">
+            <div className="space-y-0.5 border-l border-slate-200/50 ml-3 pl-1.5 transition-all duration-200 ease-in-out">
               {/* Recursive sub_folders */}
               {node.sub_folders && node.sub_folders.length > 0 && renderSidebarTree(node.sub_folders, depth + 1)}
               
@@ -105,14 +105,14 @@ export default function Layout() {
                     key={doc.id}
                     to={`/documents?open=${doc.id}`}
                     style={{ paddingLeft: `${14 + depth * 12}px` }}
-                    className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[10px] font-bold transition-all truncate block border-l-2 ${
+                    className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[10px] font-bold transition-all border-l-2 min-w-0 ${
                       isActive 
-                        ? 'bg-blue-50/80 text-blue-600 border-blue-650 shadow-sm font-extrabold' 
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-850 border-l-2 border-transparent hover:border-slate-200'
+                        ? 'bg-blue-50/90 text-blue-600 border-blue-600 shadow-sm font-extrabold' 
+                        : 'text-slate-500 hover:bg-slate-50/80 hover:text-slate-800 border-l-2 border-transparent hover:border-slate-200'
                     }`}
                   >
                     <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className="truncate">{doc.name}</span>
+                    <span className="truncate block min-w-0 flex-1">{doc.name}</span>
                   </Link>
                 );
               })}

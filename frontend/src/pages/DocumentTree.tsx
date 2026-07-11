@@ -628,7 +628,7 @@ export default function DocumentTree() {
                     </div>
                     <div className="min-w-0">
                       {/* Breadcrumbs */}
-                      <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 select-none">
+                      <div className="flex items-center gap-1 text-[9.5px] text-slate-400/90 font-extrabold uppercase tracking-wider mb-2 select-none">
                         {getBreadcrumbs().map((b: string, idx: number, arr: string[]) => (
                           <span key={idx} className="flex items-center gap-1">
                             <span>{b}</span>
@@ -642,9 +642,9 @@ export default function DocumentTree() {
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         placeholder="Untitled Document"
-                        className="text-base font-extrabold text-slate-900 border-none p-0 focus:outline-none focus:ring-0 bg-transparent placeholder-slate-350 truncate tracking-tight leading-none block w-64"
+                        className="text-lg font-extrabold text-slate-900 border-none p-0 focus:outline-none focus:ring-0 bg-transparent placeholder-slate-350 truncate tracking-tight leading-none block w-96"
                       />
-                      <div className="flex items-center gap-1.5 text-[9px] text-slate-450 font-bold mt-1.5 uppercase tracking-wider select-none">
+                      <div className="flex items-center gap-2 text-[9px] text-slate-400 font-bold mt-2 uppercase tracking-wider select-none">
                         <span>Owner: {selectedDoc.owner?.full_name || 'System Administrator'}</span>
                         <span>•</span>
                         <span>Dept: {selectedDoc.department?.name || 'Corporate'}</span>
@@ -653,7 +653,7 @@ export default function DocumentTree() {
                         <span>•</span>
                         <span>Version: v{selectedDoc.current_version}</span>
                         <span>•</span>
-                        <span className="text-slate-500">Status: {selectedDoc.status || 'Active'}</span>
+                        <span className="text-slate-455">Status: {selectedDoc.status || 'Active'}</span>
                       </div>
                     </div>
                   </div>
@@ -880,9 +880,9 @@ export default function DocumentTree() {
               </div>
 
               {/* Large Page Editor Canvas Container */}
-              <div className="flex-1 overflow-y-auto pt-10 pb-8 px-4 flex justify-center items-start custom-scrollbar bg-slate-100/40">
+              <div className="flex-1 overflow-y-auto pt-8 pb-8 px-3 flex justify-center items-start custom-scrollbar bg-slate-150/30">
                 <div 
-                  className="bg-white border border-slate-200 shadow-[0_4px_16px_rgba(0,0,0,0.02)] min-h-[750px] p-16 w-full max-w-5xl focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-sm cursor-text rounded-md"
+                  className="bg-white border border-slate-150 shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[780px] p-16 w-full max-w-6xl focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-[13.5px] cursor-text rounded-md"
                   style={{ transform: `scale(${Number(zoomPercent)/100})`, transformOrigin: 'top center' }}
                 >
                   <div
@@ -894,7 +894,7 @@ export default function DocumentTree() {
                       setEditContent(html);
                       updateCounts(html);
                     }}
-                    className="focus:outline-none min-h-[650px] font-sans text-slate-700 leading-relaxed text-xs"
+                    className="focus:outline-none min-h-[680px] font-sans text-slate-750 leading-relaxed text-[13.5px]"
                   />
                 </div>
               </div>
@@ -1014,22 +1014,26 @@ export default function DocumentTree() {
                 <div className="space-y-2 pt-4 border-t border-slate-100">
                   <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Related Documents</span>
                   <div className="space-y-2">
-                    {allDocs?.filter((d: any) => d.id !== selectedDoc.id && d.category === selectedDoc.category).slice(0, 2).map((d: any) => (
-                      <button
-                        key={d.id}
-                        onClick={() => setSelectedDocId(d.id)}
-                        className="w-full text-left p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-between group bg-slate-50/50"
-                      >
-                        <div className="min-w-0 pr-4">
-                          <span className="font-bold text-slate-800 text-xs truncate block">{d.name}</span>
-                          <span className="text-[9px] text-slate-450 block mt-0.5 uppercase tracking-wider">{d.category || 'General'}</span>
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                      </button>
-                    ))}
-                    {(!allDocs || allDocs.filter((d: any) => d.id !== selectedDoc.id && d.category === selectedDoc.category).length === 0) && (
-                      <span className="text-[10px] text-slate-400 italic block">No contextually related documents.</span>
-                    )}
+                    {(() => {
+                      const categoryDocs = allDocs?.filter((d: any) => d.id !== selectedDoc.id && d.category === selectedDoc.category) || [];
+                      const displayDocs = categoryDocs.length > 0 
+                        ? categoryDocs.slice(0, 2) 
+                        : (allDocs?.filter((d: any) => d.id !== selectedDoc.id).slice(0, 2) || []);
+                      
+                      return displayDocs.map((d: any) => (
+                        <button
+                          key={d.id}
+                          onClick={() => setSelectedDocId(d.id)}
+                          className="w-full text-left p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-between group bg-slate-50/50"
+                        >
+                          <div className="min-w-0 pr-4">
+                            <span className="font-bold text-slate-800 text-xs truncate block">{d.name}</span>
+                            <span className="text-[9px] text-slate-455 block mt-0.5 uppercase tracking-wider">{d.category || 'Company Knowledge'}</span>
+                          </div>
+                          <ArrowRight className="h-3.5 w-3.5 text-slate-450 group-hover:text-blue-600 transition-colors" />
+                        </button>
+                      ));
+                    })()}
                   </div>
                 </div>
               </>
@@ -1053,7 +1057,7 @@ export default function DocumentTree() {
                     <button
                       key={act}
                       onClick={() => triggerAIShortcut(act)}
-                      className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-1.5 text-[9px] font-extrabold text-slate-655 hover:text-slate-900 transition-all text-center uppercase tracking-wider"
+                      className="bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-200/80 hover:border-blue-200 rounded-lg py-1.5 text-[9px] font-extrabold text-slate-600 transition-all text-center uppercase tracking-wider shadow-sm flex items-center justify-center"
                     >
                       {act}
                     </button>
