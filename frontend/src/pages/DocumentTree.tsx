@@ -704,17 +704,17 @@ export default function DocumentTree() {
                 </div>
 
                 {/* Google Doc-Style Toolbar Ribbon */}
-                <div className="border border-slate-200/80 rounded-xl bg-slate-50/50 p-1 flex items-center justify-between gap-4 overflow-x-auto text-slate-700 select-none custom-scrollbar">
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => applyStyle('undo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Undo"><Undo className="h-3.5 w-3.5 text-slate-550" /></button>
-                    <button onClick={() => applyStyle('redo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Redo"><Redo className="h-3.5 w-3.5 text-slate-550" /></button>
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                <div className="border border-slate-200/80 rounded-xl bg-slate-50/50 py-2 px-3.5 flex items-center justify-between gap-5 overflow-x-auto text-slate-700 select-none custom-scrollbar shrink-0 min-h-[44px] flex-nowrap whitespace-nowrap shadow-sm">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
+                    <button onClick={() => applyStyle('undo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Undo"><Undo className="h-4 w-4 text-slate-550" /></button>
+                    <button onClick={() => applyStyle('redo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Redo"><Redo className="h-4 w-4 text-slate-550" /></button>
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
                     
                     {/* Zoom Dropdown */}
                     <select
                       value={zoomPercent}
                       onChange={(e) => setZoomPercent(e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-650 focus:outline-none"
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none cursor-pointer"
                       title="Zoom"
                     >
                       <option value="75">75%</option>
@@ -724,12 +724,12 @@ export default function DocumentTree() {
                       <option value="150">150%</option>
                     </select>
 
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Format/Heading styles */}
                     <select
                       onChange={(e) => applyStyle('formatBlock', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-650 focus:outline-none w-24"
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-28 cursor-pointer"
                       defaultValue="P"
                       title="Styles"
                     >
@@ -743,7 +743,7 @@ export default function DocumentTree() {
                     {/* Font Dropdown */}
                     <select
                       onChange={(e) => applyStyle('fontName', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-650 focus:outline-none w-28"
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-32 cursor-pointer"
                       defaultValue="Outfit"
                       title="Font family"
                     >
@@ -757,7 +757,7 @@ export default function DocumentTree() {
                     {/* Font Size */}
                     <select
                       onChange={(e) => applyStyle('fontSize', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-650 focus:outline-none w-12"
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-14 cursor-pointer"
                       defaultValue="3"
                       title="Font Size"
                     >
@@ -769,45 +769,45 @@ export default function DocumentTree() {
                       <option value="6">24px</option>
                     </select>
 
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Bold, Italic, Underline, Strikethrough */}
-                    <button onClick={() => applyStyle('bold')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center font-extrabold text-xs" title="Bold">B</button>
-                    <button onClick={() => applyStyle('italic')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center italic font-bold text-xs" title="Italic">I</button>
-                    <button onClick={() => applyStyle('underline')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center underline font-bold text-xs" title="Underline">U</button>
-                    <button onClick={() => applyStyle('strikeThrough')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center line-through font-bold text-xs" title="Strikethrough">S</button>
+                    <button onClick={() => applyStyle('bold')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center font-extrabold text-sm" title="Bold">B</button>
+                    <button onClick={() => applyStyle('italic')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center italic font-bold text-sm" title="Italic">I</button>
+                    <button onClick={() => applyStyle('underline')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center underline font-bold text-sm" title="Underline">U</button>
+                    <button onClick={() => applyStyle('strikeThrough')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center line-through font-bold text-sm" title="Strikethrough">S</button>
                     
                     {/* Text colors */}
                     <input 
                       type="color" 
                       onChange={(e) => applyStyle('foreColor', e.target.value)}
-                      className="w-5 h-5 border border-slate-250 cursor-pointer rounded-full overflow-hidden shrink-0 mt-0.5" 
+                      className="w-5.5 h-5.5 border border-slate-250 cursor-pointer rounded-full overflow-hidden shrink-0 mt-0.5" 
                       title="Text Color"
                     />
                     <input 
                       type="color" 
                       onChange={(e) => applyStyle('backColor', e.target.value)}
-                      className="w-5 h-5 border border-slate-250 cursor-pointer rounded-sm overflow-hidden shrink-0 mt-0.5" 
+                      className="w-5.5 h-5.5 border border-slate-250 cursor-pointer rounded-sm overflow-hidden shrink-0 mt-0.5" 
                       title="Highlight Color"
                       defaultValue="#FFFF00"
                     />
                     
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Alignments */}
-                    <button onClick={() => applyStyle('justifyLeft')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Align Left"><AlignLeft className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('justifyCenter')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Align Center"><AlignCenter className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('justifyRight')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Align Right"><AlignRight className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('justifyFull')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Justify"><AlignJustify className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => applyStyle('justifyLeft')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Left"><AlignLeft className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('justifyCenter')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Center"><AlignCenter className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('justifyRight')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Right"><AlignRight className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('justifyFull')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Justify"><AlignJustify className="h-4 w-4" /></button>
                     
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Lists */}
-                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center animate-all" title="Bulleted List"><List className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center animate-all" title="Numbered List"><ListOrdered className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[9px] font-bold px-1.5 h-6.5 flex items-center justify-center hover:text-slate-900" title="Checklist">☑ Checklist</button>
+                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center animate-all" title="Bulleted List"><List className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center animate-all" title="Numbered List"><ListOrdered className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[10px] font-extrabold px-1.5 h-7 flex items-center justify-center hover:text-slate-900" title="Checklist">☑ Checklist</button>
                     
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Line spacing */}
                     <select
@@ -818,7 +818,7 @@ export default function DocumentTree() {
                           setEditContent(editor.innerHTML);
                         }
                       }}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1 py-0.5 text-[9px] font-bold text-slate-600 focus:outline-none w-16"
+                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1 py-0.5 text-[10px] font-extrabold text-slate-655 focus:outline-none w-18 cursor-pointer"
                       defaultValue="1.5"
                       title="Line Spacing"
                     >
@@ -828,22 +828,22 @@ export default function DocumentTree() {
                       <option value="2.0">Double</option>
                     </select>
 
-                    <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
 
                     {/* Insert Options */}
-                    <button onClick={() => handleInsertTable()} className="p-1 hover:bg-slate-200 rounded transition-colors text-[10px] font-bold px-1.5 h-6.5 flex items-center justify-center" title="Insert 3x3 Table">Table</button>
-                    <button onClick={handleInsertLink} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Insert Link"><Link2 className="h-3.5 w-3.5" /></button>
-                    <button onClick={handleInsertImage} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Insert Image"><ImageIcon className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertHorizontalRule')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[10px] font-bold px-1.5 h-6.5 flex items-center justify-center" title="Horizontal Rule">HR</button>
-                    <button onClick={() => applyStyle('insertHTML', '<pre class="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-xs my-2"><code>// Code Block\n</code></pre>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Insert Code Block"><Code className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertHTML', '<blockquote class="border-l-4 border-slate-350 pl-4 italic text-slate-550 my-2">Block Quote</blockquote>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Insert Quote"><Quote className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => applyStyle('insertHTML', '😊')} className="p-1 hover:bg-slate-200 rounded transition-colors w-6.5 h-6.5 flex items-center justify-center" title="Insert Emoji"><Smile className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => handleInsertTable()} className="p-1 hover:bg-slate-200 rounded transition-colors text-[11px] font-bold px-1.5 h-7 flex items-center justify-center" title="Insert 3x3 Table">Table</button>
+                    <button onClick={handleInsertLink} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Link"><Link2 className="h-4 w-4" /></button>
+                    <button onClick={handleInsertImage} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Image"><ImageIcon className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('insertHorizontalRule')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[11px] font-bold px-1.5 h-7 flex items-center justify-center" title="Horizontal Rule">HR</button>
+                    <button onClick={() => applyStyle('insertHTML', '<pre class="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-xs my-2"><code>// Code Block\n</code></pre>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Code Block"><Code className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('insertHTML', '<blockquote class="border-l-4 border-slate-350 pl-4 italic text-slate-550 my-2">Block Quote</blockquote>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Quote"><Quote className="h-4 w-4" /></button>
+                    <button onClick={() => applyStyle('insertHTML', '😊')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Emoji"><Smile className="h-4 w-4" /></button>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
                     <button 
                       onClick={() => setShowFindReplace(prev => !prev)}
-                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${showFindReplace ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-650 hover:bg-slate-300'}`}
+                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${showFindReplace ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-655 hover:bg-slate-300'}`}
                     >
                       Find & Replace
                     </button>
@@ -880,9 +880,9 @@ export default function DocumentTree() {
               </div>
 
               {/* Large Page Editor Canvas Container */}
-              <div className="flex-1 overflow-y-auto pt-8 pb-8 px-3 flex justify-center items-start custom-scrollbar bg-slate-150/30">
+              <div className="flex-1 overflow-y-auto pt-8 pb-8 px-2 flex justify-center items-start custom-scrollbar bg-slate-150/30">
                 <div 
-                  className="bg-white border border-slate-150 shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[780px] p-16 w-full max-w-6xl focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-[13.5px] cursor-text rounded-md"
+                  className="bg-white border border-slate-150 shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[780px] p-16 w-full max-w-[1240px] focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-[14.5px] cursor-text rounded-md"
                   style={{ transform: `scale(${Number(zoomPercent)/100})`, transformOrigin: 'top center' }}
                 >
                   <div
@@ -894,7 +894,7 @@ export default function DocumentTree() {
                       setEditContent(html);
                       updateCounts(html);
                     }}
-                    className="focus:outline-none min-h-[680px] font-sans text-slate-750 leading-relaxed text-[13.5px]"
+                    className="focus:outline-none min-h-[680px] font-sans text-slate-750 leading-relaxed text-[14.5px]"
                   />
                 </div>
               </div>
@@ -942,8 +942,7 @@ export default function DocumentTree() {
         )}
       </main>
 
-      {/* 3. RIGHT PANEL (18% width) - Collapsible AI Sidebar */}
-      <aside className={`${isAiCollapsed ? 'w-0 border-none' : 'w-[18%] border-l border-slate-200'} flex flex-col h-full bg-white shrink-0 select-none transition-all duration-300 overflow-hidden`}>
+      <aside className={`${isAiCollapsed ? 'w-0 border-none' : 'w-[14.5%] border-l border-slate-200'} flex flex-col h-full bg-white shrink-0 select-none transition-all duration-300 overflow-hidden`}>
         
         {/* Navigation tabs for AI assistant info panels */}
         <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/20">

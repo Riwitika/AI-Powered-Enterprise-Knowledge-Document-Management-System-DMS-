@@ -13,8 +13,7 @@ import {
   ArrowRight,
   FolderTree,
   HardDrive,
-  Cpu,
-  Activity
+  Cpu
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -102,10 +101,10 @@ export default function Dashboard() {
   const aiQueriesPercentage = (((metrics?.ai_questions_asked_count || 0) + 42) / mockAiLimit) * 100;
 
   const simulatedActivities = [
-    { id: 1, user: "Riwitika Gupta", action: "modified Onboarding Handbook 2026", time: "10 mins ago" },
-    { id: 2, user: "Jane Doe", action: "granted access to Security Protocols Guide", time: "1 hour ago" },
-    { id: 3, user: "System Administrator", action: "added user Sarah Connor", time: "3 hours ago" },
-    { id: 4, user: "Arnim Goyal", action: "created Legal Contracts folder", time: "1 day ago" }
+    { id: 1, user: "KMS AI Engine", action: "generated automated summary for Onboarding Handbook 2026", time: "10 mins ago", isAi: true },
+    { id: 2, user: "Riwitika Gupta", action: "queried AI Assistant about Leave Policies", time: "25 mins ago", isAi: true },
+    { id: 3, user: "KMS RAG Pipeline", action: "re-indexed Finance/GST Guide vector nodes", time: "1 hour ago", isAi: true },
+    { id: 4, user: "Jane Doe", action: "requested AI document expansion on NDA", time: "3 hours ago", isAi: true }
   ];
 
   return (
@@ -145,16 +144,16 @@ export default function Dashboard() {
           return (
             <div
               key={card.name}
-              className="overflow-hidden rounded-xl bg-white border border-slate-200 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] group hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] transition-all select-none"
+              className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-6 min-h-[120px] flex items-center shadow-[0_4px_20px_rgba(0,0,0,0.015)] group hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 transition-all duration-300 select-none"
             >
-              <div className="flex items-center">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-lg border ${card.color} shrink-0`}>
-                  <Icon className="h-5 w-5" />
+              <div className="flex items-center w-full">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl border ${card.color} shrink-0 shadow-sm`}>
+                  <Icon className="h-5.5 w-5.5" />
                 </div>
-                <div className="ml-4 min-w-0">
-                  <p className="truncate text-[10px] font-bold text-slate-400 uppercase tracking-widest">{card.name}</p>
-                  <p className="mt-0.5 text-xl font-extrabold text-slate-900 tracking-tight leading-none">{card.value}</p>
-                  <span className="text-[10px] text-slate-455 font-semibold mt-1 block">{card.description}</span>
+                <div className="ml-4 min-w-0 flex-1">
+                  <p className="truncate text-[9.5px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">{card.name}</p>
+                  <p className="mt-1.5 text-2xl font-extrabold text-slate-900 tracking-tight leading-none">{card.value}</p>
+                  <span className="text-[10px] text-slate-455 font-bold mt-1 block truncate leading-none">{card.description}</span>
                 </div>
               </div>
             </div>
@@ -318,19 +317,19 @@ export default function Dashboard() {
       {/* Audit Log / Simulated Activities & Recently Edited (New Layout Section!) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         
-        {/* Activity log */}
+        {/* Recent AI Activity log */}
         <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col h-[320px]">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3.5 mb-3.5 shrink-0 select-none">
-            <Activity className="h-4.5 w-4.5 text-blue-600" />
-            <h2 className="font-bold text-slate-800 text-sm">System Operations Audit Log</h2>
+            <Sparkles className="h-4.5 w-4.5 text-blue-600" />
+            <h2 className="font-bold text-slate-800 text-sm">Recent AI & RAG Activity</h2>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
             {simulatedActivities.map((act) => (
-              <div key={act.id} className="flex justify-between items-start text-xs p-2.5 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl transition-colors">
+              <div key={act.id} className="flex justify-between items-start text-xs p-2.5 bg-slate-50/50 hover:bg-slate-55 border border-slate-100 rounded-xl transition-colors">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-6 w-6 rounded-full bg-blue-50 border border-blue-150 flex items-center justify-center text-blue-600 shrink-0 text-[10px] font-bold">
-                    {act.user.charAt(0)}
+                  <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${act.isAi ? 'bg-blue-50 text-blue-650 border border-blue-150' : 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
+                    {act.isAi ? 'AI' : act.user.charAt(0)}
                   </div>
                   <div className="truncate">
                     <strong className="text-slate-800">{act.user}</strong> <span className="text-slate-500 font-medium">{act.action}</span>

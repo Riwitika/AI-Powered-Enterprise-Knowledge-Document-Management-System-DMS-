@@ -75,7 +75,8 @@ export default function Layout() {
           {/* Folder row button */}
           <button
             onClick={(e) => toggleFolder(node.id, e)}
-            style={{ paddingLeft: `${8 + depth * 12}px` }}
+            style={{ paddingLeft: `${8 + depth * 14}px` }}
+            title={node.name}
             className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent min-w-0 ${
               isExpanded ? 'font-bold text-slate-900 bg-slate-50/40' : 'font-medium'
             }`}
@@ -93,7 +94,7 @@ export default function Layout() {
 
           {/* Children: Subfolders and Files */}
           {isExpanded && (
-            <div className="space-y-0.5 border-l border-slate-200/50 ml-3 pl-1.5 transition-all duration-200 ease-in-out">
+            <div className="space-y-0.5 border-l border-slate-200/50 ml-3 pl-1.5 transition-all duration-250 ease-in-out">
               {/* Recursive sub_folders */}
               {node.sub_folders && node.sub_folders.length > 0 && renderSidebarTree(node.sub_folders, depth + 1)}
               
@@ -104,11 +105,12 @@ export default function Layout() {
                   <Link
                     key={doc.id}
                     to={`/documents?open=${doc.id}`}
-                    style={{ paddingLeft: `${14 + depth * 12}px` }}
+                    style={{ paddingLeft: `${14 + depth * 14}px` }}
+                    title={doc.name}
                     className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[10px] font-bold transition-all border-l-2 min-w-0 ${
                       isActive 
                         ? 'bg-blue-50/90 text-blue-600 border-blue-600 shadow-sm font-extrabold' 
-                        : 'text-slate-500 hover:bg-slate-50/80 hover:text-slate-800 border-l-2 border-transparent hover:border-slate-200'
+                        : 'text-slate-500 hover:bg-slate-55/70 hover:text-slate-850 border-l-2 border-transparent hover:border-slate-200'
                     }`}
                   >
                     <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />

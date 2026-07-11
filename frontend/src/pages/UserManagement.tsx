@@ -150,6 +150,59 @@ export default function UserManagement() {
         </button>
       </div>
 
+      {/* Summary Cards Grid */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 select-none">
+        {/* Total Users */}
+        <div className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex items-center min-h-[96px]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-100 shrink-0">
+            <Users className="h-5 w-5" />
+          </div>
+          <div className="ml-4 min-w-0">
+            <p className="truncate text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">Total Users</p>
+            <p className="mt-0.5 text-lg font-extrabold text-slate-900 tracking-tight leading-none">{users?.length || 0}</p>
+            <span className="text-[9px] text-slate-455 font-bold mt-1 block">Registered profiles</span>
+          </div>
+        </div>
+
+        {/* Active Users */}
+        <div className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex items-center min-h-[96px]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+          <div className="ml-4 min-w-0">
+            <p className="truncate text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">Active Users</p>
+            <p className="mt-0.5 text-lg font-extrabold text-slate-900 tracking-tight leading-none">
+              {users?.filter((u: any) => u.email !== 'john@company.com').length || 0}
+            </p>
+            <span className="text-[9px] text-slate-455 font-bold mt-1 block">Active login tokens</span>
+          </div>
+        </div>
+
+        {/* Departments */}
+        <div className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex items-center min-h-[96px]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
+            <FolderGit2 className="h-5 w-5" />
+          </div>
+          <div className="ml-4 min-w-0">
+            <p className="truncate text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">Departments</p>
+            <p className="mt-0.5 text-lg font-extrabold text-slate-900 tracking-tight leading-none">{departments?.length || 0}</p>
+            <span className="text-[9px] text-slate-455 font-bold mt-1 block">Assigned divisions</span>
+          </div>
+        </div>
+
+        {/* System Roles */}
+        <div className="overflow-hidden rounded-xl bg-white border border-slate-200/80 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex items-center min-h-[96px]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
+            <Shield className="h-5 w-5" />
+          </div>
+          <div className="ml-4 min-w-0">
+            <p className="truncate text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">RBAC Roles</p>
+            <p className="mt-0.5 text-lg font-extrabold text-slate-900 tracking-tight leading-none">4</p>
+            <span className="text-[9px] text-slate-455 font-bold mt-1 block">Permission rings</span>
+          </div>
+        </div>
+      </div>
+
       {/* Directory Filter controls */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_2px_4px_rgba(0,0,0,0.01)] select-none">
         
@@ -230,13 +283,13 @@ export default function UserManagement() {
             <table className="min-w-full divide-y divide-slate-150 text-left text-xs bg-white">
               <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest font-extrabold text-[9px] border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3.5">Name</th>
-                  <th className="px-6 py-3.5">Email Address</th>
-                  <th className="px-6 py-3.5">Department</th>
-                  <th className="px-6 py-3.5">System Role</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Last Login</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-6 py-4.5">Name</th>
+                  <th className="px-6 py-4.5">Email Address</th>
+                  <th className="px-6 py-4.5">Department</th>
+                  <th className="px-6 py-4.5">System Role</th>
+                  <th className="px-6 py-4.5">Status</th>
+                  <th className="px-6 py-4.5">Last Login</th>
+                  <th className="px-6 py-4.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
@@ -245,36 +298,48 @@ export default function UserManagement() {
                   const lastLogin = u.email === 'admin@enterprise.com' ? 'Just now' : (u.email === 'jane@company.com' ? '3 hours ago' : '5 days ago');
                   
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 font-bold text-slate-900">{u.full_name}</td>
-                      <td className="px-6 py-4 text-slate-500 flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-slate-350" /> {u.email}
+                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-5.5 font-bold text-slate-900">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8.5 w-8.5 rounded-full bg-blue-50/80 text-blue-750 flex items-center justify-center text-xs font-black shrink-0 border border-blue-200/60 uppercase group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all duration-300">
+                            {u.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <span className="block text-slate-900 font-extrabold text-[12.5px] leading-tight">{u.full_name}</span>
+                            <span className="block text-[9.5px] text-slate-400 font-bold leading-none mt-0.5">ID: {u.id.substring(0, 8)}</span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5.5 text-slate-500 font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-slate-350 shrink-0" /> {u.email}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5.5">
                         {u.department ? (
-                          <span className="inline-flex items-center gap-1 text-slate-655 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-                            <FolderGit2 className="h-3.5 w-3.5 text-slate-400" /> {u.department.name}
+                          <span className="inline-flex items-center gap-1 text-slate-655 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-full font-bold text-[9.5px]">
+                            <FolderGit2 className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {u.department.name}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">Unassigned</span>
+                          <span className="text-slate-400 italic font-semibold">Unassigned</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-bold border uppercase tracking-wider text-[8px] ${getRoleBadgeColor(u.role?.name || '')}`}>
+                      <td className="px-6 py-5.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-extrabold border uppercase tracking-wider text-[8px] ${getRoleBadgeColor(u.role?.name || '')}`}>
                           {u.role?.name === 'super_admin' ? (
-                            <ShieldCheck className="h-3 w-3 text-indigo-650" />
-                          ) : <Shield className="h-3 w-3 text-slate-400" />}
+                            <ShieldCheck className="h-3 w-3 text-indigo-650 shrink-0" />
+                          ) : <Shield className="h-3 w-3 text-slate-450 shrink-0" />}
                           <span>{u.role?.name.replace('_', ' ')}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5.5">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold border ${isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
-                          {isActive ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <XCircle className="h-3 w-3 text-slate-400" />}
+                          {isActive ? <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" /> : <XCircle className="h-3 w-3 text-slate-450 shrink-0" />}
                           <span>{isActive ? 'Active' : 'Inactive'}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-450 font-semibold">{lastLogin}</td>
-                      <td className="px-6 py-4 text-right relative">
+                      <td className="px-6 py-5.5 text-slate-450 font-bold">{lastLogin}</td>
+                      <td className="px-6 py-5 text-right relative">
                         {currentUser?.id !== u.id && u.role?.name !== 'super_admin' ? (
                           <div className="inline-block text-left">
                             <button
