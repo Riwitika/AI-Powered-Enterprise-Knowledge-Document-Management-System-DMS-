@@ -21,69 +21,127 @@ export class ApiError extends Error {
 // ----------------- CLIENT-SIDE DATABASE SIMULATOR (MOCK FALLBACK) -----------------
 // This executes if the backend server is down or throws a 500 error, ensuring a seamless preview.
 const initMockDB = () => {
-  if (!localStorage.getItem("kms_mock_initialized")) {
+  if (localStorage.getItem("kms_mock_initialized") !== "v3") {
     const defaultFolders = [
-      { id: 1, name: "Company Guidelines", parent_id: null, documents: [] },
-      { id: 2, name: "Engineering & Specs", parent_id: null, documents: [] },
-      { id: 3, name: "HR SOPs & Policies", parent_id: null, documents: [] },
-      { id: 4, name: "Legal Contracts", parent_id: null, documents: [] },
+      { id: 1, name: "Company Knowledge", parent_id: null },
+      { id: 2, name: "HR", parent_id: 1 },
+      { id: 3, name: "Finance", parent_id: 1 },
+      { id: 4, name: "Legal", parent_id: 1 },
+      { id: 5, name: "Products", parent_id: 1 },
+      { id: 6, name: "ERP Lens", parent_id: 5 }
     ];
     const defaultDocs = [
       {
         id: "doc-1",
-        folder_id: 1,
-        name: "Security Protocols Guide",
-        description: "Comprehensive operating procedures for network access controls, threat logging, and system audits.",
-        file_path: "/uploads/security.pdf",
+        folder_id: 2,
+        name: "Employee Handbook",
+        description: "Official corporate policies, office guidelines, code of conduct, and organizational structure overview.",
+        file_path: "/uploads/employee_handbook.pdf",
         file_type: "pdf",
-        category: "SOP",
+        category: "HR Handbook",
         access_level: "organization",
         current_version: 1,
-        ai_summary: "This document establishes standard operating guidelines for network security. Key topics include multi-factor authentication, incident report timelines, security logging parameters, and administrator access levels.",
-        ai_keywords: ["mfa", "audit", "security", "threat-logs"],
-        created_at: new Date(Date.now() - 86400000 * 3).toISOString()
+        ai_summary: "Comprehensive handbook detailing working hours, benefits, direct lines of management contact, and professional conduct expectations.",
+        ai_keywords: ["handbook", "policies", "benefits", "conduct"],
+        created_at: new Date(Date.now() - 86400000 * 10).toISOString()
       },
       {
         id: "doc-2",
         folder_id: 2,
-        name: "Sensor Component Design Spec",
-        description: "Engineering blueprint detailing technical specifications and power distributions for the sensor modules.",
-        file_path: "/uploads/spec.docx",
-        file_type: "docx",
-        category: "Specification",
-        access_level: "department",
+        name: "Leave Policy",
+        description: "Rules regarding casual leaves, sick leaves, paid time-off limits, and request logging procedures.",
+        file_path: "/uploads/leave_policy.pdf",
+        file_type: "pdf",
+        category: "HR Policy",
+        access_level: "organization",
         current_version: 2,
-        ai_summary: "Detailed specifications for flight sensor component integration. Covers power requirements, dimensions, thermal thresholds, and physical mounting templates.",
-        ai_keywords: ["sensors", "flight-spec", "thermal-limit", "schematics"],
-        created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+        ai_summary: "Detailed criteria for PTO submissions, carrying over balances, maternity/paternity guidelines, and medical certificate templates.",
+        ai_keywords: ["pto", "leaves", "vacation", "holiday"],
+        created_at: new Date(Date.now() - 86400000 * 5).toISOString()
       },
       {
         id: "doc-3",
         folder_id: 3,
-        name: "Onboarding Handbook 2026",
-        description: "General instructions and setup details for newly recruited engineering personnel.",
-        file_path: "/uploads/onboard.docx",
+        name: "GST Guide",
+        description: "Standard compliance checklist for goods and services tax invoicing and tax bracket assignments.",
+        file_path: "/uploads/gst_guide.docx",
         file_type: "docx",
-        category: "Handbook",
+        category: "Finance Guide",
         access_level: "organization",
         current_version: 1,
-        ai_summary: "Welcome guide for new staff. Details active directories, office keycards, workspace setup parameters, and human resource contact rosters.",
-        ai_keywords: ["onboarding", "setup", "it-support", "contacts"],
-        created_at: new Date(Date.now() - 86400000 * 5).toISOString()
+        ai_summary: "Tax directives for local invoicing, matching ledgers, reverse charge mechanisms, and monthly compliance filing protocols.",
+        ai_keywords: ["gst", "invoicing", "tax", "filings"],
+        created_at: new Date(Date.now() - 86400000 * 12).toISOString()
       },
       {
         id: "doc-4",
+        folder_id: 3,
+        name: "Invoices",
+        description: "Corporate billing templates and accounts payable/receivable registration templates.",
+        file_path: "/uploads/invoices.xlsx",
+        file_type: "xlsx",
+        category: "Finance Template",
+        access_level: "department",
+        current_version: 1,
+        ai_summary: "Receipt templates with client headers, description rows, multi-currency cells, and corporate bank routing descriptions.",
+        ai_keywords: ["receipts", "billing", "ledgers", "accounts"],
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+      },
+      {
+        id: "doc-5",
         folder_id: 4,
-        name: "NDAS and NDA Template",
-        description: "Standard non-disclosure agreement layout approved by the legal department.",
+        name: "NDA",
+        description: "Standard corporate Non-Disclosure Agreement safeguarding intellectual properties and customer logs.",
         file_path: "/uploads/nda.docx",
         file_type: "docx",
-        category: "Contract",
+        category: "Legal NDA",
+        access_level: "organization",
+        current_version: 1,
+        ai_summary: "Protective legal structure outlining proprietary data definitions, disclosure limitations, arbitration terms, and duration scopes.",
+        ai_keywords: ["nda", "disclosure", "proprietary", "secrecy"],
+        created_at: new Date(Date.now() - 86400000 * 20).toISOString()
+      },
+      {
+        id: "doc-6",
+        folder_id: 4,
+        name: "Contracts",
+        description: "Approved legal service agreement draft and external vendor master service agreement template.",
+        file_path: "/uploads/contracts.docx",
+        file_type: "docx",
+        category: "Legal Agreement",
         access_level: "private",
         current_version: 1,
-        ai_summary: "Legal non-disclosure agreement layout. Covers proprietary definitions, term limits, exclusions, jurisdiction variables, and penalty clauses.",
-        ai_keywords: ["nda", "legal", "disclosure", "contract-clause"],
-        created_at: new Date(Date.now() - 86400000 * 10).toISOString()
+        ai_summary: "General master services structure specifying deliverables, milestones, warranty disclaimers, and liability caps.",
+        ai_keywords: ["contracts", "vendor", "liability", "clauses"],
+        created_at: new Date(Date.now() - 86400000 * 3).toISOString()
+      },
+      {
+        id: "doc-7",
+        folder_id: 6,
+        name: "User Manual",
+        description: "Setup operations manual for the corporate ERP Lens enterprise dashboard modules.",
+        file_path: "/uploads/user_manual.docx",
+        file_type: "docx",
+        category: "ERP Manual",
+        access_level: "organization",
+        current_version: 3,
+        ai_summary: "Manual for ERP module installations. Highlights database configuration strings, telemetry logging switches, and client portal authentication setups.",
+        ai_keywords: ["erp", "manual", "setup", "telemetry"],
+        created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+      },
+      {
+        id: "doc-8",
+        folder_id: 6,
+        name: "FAQs",
+        description: "Troubleshooting logs and frequently asked integration questions for the ERP Lens platform.",
+        file_path: "/uploads/faqs.docx",
+        file_type: "docx",
+        category: "ERP FAQs",
+        access_level: "department",
+        current_version: 1,
+        ai_summary: "Troubleshooting FAQ lists. Resolves connection dropouts, user access synchronization errors, and CSV ingestion limits.",
+        ai_keywords: ["faqs", "troubleshoot", "errors", "support"],
+        created_at: new Date(Date.now() - 86400000 * 4).toISOString()
       }
     ];
     const defaultUsers = [
@@ -105,7 +163,7 @@ const initMockDB = () => {
     localStorage.setItem("kms_depts", JSON.stringify(defaultDepts));
     localStorage.setItem("kms_chat", JSON.stringify([]));
     localStorage.setItem("kms_permissions", JSON.stringify([]));
-    localStorage.setItem("kms_mock_initialized", "true");
+    localStorage.setItem("kms_mock_initialized", "v3");
   }
 };
 
@@ -207,13 +265,26 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
   }
 
   if (path === "/folders/tree") {
-    // Build tree
-    const tree = folders.map((f: any) => ({
-      ...f,
-      sub_folders: [],
-      documents: docs.filter((d: any) => d.folder_id === f.id)
-    }));
-    return tree;
+    // Build tree recursively
+    const folderMap: Record<number, any> = {};
+    folders.forEach((f: any) => {
+      folderMap[f.id] = {
+        ...f,
+        sub_folders: [],
+        documents: docs.filter((d: any) => d.folder_id === f.id)
+      };
+    });
+
+    const roots: any[] = [];
+    folders.forEach((f: any) => {
+      const node = folderMap[f.id];
+      if (f.parent_id !== null && folderMap[f.parent_id]) {
+        folderMap[f.parent_id].sub_folders.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+    return roots;
   }
 
   if (path === "/folders") {
