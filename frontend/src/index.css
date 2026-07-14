@@ -80,3 +80,37 @@
   0%, 80%, 100% { transform: scale(0); }
   40% { transform: scale(1.0); }
 }
+
+/* Document Editor Confinement Rules */
+#doc-editor-body {
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+}
+
+#doc-editor-body table {
+  max-width: 100% !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+#doc-editor-body img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+#doc-editor-body pre, 
+#doc-editor-body code {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+}
+
+#doc-editor-body blockquote {
+  max-width: 100% !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}

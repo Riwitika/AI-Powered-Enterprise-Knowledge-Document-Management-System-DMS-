@@ -129,6 +129,16 @@ export default function Layout() {
     });
   };
 
+  const isEditingDocument = location.pathname.startsWith('/documents') && new URLSearchParams(location.search).has('open');
+
+  if (isEditingDocument) {
+    return (
+      <div className="h-screen w-screen bg-slate-50 overflow-hidden font-sans">
+        <Outlet />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
       

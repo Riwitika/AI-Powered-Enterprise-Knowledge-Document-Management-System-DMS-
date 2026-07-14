@@ -32,7 +32,13 @@ import {
   Quote,
   Smile,
   Copy,
-  FileDown
+  FileDown,
+  Star,
+  Cloud,
+  Video,
+  Printer,
+  ArrowLeft,
+  ChevronDown
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
@@ -46,9 +52,19 @@ export default function DocumentTree() {
   // Tab State for Right Panel: AI Context vs Summary vs Versions
   const [rightPanelTab, setRightPanelTab] = useState<'ai' | 'summary' | 'versions'>('summary');
 
-  // Selected Document ID
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  // Selected Document ID derived from URL params for Google Docs single source of truth
+  const selectedDocId = searchParams.get('open');
+  const setSelectedDocId = (id: string | null) => {
+    if (id) {
+      setSearchParams({ open: id });
+    } else {
+      setSearchParams({});
+    }
+  };
+
   const [isAiCollapsed, setIsAiCollapsed] = useState(false);
+  const [showOutline, setShowOutline] = useState(true);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   
   // Folder/Document creation states
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -149,22 +165,6 @@ export default function DocumentTree() {
     enabled: !!selectedDocId && showShareModal
   });
 
-  // Watch for redirect "open" query param
-  useEffect(() => {
-    if (openParamId) {
-      setSelectedDocId(openParamId);
-      // Remove query param to clean URL
-      setSearchParams({}, { replace: true });
-    }
-  }, [openParamId, setSearchParams]);
-
-  // Auto-select first document on load
-  useEffect(() => {
-    if (allDocs && allDocs.length > 0 && !selectedDocId && !openParamId) {
-      setSelectedDocId(allDocs[0].id);
-    }
-  }, [allDocs, selectedDocId, openParamId]);
-
   // Load document content
   useEffect(() => {
     if (selectedDoc) {
@@ -227,6 +227,42 @@ export default function DocumentTree() {
     const cleanText = text.trim();
     setCharCount(cleanText.length);
     setWordCount(cleanText ? cleanText.split(/\s+/).length : 0);
+  };
+
+  const getHeadings = () => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = editContent;
+    const headingElements = tempDiv.querySelectorAll('h1, h2, h3, h4');
+    const list: Array<{ text: string; tag: string; id: string }> = [];
+    headingElements.forEach((el, index) => {
+      let id = el.id;
+      if (!id) {
+        id = `heading-${index}`;
+      }
+      list.push({
+        text: el.textContent || '',
+        tag: el.tagName.toLowerCase(),
+        id
+      });
+    });
+    return list;
+  };
+
+  const scrollToHeading = (index: number) => {
+    const editor = document.getElementById('doc-editor-body');
+    if (editor) {
+      const headingElements = editor.querySelectorAll('h1, h2, h3, h4');
+      if (headingElements[index]) {
+        headingElements[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Place cursor inside the heading
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(headingElements[index]);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }
   };
 
   // Mutations
@@ -619,630 +655,685 @@ export default function DocumentTree() {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-100px)] w-full overflow-hidden border border-slate-200 rounded-xl bg-white shadow-sm relative font-sans">
+    <div className={selectedDocId ? "h-screen w-screen flex flex-col bg-[#f9fbfd] font-sans overflow-hidden" : "flex h-[calc(100vh-100px)] w-full overflow-hidden border border-slate-200 rounded-xl bg-white shadow-sm relative font-sans"}>
       
-      {/* CENTER PANEL (Editor Canvas) */}
-      <main className="flex-1 bg-slate-100 flex flex-col h-full overflow-hidden relative">
-        {selectedDocId ? (
-          docLoading ? (
-            <div className="flex flex-1 items-center justify-center bg-white">
-              <div className="text-center space-y-2">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Syncing Document...</span>
-              </div>
+      {selectedDocId ? (
+        docLoading ? (
+          <div className="flex flex-1 items-center justify-center bg-white h-full w-full">
+            <div className="text-center space-y-2">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Syncing Document...</span>
             </div>
-          ) : selectedDoc ? (
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-100/50">
-              
-              {/* Document Editor Ribbon Topbar */}
-              <div className="bg-white border-b border-slate-200 px-6 py-3 shrink-0 space-y-2.5 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
-                {/* Title and Share */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 shrink-0 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      {/* Breadcrumbs */}
-                      <div className="flex items-center gap-1 text-[9.5px] text-slate-400/90 font-extrabold uppercase tracking-wider mb-2 select-none">
-                        {getBreadcrumbs().map((b: string, idx: number, arr: string[]) => (
-                          <span key={idx} className="flex items-center gap-1">
-                            <span>{b}</span>
-                            {idx < arr.length - 1 && <ChevronRight className="h-2.5 w-2.5 text-slate-350" />}
-                          </span>
-                        ))}
-                      </div>
+          </div>
+        ) : selectedDoc ? (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#f9fbfd]">
+            
+            {/* Google Docs Top Header Bar */}
+            <header className="bg-[#f9fbfd] px-4 pt-2 pb-1 flex flex-col shrink-0 select-none border-b border-[#e1e3e1] relative z-30">
+              <div className="flex items-center justify-between">
+                
+                {/* Title & Menus */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {/* Docs Logo Icon (Back to catalog) */}
+                  <button 
+                    onClick={() => setSelectedDocId(null)}
+                    className="h-10 w-10 hover:bg-slate-100 rounded-full flex items-center justify-center text-blue-600 transition-colors shrink-0"
+                    title="Back to Catalog"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
 
+                  <div className="min-w-0 flex flex-col">
+                    {/* Title input with Star & Cloud */}
+                    <div className="flex items-center gap-2">
                       <input 
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         placeholder="Untitled Document"
-                        className="text-lg font-extrabold text-slate-900 border-none p-0 focus:outline-none focus:ring-0 bg-transparent placeholder-slate-350 truncate tracking-tight leading-none block w-96"
+                        className="text-base font-medium text-[#1f1f1f] border-none p-0 focus:outline-none focus:ring-0 bg-transparent placeholder-slate-350 truncate tracking-tight max-w-[400px] hover:bg-slate-100 rounded px-1 transition-colors leading-none"
                       />
-                      <div className="flex items-center gap-2 text-[9px] text-slate-400 font-bold mt-2 uppercase tracking-wider select-none">
-                        <span>Owner: {selectedDoc.owner?.full_name || 'System Administrator'}</span>
-                        <span>•</span>
-                        <span>Dept: {selectedDoc.department?.name || 'Corporate'}</span>
-                        <span>•</span>
-                        <span>Last Edited: {new Date(selectedDoc.created_at).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span>Version: v{selectedDoc.current_version}</span>
-                        <span>•</span>
-                        <span className="text-slate-455">Status: {selectedDoc.status || 'Active'}</span>
-                      </div>
+                      <button className="text-slate-400 hover:text-amber-500 transition-colors p-0.5 rounded-full"><Star className="h-4 w-4" /></button>
+                      <button className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full" title="All changes saved to cloud"><Cloud className="h-4 w-4 text-emerald-600" /></button>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Auto save status indicator */}
-                    <span className="text-[10px] text-slate-400 font-bold tracking-wide flex items-center gap-1">
-                      {saveDocMutation.isPending ? (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                          <span>Saving Changes...</span>
-                        </>
-                      ) : selectedDoc && (editTitle !== selectedDoc.name || editContent !== (selectedDoc.content || '')) ? (
-                        <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          <span>Unsaved Changes</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          <span>Sync committed to DB</span>
-                        </>
-                      )}
-                    </span>
-
-                    {/* Google Doc-Style Share Button */}
-                    <button
-                      onClick={() => setShowShareModal(true)}
-                      className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-full px-4 py-1.5 text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors border border-blue-500"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                      <span>Share</span>
-                    </button>
-                    {/* Collapsible toggle for AI Panel */}
-                    <button
-                      onClick={() => setIsAiCollapsed(!isAiCollapsed)}
-                      className={`p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-455 hover:text-slate-800 rounded-lg transition-colors flex items-center justify-center shrink-0 ${
-                        !isAiCollapsed ? 'bg-blue-50/50 text-blue-650 border-blue-200' : ''
-                      }`}
-                      title={isAiCollapsed ? "Expand AI Panel" : "Collapse AI Panel"}
-                    >
-                      <Sparkles className="h-4 w-4" />
-                    </button>
-
-                    <button
-                      onClick={() => setSelectedDocId(null)}
-                      className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-450 hover:text-slate-800 rounded-lg transition-colors"
-                      title="Close Document"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Google Doc-Style Toolbar Ribbon */}
-                <div className="border border-slate-200/80 rounded-xl bg-slate-50/50 py-2 px-3.5 flex items-center justify-between gap-5 overflow-x-auto text-slate-700 select-none custom-scrollbar shrink-0 min-h-[44px] flex-nowrap whitespace-nowrap shadow-sm">
-                  <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
-                    <button onClick={() => applyStyle('undo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Undo"><Undo className="h-4 w-4 text-slate-550" /></button>
-                    <button onClick={() => applyStyle('redo')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Redo"><Redo className="h-4 w-4 text-slate-550" /></button>
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-                    
-                    {/* Zoom Dropdown */}
-                    <select
-                      value={zoomPercent}
-                      onChange={(e) => setZoomPercent(e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none cursor-pointer"
-                      title="Zoom"
-                    >
-                      <option value="75">75%</option>
-                      <option value="90">90%</option>
-                      <option value="100">100%</option>
-                      <option value="125">125%</option>
-                      <option value="150">150%</option>
-                    </select>
-
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Format/Heading styles */}
-                    <select
-                      onChange={(e) => applyStyle('formatBlock', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-28 cursor-pointer"
-                      defaultValue="P"
-                      title="Styles"
-                    >
-                      <option value="P">Normal Text</option>
-                      <option value="H1">Heading 1</option>
-                      <option value="H2">Heading 2</option>
-                      <option value="H3">Heading 3</option>
-                      <option value="PRE">Code Block</option>
-                    </select>
-
-                    {/* Font Dropdown */}
-                    <select
-                      onChange={(e) => applyStyle('fontName', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-32 cursor-pointer"
-                      defaultValue="Outfit"
-                      title="Font family"
-                    >
-                      <option value="Outfit">Outfit</option>
-                      <option value="Inter">Inter</option>
-                      <option value="Arial">Arial</option>
-                      <option value="Times New Roman">Times New Roman</option>
-                      <option value="Courier New">Courier New</option>
-                    </select>
-
-                    {/* Font Size */}
-                    <select
-                      onChange={(e) => applyStyle('fontSize', e.target.value)}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-655 focus:outline-none w-14 cursor-pointer"
-                      defaultValue="3"
-                      title="Font Size"
-                    >
-                      <option value="1">10px</option>
-                      <option value="2">12px</option>
-                      <option value="3">14px</option>
-                      <option value="4">16px</option>
-                      <option value="5">18px</option>
-                      <option value="6">24px</option>
-                    </select>
-
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Bold, Italic, Underline, Strikethrough */}
-                    <button onClick={() => applyStyle('bold')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center font-extrabold text-sm" title="Bold">B</button>
-                    <button onClick={() => applyStyle('italic')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center italic font-bold text-sm" title="Italic">I</button>
-                    <button onClick={() => applyStyle('underline')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center underline font-bold text-sm" title="Underline">U</button>
-                    <button onClick={() => applyStyle('strikeThrough')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center line-through font-bold text-sm" title="Strikethrough">S</button>
-                    
-                    {/* Text colors */}
-                    <input 
-                      type="color" 
-                      onChange={(e) => applyStyle('foreColor', e.target.value)}
-                      className="w-5.5 h-5.5 border border-slate-250 cursor-pointer rounded-full overflow-hidden shrink-0 mt-0.5" 
-                      title="Text Color"
-                    />
-                    <input 
-                      type="color" 
-                      onChange={(e) => applyStyle('backColor', e.target.value)}
-                      className="w-5.5 h-5.5 border border-slate-250 cursor-pointer rounded-sm overflow-hidden shrink-0 mt-0.5" 
-                      title="Highlight Color"
-                      defaultValue="#FFFF00"
-                    />
-                    
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Alignments */}
-                    <button onClick={() => applyStyle('justifyLeft')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Left"><AlignLeft className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('justifyCenter')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Center"><AlignCenter className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('justifyRight')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Right"><AlignRight className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('justifyFull')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Justify"><AlignJustify className="h-4 w-4" /></button>
-                    
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Lists */}
-                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center animate-all" title="Bulleted List"><List className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center animate-all" title="Numbered List"><ListOrdered className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[10px] font-extrabold px-1.5 h-7 flex items-center justify-center hover:text-slate-900" title="Checklist">☑ Checklist</button>
-                    
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Line spacing */}
-                    <select
-                      onChange={(e) => {
-                        const editor = document.getElementById('doc-editor-body');
-                        if (editor) {
-                          editor.style.lineHeight = e.target.value;
-                          setEditContent(editor.innerHTML);
-                        }
-                      }}
-                      className="bg-transparent border border-transparent hover:border-slate-200 rounded px-1 py-0.5 text-[10px] font-extrabold text-slate-655 focus:outline-none w-18 cursor-pointer"
-                      defaultValue="1.5"
-                      title="Line Spacing"
-                    >
-                      <option value="1.0">Single</option>
-                      <option value="1.15">1.15</option>
-                      <option value="1.5">1.5</option>
-                      <option value="2.0">Double</option>
-                    </select>
-
-                    <div className="h-4 w-[1px] bg-slate-250 mx-2 shrink-0" />
-
-                    {/* Insert Options */}
-                    <button onClick={() => handleInsertTable()} className="p-1 hover:bg-slate-200 rounded transition-colors text-[11px] font-bold px-1.5 h-7 flex items-center justify-center" title="Insert 3x3 Table">Table</button>
-                    <button onClick={handleInsertLink} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Link"><Link2 className="h-4 w-4" /></button>
-                    <button onClick={handleInsertImage} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Image"><ImageIcon className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('insertHorizontalRule')} className="p-1 hover:bg-slate-200 rounded transition-colors text-[11px] font-bold px-1.5 h-7 flex items-center justify-center" title="Horizontal Rule">HR</button>
-                    <button onClick={() => applyStyle('insertHTML', '<pre class="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-xs my-2"><code>// Code Block\n</code></pre>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Code Block"><Code className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('insertHTML', '<blockquote class="border-l-4 border-slate-350 pl-4 italic text-slate-550 my-2">Block Quote</blockquote>')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Quote"><Quote className="h-4 w-4" /></button>
-                    <button onClick={() => applyStyle('insertHTML', '😊')} className="p-1 hover:bg-slate-200 rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Emoji"><Smile className="h-4 w-4" /></button>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
-                    <button 
-                      onClick={() => setShowFindReplace(prev => !prev)}
-                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${showFindReplace ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-655 hover:bg-slate-300'}`}
-                    >
-                      Find & Replace
-                    </button>
-                    <button
-                      onClick={() => handleSaveDocumentContent()}
-                      disabled={saveDocMutation.isPending}
-                      className="glow-btn bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1 text-[10px] font-bold shadow-sm flex items-center gap-1 disabled:opacity-50 transition-all border border-emerald-500"
-                    >
-                      <Save className="h-3 w-3" /> Save
-                    </button>
-                  </div>
-                </div>
-
-                {/* Find and replace expanded banner */}
-                {showFindReplace && (
-                  <form onSubmit={handleFindReplace} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                    <input 
-                      type="text" 
-                      placeholder="Find text..." 
-                      value={findText} 
-                      onChange={(e) => setFindText(e.target.value)} 
-                      className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs focus:outline-none focus:border-blue-500 text-slate-800"
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="Replace with..." 
-                      value={replaceText} 
-                      onChange={(e) => setReplaceText(e.target.value)} 
-                      className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs focus:outline-none focus:border-blue-500 text-slate-800"
-                    />
-                    <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded px-3.5 py-1 text-xs font-bold">Replace All</button>
-                  </form>
-                )}
-              </div>
-
-              {/* Large Page Editor Canvas Container */}
-              <div className="flex-1 overflow-y-auto pt-8 pb-8 px-2 flex justify-center items-start custom-scrollbar bg-slate-150/30">
-                <div 
-                  className="bg-white border border-slate-150 shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[780px] p-16 w-full max-w-[1240px] focus:outline-none transition-all relative font-sans leading-relaxed text-slate-800 text-[14.5px] cursor-text rounded-md"
-                  style={{ transform: `scale(${Number(zoomPercent)/100})`, transformOrigin: 'top center' }}
-                >
-                  <div
-                    id="doc-editor-body"
-                    contentEditable
-                    dangerouslySetInnerHTML={{ __html: editContent }}
-                    onBlur={(e) => {
-                      const html = e.currentTarget.innerHTML;
-                      setEditContent(html);
-                      updateCounts(html);
-                    }}
-                    className="focus:outline-none min-h-[680px] font-sans text-slate-750 leading-relaxed text-[14.5px]"
-                  />
-                </div>
-              </div>
-
-              {/* Google Doc-Style Bottom Status Bar */}
-              <footer className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between shrink-0 select-none text-[10px] text-slate-500">
-                <div className="flex items-center gap-4 font-semibold">
-                  <span>Words: <strong className="text-slate-800">{wordCount}</strong></span>
-                  <span>Characters: <strong className="text-slate-800">{charCount}</strong></span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                    Auto-Save Active
-                  </span>
-                  <span>•</span>
-                  <span>Revision Registry: <strong>v{selectedDoc.current_version}</strong></span>
-                </div>
-              </footer>
-
-            </div>
-          ) : null
-        ) : (
-          /* Empty Workspace State when no documents are selected or exist */
-          <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-8 select-none">
-            <div className="text-center max-w-sm space-y-4">
-              <div className="h-12 w-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mx-auto">
-                <FileText className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-slate-800 text-sm">No Document Open</h3>
-                <p className="text-[11px] text-slate-450 mt-1 leading-relaxed">
-                  Select a document from the left directory catalog tree, or create a new document to start drafting.
-                </p>
-              </div>
-              <button
-                onClick={() => handleCreateNewBlankDocument(null, "New Document")}
-                className="glow-btn inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all mx-auto border border-blue-500"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Create New Document</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
-
-      <aside className={`${isAiCollapsed ? 'w-0 border-none' : 'w-[14.5%] border-l border-slate-200'} flex flex-col h-full bg-white shrink-0 select-none transition-all duration-300 overflow-hidden`}>
-        
-        {/* Navigation tabs for AI assistant info panels */}
-        <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/20">
-          <button
-            onClick={() => setRightPanelTab('summary')}
-            className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
-              rightPanelTab === 'summary' 
-                ? 'border-blue-600 text-blue-600 bg-white' 
-                : 'border-transparent text-slate-400 hover:text-slate-800'
-            }`}
-          >
-            Summary & Tags
-          </button>
-          <button
-            onClick={() => setRightPanelTab('ai')}
-            className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
-              rightPanelTab === 'ai' 
-                ? 'border-blue-600 text-blue-600 bg-white' 
-                : 'border-transparent text-slate-400 hover:text-slate-800'
-            }`}
-          >
-            AI Assistant
-          </button>
-          <button
-            onClick={() => setRightPanelTab('versions')}
-            className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
-              rightPanelTab === 'versions' 
-                ? 'border-blue-600 text-blue-600 bg-white' 
-                : 'border-transparent text-slate-400 hover:text-slate-800'
-            }`}
-          >
-            Revisions
-          </button>
-        </div>
-
-        {/* Tab 1: AI Summary & Related (Liked by Mentor) */}
-        {rightPanelTab === 'summary' && (
-          <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
-            {selectedDoc ? (
-              <>
-                {/* Executive Summary */}
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Executive Summary</span>
-                  </h4>
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-600 leading-relaxed font-sans shadow-sm">
-                    {selectedDoc.ai_summary || "Uploading document automatically processes text indexes to synthesize executive summaries..."}
-                  </div>
-                </div>
-
-                {/* AI generated tag keywords */}
-                {selectedDoc.ai_keywords && selectedDoc.ai_keywords.length > 0 && (
-                  <div className="space-y-2 pt-1">
-                    <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Suggested Metadata Tags</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedDoc.ai_keywords.map((kw: string) => (
-                        <span key={kw} className="inline-flex items-center gap-1 bg-slate-100 text-slate-655 px-2.5 py-0.5 rounded-full border border-slate-200 font-semibold text-[9px]">
-                          <Tag className="h-2.5 w-2.5 text-slate-400" />
-                          {kw}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Related Documents recommendation cards */}
-                <div className="space-y-2 pt-4 border-t border-slate-100">
-                  <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Related Documents</span>
-                  <div className="space-y-2">
-                    {(() => {
-                      const categoryDocs = allDocs?.filter((d: any) => d.id !== selectedDoc.id && d.category === selectedDoc.category) || [];
-                      const displayDocs = categoryDocs.length > 0 
-                        ? categoryDocs.slice(0, 2) 
-                        : (allDocs?.filter((d: any) => d.id !== selectedDoc.id).slice(0, 2) || []);
+                    {/* Google Docs Menu Bar */}
+                    <div className="flex items-center gap-3 text-xs text-[#444746] mt-0.5 font-normal select-none">
                       
-                      return displayDocs.map((d: any) => (
-                        <button
-                          key={d.id}
-                          onClick={() => setSelectedDocId(d.id)}
-                          className="w-full text-left p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-between group bg-slate-50/50"
+                      {/* File Menu */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveMenu(activeMenu === 'File' ? null : 'File')}
+                          className="px-2 py-0.5 hover:bg-[#eff1f0] rounded cursor-pointer transition-colors"
                         >
-                          <div className="min-w-0 pr-4">
-                            <span className="font-bold text-slate-800 text-xs truncate block">{d.name}</span>
-                            <span className="text-[9px] text-slate-455 block mt-0.5 uppercase tracking-wider">{d.category || 'Company Knowledge'}</span>
-                          </div>
-                          <ArrowRight className="h-3.5 w-3.5 text-slate-450 group-hover:text-blue-600 transition-colors" />
+                          File
                         </button>
-                      ));
-                    })()}
+                        {activeMenu === 'File' && (
+                          <div className="absolute left-0 mt-1 w-52 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            <button onClick={() => { handleCreateNewBlankDocument(null, "New Document"); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">New Document</button>
+                            <button onClick={() => { handleDuplicateDocument(selectedDoc); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Make a Copy (Duplicate)</button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <button onClick={() => { handleSaveDocumentContent(); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Save Current Draft</button>
+                            <button onClick={() => { handleDownload(selectedDoc); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Download Document</button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <button onClick={() => { setRenameTarget({ type: 'file', id: selectedDoc.id, name: selectedDoc.name }); setRenameNewName(selectedDoc.name); setShowRenameModal(true); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Rename File</button>
+                            <button onClick={() => { setMoveDocId(selectedDoc.id); setMoveTargetFolderId(''); setShowMoveModal(true); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Move to Folder</button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <button onClick={() => { deleteDocMutation.mutate(selectedDoc.id); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold text-red-655 hover:text-red-750 block">Delete File</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Edit Menu */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveMenu(activeMenu === 'Edit' ? null : 'Edit')}
+                          className="px-2 py-0.5 hover:bg-[#eff1f0] rounded cursor-pointer transition-colors"
+                        >
+                          Edit
+                        </button>
+                        {activeMenu === 'Edit' && (
+                          <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            <button onClick={() => { applyStyle('undo'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Undo</span><span className="text-slate-400">Ctrl+Z</span></button>
+                            <button onClick={() => { applyStyle('redo'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Redo</span><span className="text-slate-400">Ctrl+Y</span></button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <button onClick={() => { setShowFindReplace(true); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Find and Replace</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* View Menu */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveMenu(activeMenu === 'View' ? null : 'View')}
+                          className="px-2 py-0.5 hover:bg-[#eff1f0] rounded cursor-pointer transition-colors"
+                        >
+                          View
+                        </button>
+                        {activeMenu === 'View' && (
+                          <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            <button onClick={() => { setShowOutline(!showOutline); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Show Outline</span><span className="text-slate-400">{showOutline ? '☑' : '☐'}</span></button>
+                            <button onClick={() => { setIsAiCollapsed(!isAiCollapsed); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Show AI Copilot</span><span className="text-slate-400">{!isAiCollapsed ? '☑' : '☐'}</span></button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <div className="px-4 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Zoom Percentage</div>
+                            {['75', '100', '125', '150'].map(z => (
+                              <button key={z} onClick={() => { setZoomPercent(z); setActiveMenu(null); }} className="w-full text-left px-6 py-1.5 hover:bg-slate-50 font-semibold block flex justify-between"><span>{z}%</span>{zoomPercent === z && <span className="text-blue-600">✓</span>}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Insert Menu */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveMenu(activeMenu === 'Insert' ? null : 'Insert')}
+                          className="px-2 py-0.5 hover:bg-[#eff1f0] rounded cursor-pointer transition-colors"
+                        >
+                          Insert
+                        </button>
+                        {activeMenu === 'Insert' && (
+                          <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            <button onClick={() => { handleInsertTable(); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Table (3x3)</button>
+                            <button onClick={() => { handleInsertImage(); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Image Link</button>
+                            <button onClick={() => { handleInsertLink(); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Hyperlink</button>
+                            <div className="h-[1px] bg-slate-100 my-1" />
+                            <button onClick={() => { applyStyle('insertHorizontalRule'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Horizontal Line</button>
+                            <button onClick={() => { applyStyle('insertHTML', '<pre class="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-xs my-2"><code>// Code Block\n</code></pre>'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Code Block</button>
+                            <button onClick={() => { applyStyle('insertHTML', '<blockquote class="border-l-4 border-slate-350 pl-4 italic text-slate-550 my-2">Block Quote</blockquote>'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Block Quote</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Format Menu */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveMenu(activeMenu === 'Format' ? null : 'Format')}
+                          className="px-2 py-0.5 hover:bg-[#eff1f0] rounded cursor-pointer transition-colors"
+                        >
+                          Format
+                        </button>
+                        {activeMenu === 'Format' && (
+                          <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            <button onClick={() => { applyStyle('bold'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Bold</span><span className="text-slate-400">Ctrl+B</span></button>
+                            <button onClick={() => { applyStyle('italic'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Italic</span><span className="text-slate-400">Ctrl+I</span></button>
+                            <button onClick={() => { applyStyle('underline'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block flex justify-between"><span>Underline</span><span className="text-slate-400">Ctrl+U</span></button>
+                            <button onClick={() => { applyStyle('strikeThrough'); setActiveMenu(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 font-semibold block">Strikethrough</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Close menus clicking outside */}
+                      {activeMenu && (
+                        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActiveMenu(null)} />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center py-16">
-                <FileText className="h-7 w-7 text-slate-200 mb-1" />
-                <p className="max-w-[160px] text-[10px] leading-relaxed">Open any document to view executive summary and related files.</p>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* Tab 2: Interactive Document Assistant */}
-        {rightPanelTab === 'ai' && (
-          <div className="flex-1 flex flex-col overflow-hidden p-4">
-            {selectedDoc ? (
-              <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {/* AI Interactive Assistant shortcuts */}
-                <div className="grid grid-cols-2 gap-1.5 pb-3 border-b border-slate-100 shrink-0 select-none">
-                  {['Summarize', 'Rewrite', 'Improve Writing', 'Explain', 'Translate', 'Generate Training Notes'].map((act) => (
-                    <button
-                      key={act}
-                      onClick={() => triggerAIShortcut(act)}
-                      className="bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-200/80 hover:border-blue-200 rounded-lg py-1.5 text-[9px] font-extrabold text-slate-600 transition-all text-center uppercase tracking-wider shadow-sm flex items-center justify-center"
-                    >
-                      {act}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Messages container */}
-                <div className="flex-1 overflow-y-auto space-y-3.5 py-4 pr-1 custom-scrollbar">
-                  {docChatHistory.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs py-8 px-2">
-                      <HelpCircle className="h-6 w-6 text-slate-200 mb-1" />
-                      <p className="max-w-sm text-[10px] font-bold uppercase tracking-wider mb-1">Interactive Assistant</p>
-                      <p className="max-w-[180px] text-[10px] leading-normal text-slate-450 font-semibold">Ask about the document body or use shortcuts to rewrite sentences.</p>
-                    </div>
-                  ) : (
-                    docChatHistory.map((chat, idx) => (
-                      <div key={idx} className="space-y-2">
-                        <div className="bg-blue-600 text-white p-2.5 rounded-2xl rounded-tr-none text-xs max-w-[85%] ml-auto w-fit font-bold shadow-sm">
-                          {chat.q}
-                        </div>
-                        <div className="bg-slate-50 border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-none text-xs max-w-[85%] mr-auto w-fit leading-relaxed shadow-sm font-sans relative group">
-                          {chat.a === 'Thinking...' ? (
-                            <span className="flex items-center gap-1 py-1">
-                              <span className="typing-dot animate-bounce" />
-                              <span className="typing-dot animate-bounce [animation-delay:0.2s]" />
-                              <span className="typing-dot animate-bounce [animation-delay:0.4s]" />
-                            </span>
-                          ) : (
-                            <div>
-                              <p className="whitespace-pre-line">{chat.a}</p>
-                              {/* Copy button */}
-                              <button
-                                onClick={() => navigator.clipboard.writeText(chat.a)}
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-450 transition-all"
-                                title="Copy Response"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-
-                  {/* Follow-up Questions Suggestions */}
-                  {docChatHistory.length > 0 && !docAiLoading && (
-                    <div className="pt-2 pb-1 space-y-1.5 select-none border-t border-slate-100">
-                      <span className="text-[8px] uppercase tracking-wider font-extrabold text-slate-400 block">Suggested Follow-ups:</span>
-                      <div className="flex flex-col gap-1.5">
-                        {[
-                          "Summarize the key requirements from this section.",
-                          "Identify any potential compliance or security issues.",
-                          "What are the next operational steps described here?"
-                        ].map((suggestion, sIdx) => (
-                          <button
-                            key={sIdx}
-                            onClick={() => {
-                              setDocAiQuestion('');
-                              setDocChatHistory(prev => [...prev, { q: suggestion, a: 'Thinking...' }]);
-                              askDocMutation.mutate({ id: selectedDocId!, q: suggestion });
-                            }}
-                            className="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-2 text-[10px] text-slate-655 font-bold hover:text-slate-900 transition-all flex items-center justify-between"
-                          >
-                            <span className="truncate pr-2">{suggestion}</span>
-                            <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Input form */}
-                <form onSubmit={handleAskDocAI} className="border-t border-slate-100 pt-3 mt-auto shrink-0 flex gap-1.5">
-                  <input
-                    type="text"
-                    value={docAiQuestion}
-                    onChange={(e) => setDocAiQuestion(e.target.value)}
-                    placeholder="Ask document AI..."
-                    disabled={docAiLoading}
-                    className="flex-1 bg-slate-50 border border-slate-250 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-400 text-slate-800"
-                  />
+                {/* Right Side Buttons */}
+                <div className="flex items-center gap-3">
+                  <button className="p-2 hover:bg-slate-100 rounded-full text-slate-650 transition-colors" title="Comment History"><MessageSquare className="h-4.5 w-4.5" /></button>
+                  <button className="p-2 hover:bg-slate-100 rounded-full text-slate-650 transition-colors" title="Join a Video Call"><Video className="h-4.5 w-4.5" /></button>
+                  
+                  {/* Google Doc-Style Share Button (Clean Light Blue Capsule) */}
                   <button
-                    type="submit"
-                    disabled={docAiLoading || !docAiQuestion.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-2 disabled:opacity-50 transition-colors"
+                    onClick={() => setShowShareModal(true)}
+                    className="glow-btn bg-[#c2e7ff] text-[#001d35] hover:bg-[#b3dcfa] rounded-full px-5 py-2 text-xs font-bold flex items-center gap-1.5 transition-colors border border-transparent shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                   >
-                    <Send className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
+                    <span>Share</span>
                   </button>
+                  
+                  <button
+                    onClick={() => setIsAiCollapsed(!isAiCollapsed)}
+                    className={`p-2 border border-transparent hover:bg-slate-100 text-slate-655 rounded-full transition-colors flex items-center justify-center shrink-0 ${
+                      !isAiCollapsed ? 'bg-blue-50 text-blue-650' : ''
+                    }`}
+                    title={isAiCollapsed ? "Expand AI Panel" : "Collapse AI Panel"}
+                  >
+                    <Sparkles className="h-4.5 w-4.5" />
+                  </button>
+
+                  <div className="h-7 w-7 rounded-full bg-blue-600 border border-blue-550 flex items-center justify-center text-white font-extrabold text-xs select-none">
+                    {user?.full_name?.charAt(0) || 'U'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Formatting Toolbar Ribbon */}
+              <div className="bg-[#edf2fa] border border-[#d3dbe9] rounded-full px-4 py-1 mt-2 flex items-center gap-1.5 shadow-sm text-xs text-slate-600 overflow-x-auto custom-scrollbar shrink-0 select-none">
+                <button onClick={() => applyStyle('undo')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Undo"><Undo className="h-4 w-4" /></button>
+                <button onClick={() => applyStyle('redo')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Redo"><Redo className="h-4 w-4" /></button>
+                <button onClick={() => window.print()} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Print"><Printer className="h-4 w-4" /></button>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+                
+                {/* Zoom Selector */}
+                <select 
+                  value={zoomPercent} 
+                  onChange={(e) => setZoomPercent(e.target.value)}
+                  className="bg-transparent border-none py-0.5 pl-1 pr-4 focus:outline-none focus:ring-0 text-[11px] font-semibold text-slate-700 cursor-pointer hover:bg-[#dbe1ec] rounded transition-colors"
+                >
+                  <option value="75">75%</option>
+                  <option value="100">100%</option>
+                  <option value="125">125%</option>
+                  <option value="150">150%</option>
+                </select>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Paragraph styles */}
+                <select 
+                  onChange={(e) => {
+                    if (e.target.value === 'p') {
+                      applyStyle('formatBlock', '<p>');
+                    } else {
+                      applyStyle('formatBlock', `<${e.target.value}>`);
+                    }
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                  className="bg-transparent border-none py-0.5 pl-1 pr-4 focus:outline-none focus:ring-0 text-[11px] font-semibold text-slate-700 cursor-pointer hover:bg-[#dbe1ec] rounded transition-colors w-24"
+                >
+                  <option value="" disabled>Normal text</option>
+                  <option value="p">Paragraph</option>
+                  <option value="h1">Heading 1</option>
+                  <option value="h2">Heading 2</option>
+                  <option value="h3">Heading 3</option>
+                </select>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Font selector placeholder */}
+                <span className="px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-[#dbe1ec] rounded transition-colors cursor-default">Arial</span>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Formatting */}
+                <button onClick={() => applyStyle('bold')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center font-extrabold text-xs" title="Bold">B</button>
+                <button onClick={() => applyStyle('italic')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center italic font-bold text-xs" title="Italic">I</button>
+                <button onClick={() => applyStyle('underline')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center underline font-bold text-xs" title="Underline">U</button>
+                <button onClick={() => applyStyle('strikeThrough')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center line-through font-bold text-xs" title="Strikethrough">S</button>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Alignment */}
+                <button onClick={() => applyStyle('justifyLeft')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Left"><AlignLeft className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('justifyCenter')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Center"><AlignCenter className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('justifyRight')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Align Right"><AlignRight className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('justifyFull')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Justify"><AlignJustify className="h-3.5 w-3.5" /></button>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Lists & Checklist */}
+                <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Bulleted List"><List className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('insertOrderedList')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Numbered List"><ListOrdered className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('insertUnorderedList')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors text-[10px] font-extrabold px-1.5 h-7 flex items-center justify-center" title="Checklist">☑</button>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Insert options */}
+                <button onClick={() => handleInsertTable()} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors text-[11px] font-bold px-1.5 h-7 flex items-center justify-center" title="Insert 3x3 Table">Table</button>
+                <button onClick={handleInsertLink} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Link"><Link2 className="h-3.5 w-3.5" /></button>
+                <button onClick={handleInsertImage} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Image"><ImageIcon className="h-3.5 w-3.5" /></button>
+                <button onClick={() => applyStyle('insertHTML', '😊')} className="p-1 hover:bg-[#dbe1ec] rounded transition-colors w-7 h-7 flex items-center justify-center" title="Insert Emoji"><Smile className="h-3.5 w-3.5" /></button>
+                <div className="h-4 w-[1px] bg-[#d3dbe9] mx-1" />
+
+                {/* Find and Replace Toggle */}
+                <button 
+                  onClick={() => setShowFindReplace(prev => !prev)}
+                  className={`p-1 hover:bg-[#dbe1ec] rounded transition-colors text-[10px] font-extrabold px-1.5 h-7 flex items-center justify-center ${showFindReplace ? 'bg-[#c2e7ff] text-blue-800' : ''}`} 
+                  title="Find and Replace"
+                >
+                  🔍 Find
+                </button>
+                
+                {/* Auto save save button */}
+                <button 
+                  onClick={() => handleSaveDocumentContent()}
+                  className="glow-btn inline-flex items-center gap-1 bg-[#1a73e8] hover:bg-blue-700 text-white rounded px-2.5 py-1 text-[10px] font-bold transition-all ml-auto shadow-sm"
+                  title="Commit draft to database"
+                >
+                  <Save className="h-3 w-3" />
+                  <span>Save</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Find & Replace banner */}
+            {showFindReplace && (
+              <div className="bg-[#edf2fa] px-6 py-2 border-b border-[#d3dbe9] flex items-center gap-4 shrink-0 select-none relative z-20">
+                <form onSubmit={handleFindReplace} className="flex items-center gap-3 w-full max-w-lg">
+                  <input 
+                    type="text" 
+                    placeholder="Find text..." 
+                    value={findText} 
+                    onChange={(e) => setFindText(e.target.value)} 
+                    className="bg-white border border-[#c0c7d5] rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 text-slate-800 flex-1"
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Replace with..." 
+                    value={replaceText} 
+                    onChange={(e) => setReplaceText(e.target.value)} 
+                    className="bg-white border border-[#c0c7d5] rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 text-slate-800 flex-1"
+                  />
+                  <button type="submit" className="bg-[#1a73e8] hover:bg-blue-700 text-white rounded-md px-4 py-1.5 text-xs font-bold shadow-sm transition-colors">Replace All</button>
+                  <button type="button" onClick={() => setShowFindReplace(false)} className="text-slate-400 hover:text-slate-655 transition-colors"><X className="h-4.5 w-4.5" /></button>
                 </form>
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center py-16">
-                <MessageSquare className="h-7 w-7 text-slate-200 mb-1" />
-                <p className="max-w-[160px] text-[10px] leading-relaxed">Open any document to consult the context-anchored AI Assistant.</p>
-              </div>
             )}
-          </div>
-        )}
 
-        {/* Tab 3: Version Registry */}
-        {rightPanelTab === 'versions' && (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {selectedDoc ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Revision Registry</span>
-                  <label className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">
-                    Upload Version
-                    <input type="file" onChange={handleNewVersionUpload} className="hidden" />
-                  </label>
-                </div>
+            {/* Workspace Layout Container (Left sidebar + Editor canvas + Right AI Panel) */}
+            <div className="flex-1 flex w-full overflow-hidden relative">
+              
+              {/* Collapsible Left Outline / "Document tabs" Sidebar */}
+              {showOutline && (
+                <div className="w-56 border-r border-[#e1e3e1] bg-white flex flex-col shrink-0 select-none relative z-20 animate-in slide-in-from-left duration-250">
+                  {/* Header */}
+                  <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
+                    <span className="text-xs font-bold text-[#444746] uppercase tracking-wider">Document tabs</span>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors"><Plus className="h-3.5 w-3.5" /></button>
+                      <button 
+                        onClick={() => setShowOutline(false)}
+                        className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors" 
+                        title="Close Document outline"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  {docVersions && docVersions.length > 0 ? (
-                    docVersions.map((ver: any) => (
-                      <div key={ver.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-extrabold text-slate-800 text-xs block">Version {ver.version_number}</span>
-                            <span className="text-[9px] text-slate-400 block mt-0.5">{new Date(ver.uploaded_at).toLocaleString()}</span>
-                          </div>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider ${
-                            ver.version_number === selectedDoc.current_version
-                              ? 'bg-emerald-50 border border-emerald-250 text-emerald-700'
-                              : 'bg-slate-100 border border-slate-200 text-slate-500'
-                          }`}>
-                            {ver.version_number === selectedDoc.current_version ? 'Approved' : 'Revision'}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleDownload(selectedDoc)}
-                            className="text-[10px] text-blue-600 hover:underline font-bold flex items-center gap-0.5"
-                          >
-                            <FileDown className="h-3 w-3" /> Download
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-extrabold text-slate-800 text-xs block">Version {selectedDoc.current_version}</span>
-                          <span className="text-[9px] text-slate-450 block">{new Date(selectedDoc.created_at).toLocaleString()}</span>
-                        </div>
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-250 px-2 py-0.5 text-[8px] font-extrabold text-emerald-700 uppercase tracking-wider">
-                          Approved
-                        </span>
+                  {/* Sidebar Content */}
+                  <div className="flex-1 overflow-y-auto py-3 px-2.5 space-y-4 custom-scrollbar">
+                    
+                    {/* Active Tab */}
+                    <div className="space-y-1">
+                      <div className="bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-between py-2 px-3 rounded-lg text-xs font-semibold cursor-pointer shadow-sm border border-[#d3e3fd]">
+                        <span className="truncate flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-blue-600" /> Tab 1</span>
+                        <button className="text-[#1a73e8] hover:bg-[#d3e3fd] rounded-full p-0.5 text-[10px] w-4 h-4 flex items-center justify-center font-bold">⋮</button>
                       </div>
                     </div>
-                  )}
+
+                    {/* Outline Headings Section */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block px-1">Outline</span>
+                      
+                      <div className="space-y-1">
+                        {getHeadings().length > 0 ? (
+                          getHeadings().map((h, index) => (
+                            <button
+                              key={h.id}
+                              onClick={() => scrollToHeading(index)}
+                              style={{ paddingLeft: `${h.tag === 'h1' ? 8 : h.tag === 'h2' ? 18 : h.tag === 'h3' ? 28 : 38}px` }}
+                              className="w-full text-left py-1.5 pr-2 rounded text-[11px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors block truncate"
+                            >
+                              {h.text}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-[10px] leading-relaxed text-slate-450 italic px-1 font-medium">
+                            Headings that you add to the document will appear here.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center py-16">
-                <FileText className="h-7 w-7 text-slate-200 mb-1" />
-                <p className="max-w-[160px] text-[10px] leading-relaxed">Open any document to trace version logs.</p>
-              </div>
-            )}
+              )}
+
+              {/* Collapsed outline show trigger button */}
+              {!showOutline && (
+                <button
+                  onClick={() => setShowOutline(true)}
+                  className="absolute left-3 top-4 z-40 bg-white border border-slate-200 hover:bg-slate-50 rounded-full w-8 h-8 flex items-center justify-center shadow-md text-slate-600 transition-all hover:scale-105"
+                  title="Show Document Outline"
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              )}
+
+              {/* CENTER PANEL (Editor Canvas) */}
+              <main className="flex-1 bg-[#f4f7f6] flex flex-col h-full overflow-hidden relative">
+                
+                {/* Horizontal Ruler */}
+                <div className="h-6 bg-[#f4f7f6] border-b border-[#e1e3e1] flex items-center justify-center shrink-0 select-none relative">
+                  <div className="w-full max-w-[1240px] px-16 flex items-center relative text-[9px] text-slate-400 font-semibold h-full select-none">
+                    <div className="absolute left-[calc(4rem+2px)] right-[calc(4rem+2px)] h-2 border-x border-slate-300 flex justify-between select-none">
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                      <span className="flex-1 border-r border-slate-200/50" />
+                    </div>
+                    <span className="absolute left-20">1</span>
+                    <span className="absolute left-40">2</span>
+                    <span className="absolute left-60">3</span>
+                    <span className="absolute left-80">4</span>
+                    <span className="absolute left-[100px]">5</span>
+                    <span className="absolute left-[120px]">6</span>
+                    <span className="absolute left-[140px]">7</span>
+                    <span className="absolute left-[160px]">8</span>
+                    <span className="absolute left-[180px]">9</span>
+                    <span className="absolute left-[200px]">10</span>
+                    <span className="absolute left-[220px]">11</span>
+                    <span className="absolute left-[240px]">12</span>
+                    <span className="absolute left-[260px]">13</span>
+                    <span className="absolute left-[280px]">14</span>
+                    <span className="absolute left-[300px]">15</span>
+                    <span className="absolute left-[320px]">16</span>
+                    <span className="absolute left-[340px]">17</span>
+                    <span className="absolute left-[360px]">18</span>
+                  </div>
+                </div>
+
+                {/* Large Page Editor Canvas Container */}
+                <div className="flex-1 overflow-y-auto pt-8 pb-8 px-4 flex justify-center items-start custom-scrollbar bg-[#f4f7f6]">
+                  <div 
+                    className="bg-white border border-[#d3dbe9] shadow-[0_1px_3px_rgba(0,0,0,0.1),_0_1px_2px_rgba(0,0,0,0.06)] min-h-[1056px] p-16 w-full max-w-[1240px] focus:outline-none transition-all relative font-sans leading-relaxed text-[#202124] text-[14.5px] cursor-text rounded-none overflow-hidden"
+                    style={{ transform: `scale(${Number(zoomPercent)/100})`, transformOrigin: 'top center' }}
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) {
+                        document.getElementById('doc-editor-body')?.focus();
+                      }
+                    }}
+                  >
+                    <div
+                      id="doc-editor-body"
+                      contentEditable
+                      dangerouslySetInnerHTML={{ __html: editContent }}
+                      onBlur={(e) => {
+                        const html = e.currentTarget.innerHTML;
+                        setEditContent(html);
+                        updateCounts(html);
+                      }}
+                      className="focus:outline-none min-h-[960px] font-sans text-[#202124] leading-relaxed text-[14.5px] w-full max-w-full break-words outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Bottom Status Bar */}
+                <footer className="h-9 bg-white border-t border-slate-200 px-6 flex items-center justify-between shrink-0 select-none text-[10px] text-slate-500">
+                  <div className="flex items-center gap-4 font-semibold">
+                    <span>Words: <strong className="text-slate-800">{wordCount}</strong></span>
+                    <span>Characters: <strong className="text-slate-800">{charCount}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+                      Auto-Save Active
+                    </span>
+                    <span>•</span>
+                    <span>Revision Registry: <strong>v{selectedDoc.current_version}</strong></span>
+                  </div>
+                </footer>
+              </main>
+
+               {/* Collapsible Right AI Panel */}
+              <aside className={`${isAiCollapsed ? 'w-0 border-none' : 'w-[20%] border-l border-[#e1e3e1]'} flex flex-col h-full bg-white shrink-0 select-none transition-all duration-300 overflow-hidden relative z-20`}>
+                <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/20">
+                  <button
+                    onClick={() => setRightPanelTab('summary')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
+                      rightPanelTab === 'summary' 
+                        ? 'border-blue-600 text-blue-600 bg-white' 
+                        : 'border-transparent text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    Summary
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('ai')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
+                      rightPanelTab === 'ai' 
+                        ? 'border-blue-600 text-blue-600 bg-white' 
+                        : 'border-transparent text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    AI Copilot
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('versions')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2 ${
+                      rightPanelTab === 'versions' 
+                        ? 'border-blue-600 text-blue-600 bg-white' 
+                        : 'border-transparent text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    Revisions
+                  </button>
+                </div>
+
+                {rightPanelTab === 'summary' && (
+                  <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+                        <span>Executive Summary</span>
+                      </h4>
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-655 leading-relaxed font-sans shadow-sm">
+                        {selectedDoc.ai_summary || "Uploading document automatically processes text indexes to synthesize executive summaries..."}
+                      </div>
+                    </div>
+
+                    {selectedDoc.ai_keywords && selectedDoc.ai_keywords.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Suggested Tags</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedDoc.ai_keywords.map((kw: string) => (
+                            <span key={kw} className="inline-flex items-center gap-1 bg-slate-100 text-slate-655 px-2.5 py-0.5 rounded-full border border-slate-200 font-semibold text-[9px]">
+                              <Tag className="h-2.5 w-2.5 text-slate-400" />
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 pt-4 border-t border-slate-100">
+                      <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest block">Related Documents</span>
+                      <div className="space-y-2">
+                        {(() => {
+                          const categoryDocs = allDocs?.filter((d: any) => d.id !== selectedDoc.id && d.category === selectedDoc.category) || [];
+                          const displayDocs = categoryDocs.length > 0 
+                            ? categoryDocs.slice(0, 2) 
+                            : (allDocs?.filter((d: any) => d.id !== selectedDoc.id).slice(0, 2) || []);
+                          
+                          return displayDocs.map((d: any) => (
+                            <button
+                              key={d.id}
+                              onClick={() => setSelectedDocId(d.id)}
+                              className="w-full text-left p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-between group bg-slate-50/50"
+                            >
+                              <div className="min-w-0 pr-4">
+                                <span className="font-bold text-slate-800 text-xs truncate block">{d.name}</span>
+                                <span className="text-[9px] text-slate-455 block mt-0.5 uppercase tracking-wider">{d.category || 'Company Knowledge'}</span>
+                              </div>
+                              <ArrowRight className="h-3.5 w-3.5 text-slate-455 group-hover:text-blue-600 transition-colors" />
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {rightPanelTab === 'ai' && (
+                  <div className="flex-1 flex flex-col overflow-hidden p-4">
+                    <div className="grid grid-cols-2 gap-1.5 pb-3 border-b border-slate-100 shrink-0 select-none">
+                      {['Summarize', 'Rewrite', 'Improve Writing', 'Explain', 'Translate', 'Generate Notes'].map((act) => (
+                        <button
+                          key={act}
+                          onClick={() => triggerAIShortcut(act)}
+                          className="bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-200/80 hover:border-blue-200 rounded-lg py-1.5 text-[9px] font-extrabold text-slate-650 transition-all text-center uppercase tracking-wider shadow-sm flex items-center justify-center"
+                        >
+                          {act}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3.5 py-4 pr-1 custom-scrollbar">
+                      {docChatHistory.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs py-8 px-2">
+                          <HelpCircle className="h-6 w-6 text-slate-200 mb-1" />
+                          <p className="max-w-sm text-[10px] font-bold uppercase tracking-wider mb-1">Interactive Assistant</p>
+                          <p className="max-w-[180px] text-[10px] leading-normal text-slate-455 font-semibold">Ask about the document body or use shortcuts to rewrite sentences.</p>
+                        </div>
+                      ) : (
+                        docChatHistory.map((chat, idx) => (
+                          <div key={idx} className="space-y-2">
+                            <div className="flex justify-end">
+                              <div className="bg-slate-100 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs text-slate-800 max-w-[85%] font-medium leading-relaxed shadow-sm">
+                                {chat.q}
+                              </div>
+                            </div>
+                            <div className="flex justify-start">
+                              <div className="bg-blue-50/50 border border-blue-100 rounded-2xl px-3.5 py-2 text-xs text-slate-850 max-w-[90%] leading-relaxed shadow-sm space-y-2">
+                                <p className="font-semibold">{chat.a}</p>
+                                <div className="flex gap-2 pt-1">
+                                  <button 
+                                    onClick={() => navigator.clipboard.writeText(chat.a)}
+                                    className="text-[9px] text-blue-600 font-bold hover:underline"
+                                  >
+                                    Copy
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      applyStyle('insertHTML', `<p>${chat.a}</p>`);
+                                    }}
+                                    className="text-[9px] text-blue-655 font-bold hover:underline"
+                                  >
+                                    Insert
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <form onSubmit={handleAskDocAI} className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-2 select-none">
+                      <input 
+                        type="text" 
+                        value={docAiQuestion}
+                        onChange={(e) => setDocAiQuestion(e.target.value)}
+                        placeholder="Ask about this document..."
+                        disabled={docAiLoading}
+                        className="w-full bg-slate-50 border border-[#e1e3e1] rounded-xl p-2.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800"
+                      />
+                      <button 
+                        type="submit" 
+                        disabled={docAiLoading}
+                        className="h-8.5 w-8.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm"
+                      >
+                        {docAiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {rightPanelTab === 'versions' && (
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                    {docVersions && docVersions.length > 0 ? (
+                      <div className="space-y-3.5">
+                        {docVersions.map((v: any, idx: number) => (
+                          <div key={v.id} className="p-3 border border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors relative">
+                            <div className="flex justify-between items-start">
+                              <span className="font-bold text-slate-850 text-xs">Version v{v.version_number}</span>
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
+                                {idx === 0 ? 'Current' : 'Archive'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-455 mt-1">{v.change_summary || 'No changelog description added.'}</p>
+                            <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-100 text-[9px] text-slate-400">
+                              <span>By {v.created_by?.full_name || 'System Admin'}</span>
+                              <span>{new Date(v.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center py-16">
+                        <FileText className="h-7 w-7 text-slate-200 mb-1" />
+                        <p className="max-w-[160px] text-[10px] leading-relaxed">Open any document to trace version logs.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </aside>
+            </div>
           </div>
-        )}
-      </aside>
+        ) : null
+      ) : (
+        <main className="flex-1 bg-slate-50 flex flex-col h-full overflow-hidden relative items-center justify-center p-8 text-center select-none">
+          <div className="max-w-sm space-y-4 flex flex-col items-center">
+            <div className="h-16 w-16 bg-blue-50 border border-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
+              <FileText className="h-8 w-8" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-slate-800 text-sm">No Document Open</h3>
+              <p className="text-[11px] text-slate-455 mt-1.5 leading-relaxed">
+                Select a document from the left directory catalog tree, or create a new document to start drafting.
+              </p>
+            </div>
+            <button
+              onClick={() => handleCreateNewBlankDocument(null, "New Document")}
+              className="glow-btn inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all border border-blue-500"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create New Document</span>
+            </button>
+          </div>
+        </main>
+      )}
 
       {/* 4. MODALS & CONTEXT MENU */}
 
