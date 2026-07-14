@@ -28,17 +28,12 @@ import {
   Plus,
   Link2,
   Image as ImageIcon,
-  Code,
-  Quote,
   Smile,
-  Copy,
-  FileDown,
   Star,
   Cloud,
   Video,
   Printer,
-  ArrowLeft,
-  ChevronDown
+  ArrowLeft
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
@@ -47,7 +42,6 @@ export default function DocumentTree() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
-  const openParamId = searchParams.get('open');
   
   // Tab State for Right Panel: AI Context vs Summary vs Versions
   const [rightPanelTab, setRightPanelTab] = useState<'ai' | 'summary' | 'versions'>('summary');
@@ -383,30 +377,6 @@ export default function DocumentTree() {
     }
   });
 
-  // Helper to build breadcrumb paths
-  const getBreadcrumbs = () => {
-    if (!selectedDoc || !folderTree) return ['Root'];
-    const path: string[] = [];
-    let currentFolderId = selectedDoc.folder_id;
-    
-    // Flatten folders to easily search by ID
-    const allFolders: Record<number, any> = {};
-    const flatten = (nodes: any[]) => {
-      for (const node of nodes) {
-        allFolders[node.id] = node;
-        if (node.sub_folders) flatten(node.sub_folders);
-      }
-    };
-    if (folderTree) flatten(folderTree);
-
-    while (currentFolderId && allFolders[currentFolderId]) {
-      const folder = allFolders[currentFolderId];
-      path.unshift(folder.name);
-      currentFolderId = folder.parent_id;
-    }
-    path.unshift('Root');
-    return path;
-  };
 
   // Action helpers
   const handleSaveDocumentContent = () => {
@@ -454,13 +424,6 @@ export default function DocumentTree() {
     uploadDocMutation.mutate(formData);
   };
 
-  const handleNewVersionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedDocId || !e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('file', file);
-    uploadVersionMutation.mutate({ id: selectedDocId, formData });
-  };
 
   const handleAskDocAI = (e: React.FormEvent) => {
     e.preventDefault();
