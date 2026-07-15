@@ -87,15 +87,17 @@ def test_auth_flow(db_session):
 
 
 def test_document_crud_and_permissions(db_session):
-    # 1. Setup two test users (User A - Owner, User B - Guest)
+    # 1. Setup test users (User A - Owner, User B - Guest, User M - Manager/Admin)
     email_a = "usera@test.com"
     email_b = "userb@test.com"
+    email_m = "manager@test.com"
     
     # Clean up existing
-    db_session.query(User).filter(User.email.in_([email_a, email_b])).delete()
+    db_session.query(User).filter(User.email.in_([email_a, email_b, email_m])).delete()
     db_session.commit()
     
     role_emp = db_session.query(Role).filter(Role.name == "employee").first()
+    role_admin = db_session.query(Role).filter(Role.name == "admin").first()
     
     user_a = User(
         email=email_a,
@@ -111,19 +113,29 @@ def test_document_crud_and_permissions(db_session):
         role_id=role_emp.id if role_emp else None,
         is_active=True
     )
-    db_session.add_all([user_a, user_b])
+    user_m = User(
+        email=email_m,
+        full_name="Manager User",
+        password_hash=get_password_hash("password"),
+        role_id=role_admin.id if role_admin else None,
+        is_active=True
+    )
+    db_session.add_all([user_a, user_b, user_m])
     db_session.commit()
     db_session.refresh(user_a)
     db_session.refresh(user_b)
+    db_session.refresh(user_m)
 
-    # Log in both users
+    # Log in all users
     token_a = client.post("/api/v1/auth/login", data={"username": email_a, "password": "password"}).json()["access_token"]
     token_b = client.post("/api/v1/auth/login", data={"username": email_b, "password": "password"}).json()["access_token"]
+    token_m = client.post("/api/v1/auth/login", data={"username": email_m, "password": "password"}).json()["access_token"]
     
     headers_a = {"Authorization": f"Bearer {token_a}"}
     headers_b = {"Authorization": f"Bearer {token_b}"}
+    headers_m = {"Authorization": f"Bearer {token_m}"}
 
-    # 2. User A uploads a private document
+    # 2. User A uploads a private document (defaults to "draft" status)
     file_content = b"This is a secret document containing proprietary codes and information."
     file_tuple = ("secret.txt", io.BytesIO(file_content), "text/plain")
     
@@ -146,7 +158,14 @@ def test_document_crud_and_permissions(db_session):
     assert doc["name"] == "Secret Doc"
     assert doc["access_level"] == "private"
 
-    # 3. User B tries to view it (expect 403 Forbidden)
+    # 2.5 Submit for approval and Approve to make it visible/active
+    resp_submit = client.post(f"/api/v1/documents/{doc_id}/submit-approval", headers=headers_a)
+    assert resp_submit.status_code == 200
+    
+    resp_approve = client.post(f"/api/v1/documents/{doc_id}/approve", headers=headers_m)
+    assert resp_approve.status_code == 200
+
+    # 3. User B tries to view it (expect 403 Forbidden because of private access level)
     response = client.get(f"/api/v1/documents/{doc_id}", headers=headers_b)
     assert response.status_code == 403
 
@@ -158,7 +177,7 @@ def test_document_crud_and_permissions(db_session):
     response = client.post(f"/api/v1/permissions/{doc_id}/grant", headers=headers_a, json=grant_payload)
     assert response.status_code == 201
 
-    # 5. User B tries to view it again (expect 200 Success now)
+    # 5. User B tries to view it again (expect 200 Success now that they have custom access)
     response = client.get(f"/api/v1/documents/{doc_id}", headers=headers_b)
     assert response.status_code == 200
     assert response.json()["name"] == "Secret Doc"
@@ -175,4 +194,5 @@ def test_document_crud_and_permissions(db_session):
     # 8. Clean up users
     db_session.delete(user_a)
     db_session.delete(user_b)
+    db_session.delete(user_m)
     db_session.commit()

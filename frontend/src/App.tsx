@@ -10,6 +10,8 @@ import DocumentViewer from './pages/DocumentViewer';
 import AIChat from './pages/AIChat';
 import Search from './pages/Search';
 import UserManagement from './pages/UserManagement';
+import ApprovalDashboard from './pages/ApprovalDashboard';
+import PublicDocumentViewer from './pages/PublicDocumentViewer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +72,7 @@ export default function App() {
               </PublicRoute>
             } 
           />
+          <Route path="/public/documents/:id" element={<PublicDocumentViewer />} />
 
           {/* Protected routes under Layout */}
           <Route 
@@ -86,6 +89,7 @@ export default function App() {
             <Route path="chat" element={<AIChat />} />
             <Route path="search" element={<Search />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="approval" element={<ApprovalDashboard />} />
           </Route>
 
           {/* Fallback */}

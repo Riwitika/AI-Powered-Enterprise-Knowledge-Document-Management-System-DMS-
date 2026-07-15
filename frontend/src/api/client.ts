@@ -303,7 +303,39 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
   }
 
   if (path === "/documents") {
-    return docs;
+    const activeUser = JSON.parse(localStorage.getItem("kms_active_user") || "null");
+    const isManagerOrAdmin = activeUser?.role?.name === "super_admin" || activeUser?.role?.name === "admin" || activeUser?.role?.name === "department_manager";
+    return docs.filter((d: any) => {
+      if (d.is_template) return false; // Templates listed separately
+      if (d.status === "active" || !d.status) return true;
+      if (activeUser && d.owner_id === activeUser.id) return true;
+      if (d.status === "pending_approval" && isManagerOrAdmin) return true;
+      return false;
+    });
+  }
+
+  if (path === "/documents/pending") {
+    const activeUser = JSON.parse(localStorage.getItem("kms_active_user") || "null");
+    const isManagerOrAdmin = activeUser?.role?.name === "super_admin" || activeUser?.role?.name === "admin" || activeUser?.role?.name === "department_manager";
+    if (!isManagerOrAdmin) throw new ApiError(403, "Forbidden");
+    return docs.filter((d: any) => d.status === "pending_approval");
+  }
+
+  if (path === "/documents/templates") {
+    return docs.filter((d: any) => d.is_template === true);
+  }
+
+  if (path.startsWith("/documents/public/")) {
+    const parts = path.split("/");
+    const id = parts[3];
+    const docObj = docs.find((d: any) => d.id === id);
+    if (!docObj) throw new ApiError(404, "Document not found");
+    if (docObj.access_level !== "public") throw new ApiError(403, "Access Denied");
+    
+    if (parts.length === 5 && parts[4] === "download") {
+      return new Blob(["Mock public file bytes placeholder"], { type: "application/octet-stream" });
+    }
+    return docObj;
   }
 
   if (path === "/documents/upload") {
@@ -314,20 +346,25 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
     const category = body.get("category") as string;
     const access_level = body.get("access_level") as string;
     const folder_id = body.get("folder_id") ? Number(body.get("folder_id")) : null;
+    const is_template = body.get("is_template") === "true";
+    const activeUser = JSON.parse(localStorage.getItem("kms_active_user") || "null");
 
     const newDoc = {
       id: `doc-${Math.random()}`,
       folder_id,
-      name: name || fileObj.name,
+      name: name || fileObj?.name || "Untitled Document",
       description,
       file_path: "/uploads/mock.pdf",
-      file_type: fileObj.name.split(".").pop() || "pdf",
+      file_type: fileObj?.name?.split(".").pop() || "pdf",
       category,
       access_level,
       current_version: 1,
       ai_summary: `Summarizing file content: ${description || name}. Evaluated clauses on access levels.`,
-      ai_keywords: ["uploaded-file", category.toLowerCase() || "general"],
-      created_at: new Date().toISOString()
+      ai_keywords: ["uploaded-file", category?.toLowerCase() || "general"],
+      created_at: new Date().toISOString(),
+      owner_id: activeUser?.id || "admin-uuid",
+      status: is_template ? "active" : "draft",
+      is_template
     };
     const updated = [newDoc, ...docs];
     localStorage.setItem("kms_docs", JSON.stringify(updated));
@@ -361,6 +398,15 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
     }
     
     if (parts[3] === "versions") {
+      if (parts.length === 6 && parts[5] === "view") {
+        const verNum = parts[4];
+        const docObj = docs.find((d: any) => d.id === id) || docs[0];
+        return {
+          content: `<h3>Simulated Content of ${docObj.name} (Version v${verNum})</h3><p>This is the read-only revision text captured at version ${verNum} checkpoint. Automated indexing and vector calculations are completed.</p>`,
+          version_number: Number(verNum),
+          name: docObj.name
+        };
+      }
       return [
         { id: 101, document_id: id, version_number: 1, file_path: "/uploads/v1.pdf", uploaded_at: new Date().toISOString() }
       ];
@@ -370,6 +416,36 @@ const handleMockRequest = async (path: string, options: RequestInit = {}): Promi
       const docToUpdate = docs.find((d: any) => d.id === id);
       if (docToUpdate) {
         docToUpdate.current_version += 1;
+        localStorage.setItem("kms_docs", JSON.stringify(docs));
+        return docToUpdate;
+      }
+    }
+
+    if (parts[3] === "submit-approval" && options.method === "POST") {
+      const docToUpdate = docs.find((d: any) => d.id === id);
+      if (docToUpdate) {
+        docToUpdate.status = "pending_approval";
+        localStorage.setItem("kms_docs", JSON.stringify(docs));
+        return docToUpdate;
+      }
+    }
+
+    if (parts[3] === "approve" && options.method === "POST") {
+      const docToUpdate = docs.find((d: any) => d.id === id);
+      if (docToUpdate) {
+        docToUpdate.status = "active";
+        docToUpdate.rejection_remarks = undefined;
+        localStorage.setItem("kms_docs", JSON.stringify(docs));
+        return docToUpdate;
+      }
+    }
+
+    if (parts[3] === "reject" && options.method === "POST") {
+      const docToUpdate = docs.find((d: any) => d.id === id);
+      const payload = JSON.parse(options.body as string || "{}");
+      if (docToUpdate) {
+        docToUpdate.status = "rejected";
+        docToUpdate.rejection_remarks = payload.rejection_remarks || "No remarks provided";
         localStorage.setItem("kms_docs", JSON.stringify(docs));
         return docToUpdate;
       }
@@ -654,6 +730,18 @@ export const api = {
       method: "POST",
       body: formData,
     }),
+    getPending: async () => apiRequest("/documents/pending"),
+    getTemplates: async () => apiRequest("/documents/templates"),
+    getPublic: async (id: string) => apiRequest(`/documents/public/${id}`),
+    downloadPublic: async (id: string): Promise<Blob> => apiRequest(`/documents/public/${id}/download`),
+    submitApproval: async (id: string) => apiRequest(`/documents/${id}/submit-approval`, { method: "POST" }),
+    approve: async (id: string) => apiRequest(`/documents/${id}/approve`, { method: "POST" }),
+    reject: async (id: string, remarks: string) => apiRequest(`/documents/${id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rejection_remarks: remarks }),
+    }),
+    viewVersion: async (id: string, ver: number) => apiRequest(`/documents/${id}/versions/${ver}/view`),
   },
   permissions: {
     list: async (docId: string) => apiRequest(`/permissions/${docId}`),

@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.core.deps import get_db, get_current_active_user, get_accessible_document_ids, verify_document_access
 from app.models.models import Document, DocumentVersion, User, Folder
@@ -22,11 +23,16 @@ def upload_document(
     folder_id: Optional[int] = Form(None),
     category: Optional[str] = Form(None),
     access_level: str = Form("private"),
+    is_template: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    if folder_id:
-        folder = db.query(Folder).filter(Folder.id == folder_id).first()
+    target_folder_id = folder_id
+    if target_folder_id == 0 or target_folder_id == "":
+        target_folder_id = None
+
+    if target_folder_id:
+        folder = db.query(Folder).filter(Folder.id == target_folder_id).first()
         if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
             
@@ -41,7 +47,7 @@ def upload_document(
 
     # Create document entry
     new_doc = Document(
-        folder_id=folder_id,
+        folder_id=target_folder_id,
         name=doc_name,
         description=description,
         file_path=file_path,
@@ -51,7 +57,8 @@ def upload_document(
         owner_id=current_user.id,
         access_level=access_level,
         current_version=1,
-        status="active"
+        status="active" if is_template else "draft",
+        is_template=is_template
     )
 
     try:
@@ -93,8 +100,30 @@ def list_documents(
     allowed_ids = get_accessible_document_ids(current_user, db)
     docs = db.query(Document).filter(
         Document.id.in_(allowed_ids),
-        Document.status == "active"
+        or_(
+            Document.status == "active",
+            Document.owner_id == current_user.id
+        )
     ).all()
+    return docs
+
+
+@router.get("/pending", response_model=List[DocumentResponse])
+def get_pending_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if not current_user.role or current_user.role.name not in ["super_admin", "admin", "department_manager"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    docs = db.query(Document).filter(Document.status == "pending_approval").all()
+    return docs
+
+@router.get("/templates", response_model=List[DocumentResponse])
+def get_templates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    docs = db.query(Document).filter(Document.is_template == True).all()
     return docs
 
 
@@ -145,11 +174,15 @@ def update_document_metadata(
     if payload.description is not None:
         doc.description = payload.description
     if payload.folder_id is not None:
-        if payload.folder_id:
-            folder = db.query(Folder).filter(Folder.id == payload.folder_id).first()
+        target_folder_id = payload.folder_id
+        if target_folder_id == 0 or target_folder_id == "":
+            target_folder_id = None
+
+        if target_folder_id:
+            folder = db.query(Folder).filter(Folder.id == target_folder_id).first()
             if not folder:
                 raise HTTPException(status_code=404, detail="Folder not found")
-        doc.folder_id = payload.folder_id
+        doc.folder_id = target_folder_id
     if payload.category is not None:
         doc.category = payload.category
     if payload.access_level is not None:
@@ -159,6 +192,10 @@ def update_document_metadata(
     if payload.content is not None:
         doc.content = payload.content
         needs_reindex = True
+    if payload.rejection_remarks is not None:
+        doc.rejection_remarks = payload.rejection_remarks
+    if payload.is_template is not None:
+        doc.is_template = payload.is_template
         
     db.commit()
     db.refresh(doc)
@@ -271,3 +308,105 @@ def upload_new_version(
     background_tasks.add_task(run_background_processing, doc.id)
     
     return doc
+
+
+# ----------------- NEW WORKFLOWS & PUBLIC ROUTES -----------------
+
+
+
+@router.get("/public/{document_id}", response_model=DocumentResponse)
+def get_public_document(
+    document_id: UUID,
+    db: Session = Depends(get_db)
+):
+    doc = verify_document_access(document_id, None, db, required_access="view")
+    return doc
+
+@router.get("/public/{document_id}/download")
+def download_public_document(
+    document_id: UUID,
+    db: Session = Depends(get_db)
+):
+    doc = verify_document_access(document_id, None, db, required_access="view")
+    if not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Physical file not found on disk")
+    return FileResponse(
+        path=doc.file_path,
+        filename=f"{doc.name}.{doc.file_type}",
+        media_type="application/octet-stream"
+    )
+
+@router.post("/{document_id}/submit-approval", response_model=DocumentResponse)
+def submit_for_approval(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    doc = verify_document_access(document_id, current_user, db, required_access="edit")
+    if doc.owner_id != current_user.id and (not current_user.role or current_user.role.name not in ["super_admin", "admin"]):
+        raise HTTPException(status_code=403, detail="Only the owner can submit for approval")
+    doc.status = "pending_approval"
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+from pydantic import BaseModel
+class RejectionPayload(BaseModel):
+    rejection_remarks: Optional[str] = None
+
+@router.post("/{document_id}/approve", response_model=DocumentResponse)
+def approve_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if not current_user.role or current_user.role.name not in ["super_admin", "admin", "department_manager"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.status = "active"
+    doc.rejection_remarks = None
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+@router.post("/{document_id}/reject", response_model=DocumentResponse)
+def reject_document(
+    document_id: UUID,
+    payload: RejectionPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if not current_user.role or current_user.role.name not in ["super_admin", "admin", "department_manager"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.status = "rejected"
+    doc.rejection_remarks = payload.rejection_remarks
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+@router.get("/{document_id}/versions/{version_number}/view")
+def view_document_version(
+    document_id: UUID,
+    version_number: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    from app.services.extraction import extract_document_text
+    doc = verify_document_access(document_id, current_user, db, required_access="view")
+    version = db.query(DocumentVersion).filter(
+        DocumentVersion.document_id == document_id,
+        DocumentVersion.version_number == version_number
+    ).first()
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    if not os.path.exists(version.file_path):
+        # Fallback if file doesn't exist (e.g. mock seed files)
+        return {"content": doc.content or "No content found.", "version_number": version_number, "name": doc.name}
+    content = extract_document_text(version.file_path, doc.file_type)
+    return {"content": content, "version_number": version_number, "name": doc.name}

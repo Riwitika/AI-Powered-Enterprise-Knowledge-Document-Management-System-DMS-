@@ -78,10 +78,10 @@ def get_accessible_document_ids(user: User, db: Session) -> List[UUID]:
     if user.role and user.role.name in ["super_admin", "admin"]:
         return [d[0] for d in db.query(Document.id).all()]
 
-    # 1. Base conditions (owned, shared org-wide, view_only, edit)
+    # 1. Base conditions (owned, shared org-wide, view_only, edit, public)
     conditions = [
         Document.owner_id == user.id,
-        Document.access_level.in_(["organization", "view_only", "edit"])
+        Document.access_level.in_(["organization", "view_only", "edit", "public"])
     ]
     
     # 2. Department condition
@@ -105,12 +105,23 @@ def get_accessible_document_ids(user: User, db: Session) -> List[UUID]:
     if custom_ids:
         query_conditions.append(Document.id.in_(custom_ids))
         
-    docs = db.query(Document.id).filter(or_(*query_conditions)).all()
-    return [r[0] for r in docs]
+    docs = db.query(Document).filter(or_(*query_conditions)).all()
+    
+    accessible_ids = []
+    is_manager = user.role and user.role.name == "department_manager"
+    for doc in docs:
+        if doc.status == "active":
+            accessible_ids.append(doc.id)
+        elif doc.owner_id == user.id:
+            accessible_ids.append(doc.id)
+        elif doc.status == "pending_approval" and is_manager:
+            accessible_ids.append(doc.id)
+            
+    return accessible_ids
 
 def verify_document_access(
     document_id: UUID,
-    user: User,
+    user: Optional[User],
     db: Session,
     required_access: str = "view"  # "view" or "edit"
 ) -> Document:
@@ -125,6 +136,17 @@ def verify_document_access(
             detail="Document not found"
         )
         
+    # Public access check first
+    if doc.access_level == "public" and required_access == "view":
+        if doc.status == "active":
+            return doc
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+        
     # Admins can access everything
     if user.role and user.role.name in ["super_admin", "admin"]:
         return doc
@@ -132,6 +154,16 @@ def verify_document_access(
     # Owner can access everything
     if doc.owner_id == user.id:
         return doc
+
+    # Filter by approval workflow status
+    if doc.status in ["draft", "pending_approval", "rejected"]:
+        is_manager = user.role and user.role.name == "department_manager"
+        if doc.status == "pending_approval" and is_manager:
+            return doc
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Document is not approved or you do not have permission to access it"
+        )
 
     # If document is archived, only admins and owners can see it
     if doc.status == "archived":
@@ -164,7 +196,7 @@ def verify_document_access(
         )
 
     # View access check (required_access == "view")
-    if doc.access_level in ["organization", "view_only", "edit"]:
+    if doc.access_level in ["organization", "view_only", "edit", "public"]:
         return doc
         
     if doc.access_level == "department" and user.department_id == doc.department_id:

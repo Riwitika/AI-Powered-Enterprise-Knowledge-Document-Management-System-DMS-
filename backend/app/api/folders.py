@@ -47,8 +47,7 @@ def get_tree(
         return [workspace_root]
         
     allowed_docs = db.query(Document).filter(
-        Document.id.in_(allowed_doc_ids),
-        Document.status == "active"
+        Document.id.in_(allowed_doc_ids)
     ).all()
     
     # Map folders by ID
@@ -107,17 +106,21 @@ def create_folder(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    if payload.parent_id:
-        parent = db.query(Folder).filter(Folder.id == payload.parent_id).first()
+    parent_id = payload.parent_id
+    if parent_id == 0 or parent_id == "":
+        parent_id = None
+
+    if parent_id:
+        parent = db.query(Folder).filter(Folder.id == parent_id).first()
         if not parent:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Parent folder with ID {payload.parent_id} not found"
+                detail=f"Parent folder with ID {parent_id} not found"
             )
             
     new_folder = Folder(
         name=payload.name,
-        parent_id=payload.parent_id,
+        parent_id=parent_id,
         created_by=current_user.id
     )
     db.add(new_folder)
@@ -155,15 +158,30 @@ def update_folder(
             detail="Folder not found"
         )
         
-    if payload.parent_id == folder_id:
+    parent_id = payload.parent_id
+    if parent_id == 0 or parent_id == "":
+        parent_id = None
+
+    if parent_id == folder_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A folder cannot be its own parent"
         )
-        
-    if payload.parent_id:
+
+    # Prevent cycle: check if parent_id is a descendant of folder_id
+    if parent_id:
+        current_parent_id = parent_id
+        while current_parent_id:
+            if current_parent_id == folder_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot move a folder into one of its descendants"
+                )
+            p_folder = db.query(Folder).filter(Folder.id == current_parent_id).first()
+            current_parent_id = p_folder.parent_id if p_folder else None
+
         # Check parent folder existence
-        parent = db.query(Folder).filter(Folder.id == payload.parent_id).first()
+        parent = db.query(Folder).filter(Folder.id == parent_id).first()
         if not parent:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -171,7 +189,7 @@ def update_folder(
             )
             
     folder.name = payload.name
-    folder.parent_id = payload.parent_id
+    folder.parent_id = parent_id
     db.commit()
     db.refresh(folder)
     return folder
@@ -200,15 +218,14 @@ def delete_folder(
             detail="Cannot delete folder containing subfolders"
         )
         
-    # Check for active documents in the folder
+    # Check for any documents in the folder
     has_docs = db.query(Document).filter(
-        Document.folder_id == folder_id,
-        Document.status == "active"
+        Document.folder_id == folder_id
     ).first()
     if has_docs:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete folder containing active documents"
+            detail="Cannot delete folder containing documents"
         )
         
     try:

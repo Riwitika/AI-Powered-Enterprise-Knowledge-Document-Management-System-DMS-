@@ -91,6 +91,8 @@ class DocumentBase(BaseModel):
     access_level: str = "private"  # private | view_only | edit | department | organization | custom
     status: str = "active"
     content: Optional[str] = None
+    rejection_remarks: Optional[str] = None
+    is_template: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class DocumentCreate(DocumentBase):
@@ -104,6 +106,8 @@ class DocumentUpdate(BaseModel):
     access_level: Optional[str] = None
     status: Optional[str] = None
     content: Optional[str] = None
+    rejection_remarks: Optional[str] = None
+    is_template: Optional[bool] = None
 
 class DocumentResponse(DocumentBase):
     id: UUID

@@ -174,6 +174,8 @@ class Document(Base):
     ai_summary = Column(Text, nullable=True)
     ai_keywords = Column(ARRAY(String), nullable=True)
     status = Column(String(20), default="active")
+    rejection_remarks = Column(Text, nullable=True)
+    is_template = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

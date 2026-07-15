@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { useQuery } from '@tanstack/react-query';
+import FloatingAIChat from './FloatingAIChat';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
   LayoutDashboard,
@@ -17,7 +18,11 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  Folder
+  Folder,
+  Plus,
+  FolderPlus,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 export default function Layout() {
@@ -48,6 +53,125 @@ export default function Layout() {
   };
 
   const isAdmin = user?.role?.name === 'super_admin' || user?.role?.name === 'admin';
+  const isManager = user?.role?.name === 'department_manager';
+  const canApprove = isAdmin || isManager;
+
+  const queryClient = useQueryClient();
+
+  const createFolderMutation = useMutation({
+    mutationFn: api.folders.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+    }
+  });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: api.documents.upload,
+    onSuccess: (newDoc) => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      if (newDoc && newDoc.id) {
+        navigate(`/documents?open=${newDoc.id}`);
+      }
+    }
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (docId: string) => api.documents.delete(docId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      const params = new URLSearchParams(location.search);
+      if (params.get('open')) {
+        navigate('/documents');
+      }
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to delete document');
+    }
+  });
+
+  const renameDocumentMutation = useMutation({
+    mutationFn: (payload: { id: string; name: string }) => 
+      api.documents.update(payload.id, { name: payload.name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['document'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to rename document');
+    }
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (folderId: number) => api.folders.delete(folderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to delete folder');
+    }
+  });
+
+  const renameFolderMutation = useMutation({
+    mutationFn: (payload: { id: number; name: string }) => 
+      api.folders.update(payload.id, { name: payload.name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to rename folder');
+    }
+  });
+
+  const handleDeleteDocument = (docId: string) => {
+    if (window.confirm("Are you sure you want to delete this document?")) {
+      deleteDocumentMutation.mutate(docId);
+    }
+  };
+
+  const handleRenameDocument = (doc: any) => {
+    const name = prompt("Enter new document name:", doc.name);
+    if (name && name.trim() && name.trim() !== doc.name) {
+      renameDocumentMutation.mutate({ id: doc.id, name: name.trim() });
+    }
+  };
+
+  const handleDeleteFolder = (folderId: number) => {
+    if (window.confirm("Are you sure you want to delete this folder? All empty subdirectories will be cleared.")) {
+      deleteFolderMutation.mutate(folderId);
+    }
+  };
+
+  const handleRenameFolder = (folder: any) => {
+    const name = prompt("Enter new folder name:", folder.name);
+    if (name && name.trim() && name.trim() !== folder.name) {
+      renameFolderMutation.mutate({ id: folder.id, name: name.trim() });
+    }
+  };
+
+  const handleCreateFolder = (parentId: number) => {
+    const name = prompt("Enter subfolder name:");
+    if (name && name.trim()) {
+      createFolderMutation.mutate({ name: name.trim(), parent_id: parentId });
+    }
+  };
+
+  const handleCreateDocument = (folderId: number) => {
+    const title = prompt("Enter document title:");
+    if (title && title.trim()) {
+      const dummyFile = new File(["<p>Start writing your enterprise document...</p>"], `${title.trim()}.txt`, { type: "text/plain" });
+      const formData = new FormData();
+      formData.append('file', dummyFile);
+      formData.append('name', title.trim());
+      formData.append('description', 'Draft document created in workspace');
+      formData.append('category', 'Draft');
+      formData.append('access_level', 'private');
+      formData.append('folder_id', String(folderId));
+      uploadDocMutation.mutate(formData);
+    }
+  };
 
   // Get recent files for the top bar quick selector
   const { data: metrics } = useQuery({
@@ -76,12 +200,11 @@ export default function Layout() {
       
       return (
         <div key={node.id} className="space-y-0.5 select-none">
-          {/* Folder row button */}
-          <button
+          {/* Folder row container */}
+          <div
             onClick={(e) => toggleFolder(node.id, e)}
             style={{ paddingLeft: `${8 + depth * 14}px` }}
-            title={node.name}
-            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent min-w-0 ${
+            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all text-left text-slate-600 hover:bg-slate-100/70 border-l-2 border-transparent min-w-0 group cursor-pointer ${
               isExpanded ? 'font-bold text-slate-900 bg-slate-50/40' : 'font-medium'
             }`}
           >
@@ -89,12 +212,47 @@ export default function Layout() {
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3 text-blue-500 shrink-0 font-bold" />
               ) : (
-                <ChevronRight className="h-3 w-3 text-slate-400 shrink-0 hover:text-slate-800" />
+                <ChevronRight className="h-3 w-3 text-slate-400 shrink-0 hover:text-slate-850" />
               )}
               <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500 fill-amber-500/10' : 'text-amber-600 fill-amber-600/5'}`} />
               <span className="truncate block min-w-0 flex-1">{node.name}</span>
             </span>
-          </button>
+
+            {/* Folder Actions hover panel */}
+            <div 
+              className="hidden group-hover:flex items-center gap-1 shrink-0 pr-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => handleCreateFolder(node.id)}
+                className="p-0.5 hover:bg-slate-200 rounded text-slate-500 transition-colors"
+                title="Create Subfolder"
+              >
+                <FolderPlus className="h-3 w-3 text-amber-600" />
+              </button>
+              <button
+                onClick={() => handleCreateDocument(node.id)}
+                className="p-0.5 hover:bg-slate-200 rounded text-slate-550 transition-colors"
+                title="Create Document"
+              >
+                <Plus className="h-3 w-3 text-blue-600" />
+              </button>
+              <button
+                onClick={() => handleRenameFolder(node)}
+                className="p-0.5 hover:bg-slate-200 rounded text-slate-500 transition-colors"
+                title="Rename Folder"
+              >
+                <Edit className="h-2.5 w-2.5 text-slate-500" />
+              </button>
+              <button
+                onClick={() => handleDeleteFolder(node.id)}
+                className="p-0.5 hover:bg-slate-200 rounded text-red-500 transition-colors"
+                title="Delete Folder"
+              >
+                <Trash2 className="h-2.5 w-2.5 text-red-600" />
+              </button>
+            </div>
+          </div>
 
           {/* Children: Subfolders and Files */}
           {isExpanded && (
@@ -106,20 +264,45 @@ export default function Layout() {
               {node.documents && node.documents.map((doc: any) => {
                 const isActive = location.search.includes(`open=${doc.id}`);
                 return (
-                  <Link
+                  <div
                     key={doc.id}
-                    to={`/documents?open=${doc.id}`}
                     style={{ paddingLeft: `${14 + depth * 14}px` }}
-                    title={doc.name}
-                    className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[10px] font-bold transition-all border-l-2 min-w-0 ${
+                    className={`group flex items-center justify-between py-1 px-2 rounded-lg transition-all border-l-2 min-w-0 ${
                       isActive 
                         ? 'bg-blue-50/90 text-blue-600 border-blue-600 shadow-sm font-extrabold' 
                         : 'text-slate-500 hover:bg-slate-55/70 hover:text-slate-850 border-l-2 border-transparent hover:border-slate-200'
                     }`}
                   >
-                    <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className="truncate block min-w-0 flex-1">{doc.name}</span>
-                  </Link>
+                    <Link
+                      to={`/documents?open=${doc.id}`}
+                      title={doc.name}
+                      className="flex items-center gap-1.5 min-w-0 flex-1 truncate pr-1"
+                    >
+                      <FileText className={`h-3 w-3 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <span className="truncate block min-w-0 flex-1">{doc.name}</span>
+                    </Link>
+
+                    {/* Document Actions hover panel */}
+                    <div 
+                      className="hidden group-hover:flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => handleRenameDocument(doc)}
+                        className="p-0.5 hover:bg-slate-200 rounded text-slate-550 transition-colors"
+                        title="Rename Document"
+                      >
+                        <Edit className="h-2.5 w-2.5 text-slate-500" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDocument(doc.id)}
+                        className="p-0.5 hover:bg-slate-200 rounded text-red-500 transition-colors"
+                        title="Delete Document"
+                      >
+                        <Trash2 className="h-2.5 w-2.5 text-red-650" />
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -129,7 +312,14 @@ export default function Layout() {
     });
   };
 
-  const isEditingDocument = location.pathname.startsWith('/documents') && new URLSearchParams(location.search).has('open');
+  const selectedDocId = new URLSearchParams(location.search).get('open');
+  const { data: selectedDoc, isLoading: docLoading } = useQuery({
+    queryKey: ['document', selectedDocId],
+    queryFn: () => selectedDocId ? api.documents.get(selectedDocId) : null,
+    enabled: !!selectedDocId
+  });
+
+  const isEditingDocument = location.pathname.startsWith('/documents') && selectedDocId && !docLoading && selectedDoc;
 
   if (isEditingDocument) {
     return (
@@ -225,6 +415,25 @@ export default function Layout() {
               <Users className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/users' ? 'text-blue-600' : 'text-slate-400'}`} />
               {!isSidebarCollapsed && <span>User Directory</span>}
               {location.pathname === '/users' && !isSidebarCollapsed && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
+              )}
+            </Link>
+          )}
+
+          {/* Approval Dashboard Link (Admins & Managers) */}
+          {canApprove && (
+            <Link
+              to="/approval"
+              className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3.5'} py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+                location.pathname === '/approval'
+                  ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+              }`}
+              title="Approval Dashboard"
+            >
+              <Activity className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/approval' ? 'text-blue-600' : 'text-slate-400'}`} />
+              {!isSidebarCollapsed && <span>Approval Dashboard</span>}
+              {location.pathname === '/approval' && !isSidebarCollapsed && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
               )}
             </Link>
@@ -390,8 +599,9 @@ export default function Layout() {
         </header>
 
         {/* Page Render Container */}
-        <div className="flex-1 overflow-auto bg-slate-100/50 p-8">
+        <div className="flex-1 overflow-auto bg-slate-100/50 p-8 relative">
           <Outlet />
+          <FloatingAIChat />
         </div>
 
       </div>
