@@ -34,12 +34,7 @@ export default function Layout() {
   // Roles checking
   const isAdmin = user?.role?.name === 'super_admin' || user?.role?.name === 'admin';
 
-  // Fetch telemetry / metrics for matching state if needed
-  const { data: metrics } = useQuery({
-    queryKey: ['dashboard-metrics-layout'],
-    queryFn: api.dashboard.metrics,
-    enabled: !!user
-  });
+
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';

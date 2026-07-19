@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { MessageSquare, X, Send, Sparkles, Loader2, Bot, Globe } from 'lucide-react';
+import { X, Send, Sparkles, Loader2, Globe } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 interface Message {

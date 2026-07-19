@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { 
   FileText, 
   Users, 
-  Clock, 
   Cloud, 
   Sparkles,
   RefreshCw,
@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import KPICard from '../components/KPICard';
 import SectionHeader from '../components/SectionHeader';
-import DataTable, { DataRow } from '../components/DataTable';
+import DataTable from '../components/DataTable';
+import type { DataRow } from '../components/DataTable';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
@@ -150,7 +151,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleDocumentActionClick = (row: DataRow, e: React.MouseEvent) => {
+  const handleDocumentActionClick = (row: DataRow, _e: React.MouseEvent) => {
     alert(`Mock operations for "${row.name}" triggered.`);
   };
 
