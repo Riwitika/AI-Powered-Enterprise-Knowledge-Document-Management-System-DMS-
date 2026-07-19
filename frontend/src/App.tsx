@@ -12,6 +12,7 @@ import Search from './pages/Search';
 import UserManagement from './pages/UserManagement';
 import ApprovalDashboard from './pages/ApprovalDashboard';
 import PublicDocumentViewer from './pages/PublicDocumentViewer';
+import Permissions from './pages/Permissions';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="search" element={<Search />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="approval" element={<ApprovalDashboard />} />
+            <Route path="permissions" element={<Permissions />} />
           </Route>
 
           {/* Fallback */}

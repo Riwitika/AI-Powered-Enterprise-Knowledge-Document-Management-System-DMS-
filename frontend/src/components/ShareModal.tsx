@@ -48,7 +48,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     mutationFn: (level: string) => api.documents.update(selectedDoc.id, { access_level: level }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
-      queryClient.invalidateQueries({ queryKey: ['document-details', selectedDoc.id] });
+      queryClient.invalidateQueries({ queryKey: ['document', selectedDoc.id] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
     },
     onError: (err: any) => {
       alert(err.message || 'Failed to update document access level');
@@ -173,32 +174,37 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Owner</span>
             </div>
 
-            {docPermissions?.map((perm: any) => (
-              <div key={perm.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs hover:bg-slate-100/70 transition-all">
-                <div>
-                  {perm.user ? (
-                    <>
-                      <span className="font-bold text-slate-800 block">{perm.user.full_name}</span>
-                      <span className="text-[10px] text-slate-455 block">{perm.user.email}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-800 block">{perm.department?.name} Department</span>
-                      <span className="text-[10px] text-slate-455 block">Division level access</span>
-                    </>
-                  )}
+            {docPermissions?.map((perm: any) => {
+              const targetUser = systemUsers?.find((u: any) => u.id === perm.user_id);
+              const targetDept = systemDepts?.find((d: any) => d.id === perm.department_id);
+
+              return (
+                <div key={perm.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs hover:bg-slate-100/70 transition-all">
+                  <div>
+                    {perm.user_id ? (
+                      <>
+                        <span className="font-bold text-slate-900 block">{targetUser?.full_name || 'Loading member profile...'}</span>
+                        <span className="text-[10px] text-slate-500 block">{targetUser?.email}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-slate-900 block">{targetDept?.name || 'Loading department...'} Department</span>
+                        <span className="text-[10px] text-slate-500 block">Division level access</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-slate-550 capitalize">{perm.access_type}</span>
+                    <button
+                      onClick={() => handleRevokePermission(perm)}
+                      className="text-[10px] text-red-600 hover:text-red-750 font-bold"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold text-slate-550 capitalize">{perm.access_type}</span>
-                  <button
-                    onClick={() => handleRevokePermission(perm)}
-                    className="text-[10px] text-red-600 hover:text-red-750 font-bold"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -216,8 +222,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(shareUrl);
-              handleCopyShareLink(); // triggers toast/copied state in parent
+              handleCopyShareLink(); // triggers copying and toast state in parent
             }}
             className="bg-slate-100 hover:bg-slate-200 border border-slate-250 text-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm transition-all shrink-0 flex items-center gap-1.5 w-28 justify-center"
           >

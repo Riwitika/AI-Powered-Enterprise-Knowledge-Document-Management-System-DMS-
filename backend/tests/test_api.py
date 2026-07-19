@@ -157,13 +157,16 @@ def test_document_crud_and_permissions(db_session):
     doc_id = doc["id"]
     assert doc["name"] == "Secret Doc"
     assert doc["access_level"] == "private"
+    assert doc["status"] == "pending"
 
     # 2.5 Submit for approval and Approve to make it visible/active
     resp_submit = client.post(f"/api/v1/documents/{doc_id}/submit-approval", headers=headers_a)
     assert resp_submit.status_code == 200
+    assert resp_submit.json()["status"] == "pending_approval"
     
     resp_approve = client.post(f"/api/v1/documents/{doc_id}/approve", headers=headers_m)
     assert resp_approve.status_code == 200
+    assert resp_approve.json()["status"] == "active"
 
     # 3. User B tries to view it (expect 403 Forbidden because of private access level)
     response = client.get(f"/api/v1/documents/{doc_id}", headers=headers_b)

@@ -60,5 +60,5 @@ def search_documents(
         query = query.filter(Document.department_id == department_id)
 
     # Deduplicate results if we joined tags
-    results = query.distinct(Document.id).all()
+    results = query.distinct().all()
     return results

@@ -20,6 +20,7 @@ export default function ApprovalDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       setSelectedDoc(null);
       setRemarks('');
       setShowRejectForm(false);
@@ -34,6 +35,7 @@ export default function ApprovalDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       setSelectedDoc(null);
       setRemarks('');
       setShowRejectForm(false);

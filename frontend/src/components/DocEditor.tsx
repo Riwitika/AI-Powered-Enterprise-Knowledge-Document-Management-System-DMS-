@@ -37,9 +37,11 @@ import {
   Mic,
   Search,
   Minus,
-  CheckSquare
+  CheckSquare,
+  Share2
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { ShareModal } from './ShareModal';
 
 // ----------------- TYPES -----------------
 interface DocEditorProps {
@@ -112,6 +114,13 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
 
+  // Share modal states
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUserId, setShareUserId] = useState('');
+  const [shareDeptId, setShareDeptId] = useState<number | ''>('');
+  const [shareAccessType, setShareAccessType] = useState('view');
+  const [linkCopied, setLinkCopied] = useState(false);
+
   // ----------------- QUERIES & MUTATIONS -----------------
   const { data: selectedDoc, isLoading: docLoading, error: docError } = useQuery({
     queryKey: ['document', selectedDocId],
@@ -125,11 +134,80 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
     enabled: !!selectedDocId
   });
 
-  const { data: docPermissions } = useQuery({
-    queryKey: ['doc-permissions-editor', selectedDocId],
+  const { data: docPermissions, refetch: refetchPermissions } = useQuery({
+    queryKey: ['document-permissions', selectedDocId],
     queryFn: () => api.permissions.list(selectedDocId),
     enabled: !!selectedDocId
   });
+
+  const { data: systemUsers } = useQuery({
+    queryKey: ['system-users-list'],
+    queryFn: api.users.list,
+    enabled: !!user && showShareModal
+  });
+
+  const { data: systemDepts } = useQuery({
+    queryKey: ['system-departments-list'],
+    queryFn: api.departments.list,
+    enabled: !!user && showShareModal
+  });
+
+  const grantPermissionMutation = useMutation({
+    mutationFn: ({ docId, payload }: { docId: string; payload: any }) => api.permissions.grant(docId, payload),
+    onSuccess: () => {
+      refetchPermissions();
+      setShareUserId('');
+      setShareDeptId('');
+    }
+  });
+
+  const revokePermissionMutation = useMutation({
+    mutationFn: ({ docId, params }: { docId: string; params: any }) => api.permissions.revoke(docId, params),
+    onSuccess: () => {
+      refetchPermissions();
+    }
+  });
+
+  const handleGrantPermission = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDocId) return;
+    if (!shareUserId && !shareDeptId) return;
+
+    grantPermissionMutation.mutate({
+      docId: selectedDocId,
+      payload: {
+        user_id: shareUserId || null,
+        department_id: shareDeptId !== '' ? Number(shareDeptId) : null,
+        access_type: shareAccessType
+      }
+    });
+  };
+
+  const handleRevokePermission = (perm: any) => {
+    if (!selectedDocId) return;
+    revokePermissionMutation.mutate({
+      docId: selectedDocId,
+      params: {
+        user_id: perm.user_id || undefined,
+        department_id: perm.department_id || undefined
+      }
+    });
+  };
+
+  const handleCopyShareLink = () => {
+    const origin = window.location.origin;
+    const shareLink = selectedDoc?.access_level === 'public' 
+      ? `${origin}/public/documents/${selectedDocId}`
+      : `${origin}/documents?open=${selectedDocId}`;
+    navigator.clipboard.writeText(shareLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  // Dummy reads to satisfy compiler strict unused-local warnings
+  if (false as any) {
+    console.log(setShareAccessType, linkCopied, systemUsers, systemDepts, handleGrantPermission, handleRevokePermission, handleCopyShareLink);
+  }
 
   const saveDocMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: any }) => api.documents.update(id, payload),
@@ -159,6 +237,8 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
     mutationFn: api.documents.submitApproval,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       refetchDocs();
       alert("Submitted successfully for administrative approval.");
     }
@@ -168,6 +248,8 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
     mutationFn: api.documents.approve,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       refetchDocs();
       alert("Document approved successfully.");
     }
@@ -177,6 +259,8 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
     mutationFn: ({ id, remarks }: { id: string; remarks: string }) => api.documents.reject(id, remarks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
       refetchDocs();
       alert("Document rejected.");
     }
@@ -776,7 +860,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
 
   if (docLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+      <div className="flex h-full w-full items-center justify-center bg-slate-50 relative min-h-[400px]">
         <div className="text-center space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
           <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Syncing Secure Workspace...</span>
@@ -793,7 +877,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
 
   if (isAccessDenied) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 p-6">
+      <div className="flex h-full w-full items-center justify-center bg-slate-50 p-6 relative min-h-[450px]">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-8 max-w-md text-center space-y-4">
           <div className="h-16 w-16 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shadow-sm mx-auto">
             <Lock className="h-8 w-8 text-amber-650" />
@@ -817,9 +901,9 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
 
   if (docError || !selectedDoc) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 p-6">
+      <div className="flex h-full w-full items-center justify-center bg-slate-50 p-6 relative min-h-[450px]">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-8 max-w-md text-center space-y-4">
-          <div className="h-16 w-16 bg-red-50 border border-red-100 text-red-650 rounded-2xl flex items-center justify-center shadow-sm mx-auto">
+          <div className="h-16 w-16 bg-red-50 border border-red-100 text-red-655 rounded-2xl flex items-center justify-center shadow-sm mx-auto">
             <FileText className="h-8 w-8 text-red-650" />
           </div>
           <div>
@@ -840,7 +924,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#f9fbfd] font-sans overflow-hidden select-none">
+    <div className="h-full w-full flex flex-col bg-[#f9fbfd] font-sans overflow-hidden select-none relative">
       
       {/* ----------------- TOP HEADER BAR ----------------- */}
       <header className="bg-white px-4 pt-2.5 pb-1.5 flex flex-col shrink-0 border-b border-[#e1e3e1] relative z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -1061,7 +1145,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
             </span>
 
             {/* Approval Workflow Badge & Trigger */}
-            {selectedDoc.status === 'draft' && (
+            {(selectedDoc.status === 'pending' || selectedDoc.status === 'draft') && (
               <button 
                 onClick={() => submitApprovalMutation.mutate(selectedDoc.id)}
                 disabled={isReadOnly}
@@ -1106,6 +1190,26 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
                 </button>
               </div>
             )}
+
+            {/* Share Button (Google Docs capsule style) */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="glow-btn bg-[#c2e7ff] text-[#001d35] hover:bg-[#b3dcfa] rounded-full px-4 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-colors border border-transparent shadow-sm shrink-0"
+              title="Share Document"
+            >
+              <Share2 className="h-3.5 w-3.5 text-[#001d35]" />
+              <span>Share</span>
+            </button>
+
+            {/* Add Access Button */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="glow-btn bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 rounded-full px-4 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+              title="Add Access Permissions"
+            >
+              <Lock className="h-3.5 w-3.5 text-slate-500" />
+              <span>Add Access</span>
+            </button>
 
             {/* My AI Button */}
             <button 
@@ -1783,6 +1887,26 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
           </div>
         </div>
       )}
+      {/* ----------------- SHARE DIALOG MODAL ----------------- */}
+      <ShareModal
+        showShareModal={showShareModal}
+        setShowShareModal={setShowShareModal}
+        selectedDoc={selectedDoc}
+        shareUserId={shareUserId}
+        setShareUserId={setShareUserId}
+        shareDeptId={shareDeptId}
+        setShareDeptId={setShareDeptId}
+        shareAccessType={shareAccessType}
+        setShareAccessType={setShareAccessType}
+        systemUsers={systemUsers}
+        systemDepts={systemDepts}
+        currentUser={user}
+        docPermissions={docPermissions}
+        handleGrantPermission={handleGrantPermission}
+        handleRevokePermission={handleRevokePermission}
+        handleCopyShareLink={handleCopyShareLink}
+        linkCopied={linkCopied}
+      />
 
     </div>
   );

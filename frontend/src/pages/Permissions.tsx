@@ -31,7 +31,7 @@ export default function Permissions() {
   });
 
   const { data: doc, isLoading: docLoading } = useQuery({
-    queryKey: ['document-perms-meta', selectedDocId],
+    queryKey: ['document', selectedDocId],
     queryFn: () => selectedDocId ? api.documents.get(selectedDocId) : null,
     enabled: !!selectedDocId
   });
@@ -57,8 +57,9 @@ export default function Permissions() {
     mutationFn: ({ id, level }: { id: string; level: string }) => 
       api.documents.update(id, { access_level: level }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['document-perms-meta', selectedDocId] });
-      queryClient.invalidateQueries({ queryKey: ['folder-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['document', selectedDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
     }
   });
 

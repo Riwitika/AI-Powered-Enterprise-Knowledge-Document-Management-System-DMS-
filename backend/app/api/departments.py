@@ -87,6 +87,17 @@ def update_department(
         )
         
     if payload.parent_id:
+        # Prevent cycle: check if parent_id is a descendant of dept_id
+        current_parent_id = payload.parent_id
+        while current_parent_id:
+            if current_parent_id == dept_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot move a department into one of its descendants"
+                )
+            p_dept = db.query(Department).filter(Department.id == current_parent_id).first()
+            current_parent_id = p_dept.parent_id if p_dept else None
+
         parent = db.query(Department).filter(Department.id == payload.parent_id).first()
         if not parent:
             raise HTTPException(

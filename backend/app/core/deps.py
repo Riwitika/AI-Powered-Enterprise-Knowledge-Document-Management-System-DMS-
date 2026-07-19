@@ -156,7 +156,7 @@ def verify_document_access(
         return doc
 
     # Filter by approval workflow status
-    if doc.status in ["draft", "pending_approval", "rejected"]:
+    if doc.status in ["pending", "pending_approval", "rejected"]:
         is_manager = user.role and user.role.name == "department_manager"
         if doc.status == "pending_approval" and is_manager:
             return doc
@@ -179,13 +179,14 @@ def verify_document_access(
             return doc
             
         # Check custom edit permissions
+        edit_conditions = [Permission.user_id == user.id]
+        if user.department_id:
+            edit_conditions.append(Permission.department_id == user.department_id)
+
         custom_edit = db.query(Permission).filter(
             Permission.document_id == doc.id,
             Permission.access_type == "edit",
-            or_(
-                Permission.user_id == user.id,
-                Permission.department_id == user.department_id if user.department_id else False
-            )
+            or_(*edit_conditions)
         ).first()
         if custom_edit:
             return doc
@@ -203,12 +204,13 @@ def verify_document_access(
         return doc
 
     # Check custom permissions (either view or edit is fine for viewing)
+    view_conditions = [Permission.user_id == user.id]
+    if user.department_id:
+        view_conditions.append(Permission.department_id == user.department_id)
+
     custom_permission = db.query(Permission).filter(
         Permission.document_id == doc.id,
-        or_(
-            Permission.user_id == user.id,
-            Permission.department_id == user.department_id if user.department_id else False
-        )
+        or_(*view_conditions)
     ).first()
     if custom_permission:
         return doc

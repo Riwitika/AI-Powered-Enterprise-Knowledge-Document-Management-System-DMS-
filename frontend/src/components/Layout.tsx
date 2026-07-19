@@ -22,7 +22,8 @@ import {
   Plus,
   FolderPlus,
   Edit,
-  Trash2
+  Trash2,
+  Shield
 } from 'lucide-react';
 
 export default function Layout() {
@@ -165,8 +166,8 @@ export default function Layout() {
       const formData = new FormData();
       formData.append('file', dummyFile);
       formData.append('name', title.trim());
-      formData.append('description', 'Draft document created in workspace');
-      formData.append('category', 'Draft');
+      formData.append('description', 'Pending document created in workspace');
+      formData.append('category', 'Pending');
       formData.append('access_level', 'private');
       formData.append('folder_id', String(folderId));
       uploadDocMutation.mutate(formData);
@@ -191,6 +192,7 @@ export default function Layout() {
     e.preventDefault();
     e.stopPropagation();
     setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+    navigate(`/documents?folder=${folderId}`);
   };
 
   // Recursive Sidebar Tree Renderer
@@ -311,23 +313,7 @@ export default function Layout() {
       );
     });
   };
-
-  const selectedDocId = new URLSearchParams(location.search).get('open');
-  const { data: selectedDoc, isLoading: docLoading } = useQuery({
-    queryKey: ['document', selectedDocId],
-    queryFn: () => selectedDocId ? api.documents.get(selectedDocId) : null,
-    enabled: !!selectedDocId
-  });
-
-  const isEditingDocument = location.pathname.startsWith('/documents') && selectedDocId && !docLoading && selectedDoc;
-
-  if (isEditingDocument) {
-    return (
-      <div className="h-screen w-screen bg-slate-50 overflow-hidden font-sans">
-        <Outlet />
-      </div>
-    );
-  }
+  const isDocumentsPage = location.pathname.startsWith('/documents');
 
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
@@ -372,7 +358,7 @@ export default function Layout() {
             <button
               onClick={() => {
                 setWorkspaceExpanded(!workspaceExpanded);
-                if (location.pathname !== '/documents') {
+                if (location.pathname !== '/documents' || location.search !== '') {
                   navigate('/documents');
                 }
               }}
@@ -415,6 +401,25 @@ export default function Layout() {
               <Users className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/users' ? 'text-blue-600' : 'text-slate-400'}`} />
               {!isSidebarCollapsed && <span>User Directory</span>}
               {location.pathname === '/users' && !isSidebarCollapsed && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
+              )}
+            </Link>
+          )}
+
+          {/* Access Control Link (Admins only) */}
+          {isAdmin && (
+            <Link
+              to="/permissions"
+              className={`flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3.5'} py-2.5 text-xs font-bold rounded-xl transition-all relative ${
+                location.pathname === '/permissions'
+                  ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+              }`}
+              title="Access Control"
+            >
+              <Shield className={`h-4.5 w-4.5 shrink-0 ${location.pathname === '/permissions' ? 'text-blue-600' : 'text-slate-400'}`} />
+              {!isSidebarCollapsed && <span>Access Control</span>}
+              {location.pathname === '/permissions' && !isSidebarCollapsed && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600 shadow-sm" />
               )}
             </Link>
@@ -599,7 +604,7 @@ export default function Layout() {
         </header>
 
         {/* Page Render Container */}
-        <div className="flex-1 overflow-auto bg-slate-100/50 p-8 relative">
+        <div className={`flex-1 relative ${isDocumentsPage ? 'overflow-hidden bg-white' : 'overflow-auto bg-slate-100/50 p-8'}`}>
           <Outlet />
           <FloatingAIChat />
         </div>

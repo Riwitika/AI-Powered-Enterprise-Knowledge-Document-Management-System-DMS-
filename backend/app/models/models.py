@@ -45,6 +45,7 @@ if is_sqlite:
     
     import json
     from sqlalchemy.types import TypeDecorator, Text
+    import uuid as py_uuid
 
     class SQLiteARRAY(TypeDecorator):
         impl = Text
@@ -52,12 +53,15 @@ if is_sqlite:
         
         def __init__(self, item_type=None):
             super().__init__()
+            self.item_type = item_type
             
         def process_bind_param(self, value, dialect):
             if value is None:
                 return value
             if isinstance(value, list):
-                return json.dumps(value)
+                # Convert UUIDs to strings since UUID objects are not JSON serializable
+                cleaned_value = [str(item) if isinstance(item, py_uuid.UUID) else item for item in value]
+                return json.dumps(cleaned_value)
             return value
             
         def process_result_value(self, value, dialect):
@@ -65,7 +69,10 @@ if is_sqlite:
                 return value
             if isinstance(value, str):
                 try:
-                    return json.loads(value)
+                    res = json.loads(value)
+                    if isinstance(res, list) and self.item_type == py_uuid.UUID:
+                        return [py_uuid.UUID(x) for x in res if isinstance(x, str)]
+                    return res
                 except ValueError:
                     return value
             return value

@@ -30,14 +30,21 @@ class OpenAILLMProvider(LLMProvider):
         self.api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
         self.model = settings.OPENAI_MODEL or "gpt-4o-mini"
         if not self.api_key:
-            logger.warning("OPENAI_API_KEY is not set. LLM provider will run in MOCK mode.")
-            self.client = None
+            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
+            if is_dev:
+                logger.warning("OPENAI_API_KEY is not set. LLM provider will run in MOCK mode.")
+                self.client = None
+            else:
+                raise ValueError("OPENAI_API_KEY is not set. A valid OpenAI API key is required in production.")
         else:
             self.client = OpenAI(api_key=self.api_key)
 
     def generate_response(self, system_prompt: str, user_prompt: str) -> str:
         if not self.client:
-            return self._mock_response(user_prompt)
+            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
+            if is_dev:
+                return self._mock_response(user_prompt)
+            raise ValueError("LLM provider client is not initialized because OpenAI API key is missing.")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -49,8 +56,12 @@ class OpenAILLMProvider(LLMProvider):
             )
             return response.choices[0].message.content or ""
         except Exception as e:
-            logger.error(f"OpenAI API call failed: {e}. Falling back to mock response.")
-            return self._mock_response(user_prompt)
+            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
+            if is_dev:
+                logger.error(f"OpenAI API call failed: {e}. Falling back to mock response.")
+                return self._mock_response(user_prompt)
+            logger.error(f"OpenAI API call failed: {e}")
+            raise e
 
     def generate_summary_and_keywords(self, text: str) -> Tuple[str, List[str]]:
         # Take the first 3000 words to avoid overloading context
@@ -65,7 +76,10 @@ class OpenAILLMProvider(LLMProvider):
         user_prompt = f"Analyze the following document content:\n\n{truncated_text}"
 
         if not self.client:
-            return self._mock_summary(truncated_text)
+            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
+            if is_dev:
+                return self._mock_summary(truncated_text)
+            raise ValueError("LLM provider client is not initialized because OpenAI API key is missing.")
 
         try:
             response = self.client.chat.completions.create(
@@ -83,8 +97,12 @@ class OpenAILLMProvider(LLMProvider):
             keywords = result.get("keywords", ["general"])
             return summary, keywords
         except Exception as e:
-            logger.error(f"OpenAI Summary failed: {e}. Falling back to mock summary.")
-            return self._mock_summary(truncated_text)
+            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
+            if is_dev:
+                logger.error(f"OpenAI Summary failed: {e}. Falling back to mock summary.")
+                return self._mock_summary(truncated_text)
+            logger.error(f"OpenAI Summary failed: {e}")
+            raise e
 
     def _mock_response(self, user_prompt: str) -> str:
         return (

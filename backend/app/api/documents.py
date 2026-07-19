@@ -20,16 +20,19 @@ def upload_document(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
-    folder_id: Optional[int] = Form(None),
+    folder_id: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
     access_level: str = Form("private"),
     is_template: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    target_folder_id = folder_id
-    if target_folder_id == 0 or target_folder_id == "":
-        target_folder_id = None
+    target_folder_id = None
+    if folder_id is not None and folder_id != "" and folder_id != "null" and folder_id != "0":
+        try:
+            target_folder_id = int(folder_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid folder_id format. Must be an integer.")
 
     if target_folder_id:
         folder = db.query(Folder).filter(Folder.id == target_folder_id).first()
@@ -57,7 +60,7 @@ def upload_document(
         owner_id=current_user.id,
         access_level=access_level,
         current_version=1,
-        status="active" if is_template else "draft",
+        status="active" if is_template else "pending",
         is_template=is_template
     )
 
@@ -229,7 +232,15 @@ def delete_document(
 ):
     doc = verify_document_access(document_id, current_user, db, required_access="edit")
     
-    # Delete from local storage
+    # Delete all version files from local storage to prevent file leaks
+    try:
+        versions = db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id).all()
+        for v in versions:
+            storage.delete_file(v.file_path)
+    except Exception:
+        pass
+        
+    # Ensure current main path is deleted as well
     try:
         storage.delete_file(doc.file_path)
     except Exception:
@@ -288,8 +299,10 @@ def upload_new_version(
 
     try:
         db.add(new_version)
-        # Update document main row to point to new file path & version number
+        # Update document main row to point to new file path, extension & version number
+        file_ext = os.path.splitext(file.filename)[1].replace(".", "").lower()
         doc.file_path = file_path
+        doc.file_type = file_ext or "txt"
         doc.current_version = new_version_num
         db.commit()
         db.refresh(doc)
@@ -408,5 +421,6 @@ def view_document_version(
     if not os.path.exists(version.file_path):
         # Fallback if file doesn't exist (e.g. mock seed files)
         return {"content": doc.content or "No content found.", "version_number": version_number, "name": doc.name}
-    content = extract_document_text(version.file_path, doc.file_type)
+    file_ext = os.path.splitext(version.file_path)[1].replace(".", "").lower() or doc.file_type
+    content = extract_document_text(version.file_path, file_ext)
     return {"content": content, "version_number": version_number, "name": doc.name}

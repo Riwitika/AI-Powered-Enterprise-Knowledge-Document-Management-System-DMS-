@@ -62,7 +62,7 @@ export default function FloatingAIChat() {
   const askMutation = useMutation({
     mutationFn: (q: string) => {
       const docId = getActiveDocId();
-      if (docId && !docId.startsWith('doc-')) { // exclude mock temp ids if needed, but pass them anyway
+      if (docId) {
         return api.ai.askDoc(docId, q);
       }
       return api.ai.ask(q);

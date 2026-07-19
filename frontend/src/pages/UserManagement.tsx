@@ -95,12 +95,20 @@ export default function UserManagement() {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) return;
+
+    const roleMap: Record<string, number> = {
+      'super_admin': 1,
+      'admin': 2,
+      'department_manager': 3,
+      'employee': 4,
+      'guest': 5
+    };
     
     createUserMutation.mutate({
       full_name: name,
       email,
       password,
-      role_name: roleName,
+      role_id: roleMap[roleName] || 4,
       department_id: deptId !== '' ? Number(deptId) : null
     });
   };

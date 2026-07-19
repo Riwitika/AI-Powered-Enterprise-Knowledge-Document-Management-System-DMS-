@@ -120,6 +120,7 @@ class DocumentResponse(DocumentBase):
     ai_keywords: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
+    owner: Optional[UserResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -197,10 +198,25 @@ class AIConversationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 # ----------------- DASHBOARD -----------------
+class ActivityItem(BaseModel):
+    id: str
+    type: str  # "upload" | "edit" | "approval"
+    document_id: UUID
+    document_name: str
+    user_name: str
+    timestamp: datetime
+    model_config = ConfigDict(from_attributes=True)
+
 class DashboardMetrics(BaseModel):
     total_documents: int
+    pending_approvals_count: int
+    approved_documents_count: int
+    public_documents_count: int
+    total_users_count: int
+    recent_uploads_count: int
     documents_by_department: Dict[str, int]
     recent_uploads: List[DocumentResponse]
     most_viewed_documents: List[DocumentResponse]
     ai_questions_asked_count: int
     active_users_count: int
+    recent_activity: List[ActivityItem]
