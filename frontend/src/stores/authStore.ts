@@ -51,6 +51,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
+    // Phase 1 UI/UX Development: Bypass silent auto-login check if env variable is set to true
+    if (import.meta.env.VITE_DEV_BYPASS_AUTO_LOGIN === 'true') {
+      set({
+        user: null,
+        isAuthenticated: false,
+        isInitializing: false,
+      });
+      return;
+    }
+
     set({ isInitializing: true });
     try {
       // Silent refresh
