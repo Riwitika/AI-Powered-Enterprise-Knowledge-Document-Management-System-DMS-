@@ -23,6 +23,13 @@ export default function Dashboard() {
     refetchInterval: 5000 // Refresh every 5s to show background processing updates!
   });
 
+  // Fetch real recent AI conversations
+  const { data: conversations } = useQuery({
+    queryKey: ['recent-conversations'],
+    queryFn: api.ai.conversations,
+    refetchInterval: 5000
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -105,12 +112,7 @@ export default function Dashboard() {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   };
 
-  // Fetch real recent AI conversations
-  const { data: conversations } = useQuery({
-    queryKey: ['recent-conversations'],
-    queryFn: api.ai.conversations,
-    refetchInterval: 5000
-  });
+
 
   return (
     <div className="space-y-6 relative font-sans">
