@@ -132,19 +132,19 @@ export default function FloatingAIChat() {
       {isOpen && (
         <div className="w-[380px] h-[520px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-in slide-in-from-bottom-6 duration-250">
           {/* Header */}
-          <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
+          <div className="bg-blue-600 text-white px-5 py-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-500 text-slate-950">
-                <Sparkles className="h-4 w-4 text-white" />
+              <div className="p-1.5 rounded-lg bg-blue-500 text-white">
+                <Sparkles className="h-4 w-4 text-white animate-pulse" />
               </div>
               <div>
                 <span className="font-extrabold text-xs block">AI Copilot</span>
                 {docId ? (
-                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider block -mt-0.5">
+                  <span className="text-[9px] font-bold text-blue-200 uppercase tracking-wider block -mt-0.5">
                     Context: Current Document
                   </span>
                 ) : (
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block -mt-0.5">
+                  <span className="text-[9px] font-bold text-blue-200/80 uppercase tracking-wider block -mt-0.5">
                     Context: Global Workspace
                   </span>
                 )}
@@ -152,7 +152,7 @@ export default function FloatingAIChat() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-white/80 hover:text-white transition-colors"
             >
               <X className="h-4.5 w-4.5" />
             </button>
@@ -166,8 +166,8 @@ export default function FloatingAIChat() {
                 className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.role === 'assistant' && (
-                  <div className="h-7 w-7 rounded-full bg-slate-800 text-emerald-400 flex items-center justify-center shrink-0 border border-slate-700">
-                    <Bot className="h-4 w-4" />
+                  <div className="h-7 w-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 font-bold text-[10px]">
+                    AI
                   </div>
                 )}
                 
@@ -176,7 +176,7 @@ export default function FloatingAIChat() {
                     className={`rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${
                       msg.role === 'user'
                         ? 'bg-blue-600 text-white rounded-tr-none'
-                        : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                        : 'bg-white text-slate-800 border border-slate-200/80 rounded-tl-none'
                     }`}
                   >
                     {msg.id === 'placeholder' ? (
@@ -213,7 +213,7 @@ export default function FloatingAIChat() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder={docId ? "Ask about this document..." : "Ask a global question..."}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 font-medium"
             />
             <button
               type="submit"
@@ -226,24 +226,35 @@ export default function FloatingAIChat() {
         </div>
       )}
 
-      {/* Floating Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="h-14 w-14 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border border-slate-800 hover:border-slate-700"
-        title="Ask AI Assistant"
-      >
-        {isOpen ? (
-          <X className="h-6 w-6" />
-        ) : (
-          <div className="relative">
-            <MessageSquare className="h-6 w-6 text-emerald-400" />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
+      {/* Floating Toggle Button + Bubble Label (matching mockup) */}
+      <div className="flex items-center">
+        {!isOpen && (
+          <div className="mr-3 bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 shadow-md select-none animate-in fade-in slide-in-from-right-3 duration-250 whitespace-nowrap">
+            Ask AI Assistant
           </div>
         )}
-      </button>
+        
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 shrink-0 border border-blue-500"
+          title="Ask AI Assistant"
+        >
+          {isOpen ? (
+            <X className="h-6 w-6 text-white" />
+          ) : (
+            <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="11" width="18" height="10" rx="3" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 2V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="2" r="1.2" fill="currentColor" />
+              <circle cx="8" cy="15" r="1.5" fill="currentColor" />
+              <circle cx="16" cy="15" r="1.5" fill="currentColor" />
+              <path d="M9 19C10.5 20 13.5 20 15 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M2 14V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M22 14V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
