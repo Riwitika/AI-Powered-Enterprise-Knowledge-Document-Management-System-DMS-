@@ -17,20 +17,39 @@ export const useAuthStore = create<AuthState>((set) => ({
   isInitializing: true,
 
   login: async (username, password) => {
-    const formData = new FormData();
-    formData.append('username', username);
-    formData.append('password', password);
-
-    // Call login
-    await api.auth.login(formData);
-    
-    // Fetch user details
-    const user = await api.auth.me();
-    
-    set({
-      user,
-      isAuthenticated: true,
-    });
+    try {
+      const formData = new FormData();
+      formData.append('username', username);
+      formData.append('password', password);
+      await api.auth.login(formData);
+      const user = await api.auth.me();
+      set({
+        user,
+        isAuthenticated: true,
+      });
+    } catch (e) {
+      // Phase 1 UI/UX: Fallback to mock session if in bypass development mode
+      if (import.meta.env.VITE_DEV_BYPASS_AUTO_LOGIN === 'true') {
+        const lowerUser = username.toLowerCase();
+        const roleName = lowerUser.includes('manager') ? 'manager' : lowerUser.includes('admin') ? 'admin' : 'employee';
+        const fullName = lowerUser.includes('manager') ? 'Neha Gupta' : lowerUser.includes('admin') ? 'Arnim Goyal' : 'Riwitika Sharma';
+        
+        set({
+          user: {
+            id: 1,
+            email: username,
+            full_name: fullName,
+            role: {
+              name: roleName,
+              description: `${roleName} permission level`
+            }
+          },
+          isAuthenticated: true
+        });
+      } else {
+        throw e;
+      }
+    }
   },
 
   register: async (payload) => {
