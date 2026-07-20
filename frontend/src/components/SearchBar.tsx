@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 
 interface SearchBarProps {

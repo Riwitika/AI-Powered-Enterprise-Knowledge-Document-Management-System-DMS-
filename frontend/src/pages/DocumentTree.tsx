@@ -1,34 +1,27 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { 
-  Folder, 
   Trash2, 
-  ChevronRight, 
   Upload, 
   Plus, 
   Grid, 
   List, 
-  Layout, 
-  Info,
-  SlidersHorizontal,
-  Search,
-  Bell,
-  ChevronDown
+  Info
 } from 'lucide-react';
 
 import Breadcrumb from '../components/Breadcrumb';
 import SearchBar from '../components/SearchBar';
 import ActionToolbar from '../components/ActionToolbar';
-import FolderTree, { FolderNode } from '../components/FolderTree';
-import DocumentTable, { DocumentRowItem } from '../components/DocumentTable';
+import FolderTree from '../components/FolderTree';
+import type { FolderNode } from '../components/FolderTree';
+import DocumentTable from '../components/DocumentTable';
+import type { DocumentRowItem } from '../components/DocumentTable';
 import RightInformationPanel from '../components/RightInformationPanel';
 import { useAuthStore } from '../stores/authStore';
 
 export default function DocumentTree() {
   const { user } = useAuthStore();
-  const userName = user?.full_name || 'Arnim Goyal';
-  const roleName = user?.role?.name === 'super_admin' || user?.role?.name === 'admin' ? 'Administrator' : 'Employee';
-
+  
   // Toggle info panel / details sidebar state
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
