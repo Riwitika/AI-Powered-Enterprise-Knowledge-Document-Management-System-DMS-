@@ -20,6 +20,7 @@ interface DocHeaderProps {
   onDownloadClick?: () => void;
   onHistoryClick?: () => void;
   onMoreClick?: () => void;
+  onConvertTo?: (targetFormat: string) => void;
 }
 
 export default function DocHeader({
@@ -27,11 +28,12 @@ export default function DocHeader({
   fileType,
   version = 'v2.1',
   lastModified = '19 May 2024, 10:30 AM',
-  ownerName = 'Amit Verma',
+  ownerName = 'Paras Jain',
   onShareClick,
   onDownloadClick,
   onHistoryClick,
-  onMoreClick
+  onMoreClick,
+  onConvertTo
 }: DocHeaderProps) {
   const [docName, setDocName] = useState(name);
   const [isStarred, setIsStarred] = useState(false);
@@ -232,23 +234,22 @@ export default function DocHeader({
             id: 'file',
             label: 'File',
             items: [
-              { label: '📄 New Document', action: () => alert('New document triggered') },
-              { label: '📂 Open', action: () => alert('Open file browser') },
-              { label: '📂 Open Recent', action: () => alert('Opening recent logs') },
+              { label: '📄 New', action: () => alert('New document triggered (Mock)') },
+              { label: '📂 Open', action: () => alert('Open file browser (Mock)') },
               { label: '💾 Save', action: () => window.dispatchEvent(new CustomEvent('kms-editor-save')) },
-              { label: '💾 Save As', action: () => alert('Save As options triggered') },
-              { label: '💾 Save Version', action: () => alert('Saving a document version') },
-              { label: '✏️ Rename', action: () => alert('Rename triggered') },
-              { label: '📋 Duplicate', action: () => alert('Duplicate triggered') },
-              { label: '📂 Move', action: () => alert('Move file triggered') },
-              { label: '💾 Save as Template', action: () => alert('Save as template triggered') },
-              { label: '📤 Share', action: onShareClick || (() => {}) },
+              { label: '💾 Save As', action: () => alert('Save As options triggered (Mock)') },
               { label: '📥 Download As', action: onDownloadClick || (() => {}) },
-              { label: '📤 Export PDF', action: () => alert('PDF export processing') },
-              { label: '🖨 Print', action: () => alert('Print preview processing') },
-              { label: '📑 Document Details', action: () => alert(`Details: ${docName}`) },
-              { label: '⏳ Version History', action: onHistoryClick || (() => {}) },
-              { label: '🗑 Delete', action: () => alert('Bypassed deletion trigger') }
+              { label: '📤 Export As', action: () => alert('Export processing (Mock)') },
+              { isDivider: true },
+              { label: '🔄 Convert To: Word (.docx)', action: () => onConvertTo?.('DOCX') },
+              { label: '🔄 Convert To: Excel (.xlsx)', action: () => onConvertTo?.('XLSX') },
+              { label: '🔄 Convert To: PowerPoint (.pptx)', action: () => onConvertTo?.('PPTX') },
+              { label: '🔄 Convert To: PDF', action: () => onConvertTo?.('PDF') },
+              { label: '🔄 Convert To: CSV', action: () => onConvertTo?.('CSV') },
+              { label: '🔄 Convert To: Text', action: () => onConvertTo?.('TXT') },
+              { label: '🔄 Convert To: Image', action: () => onConvertTo?.('IMAGE') },
+              { isDivider: true },
+              { label: '⏳ Version History', action: onHistoryClick || (() => {}) }
             ]
           },
           {
@@ -342,19 +343,24 @@ export default function DocHeader({
               <div className={`absolute mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.03)] py-1.5 z-[9999] animate-in fade-in slide-in-from-top-1 duration-150 ${
                 ['tools', 'extensions', 'help'].includes(menu.id) ? 'right-0 left-auto' : 'left-0'
               }`}>
-                {menu.items.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setOpenMenu(null);
-                      item.action();
-                    }}
-                    className="w-full text-left px-4 py-1.8 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                {menu.items.map((item, idx) => {
+                  if ((item as any).isDivider) {
+                    return <div key={idx} className="my-1 border-t border-slate-100" />;
+                  }
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        (item as any).action();
+                      }}
+                      className="w-full text-left px-4 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    >
+                      {(item as any).label}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

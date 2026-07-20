@@ -22,7 +22,7 @@ interface DocInfoSidebarProps {
 
 export default function DocInfoSidebar({
   locationPath = '/02_Finance/Reports',
-  ownerName = 'Amit Verma',
+  ownerName = 'Paras Jain',
   createdOn = '14 May 2024, 11:00 AM',
   lastModified = '19 May 2024, 10:30 AM',
   tags = ['Budget', 'Q2', 'Finance'],
@@ -33,8 +33,8 @@ export default function DocInfoSidebar({
 }: DocInfoSidebarProps) {
   const [activeTab, setActiveTab] = useState<'properties' | 'activity' | 'comments'>('properties');
   const [comments, setComments] = useState([
-    { author: 'Amit Verma', initials: 'AV', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
-    { author: 'Neha Gupta', initials: 'NG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
+    { author: 'Paras Jain', initials: 'PJ', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
+    { author: 'Yukti Gupta', initials: 'YG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
   ]);
   const [newComment, setNewComment] = useState('');
 
@@ -161,10 +161,10 @@ export default function DocInfoSidebar({
         {activeTab === 'activity' && (
           <div className="relative pl-4 border-l border-slate-200 space-y-5 py-2">
             {[
-              { text: 'Amit Verma modified version to v2.1', time: '19 May 2024, 10:30 AM' },
-              { text: 'Neha Gupta viewed document', time: '18 May 2024, 05:25 PM' },
-              { text: 'Rohit Sharma shared with finance team', time: '17 May 2024, 02:40 PM' },
-              { text: 'Amit Verma created document', time: '14 May 2024, 11:00 AM' }
+              { text: 'Paras Jain modified version to v2.1', time: '19 May 2024, 10:30 AM' },
+              { text: 'Yukti Gupta viewed document', time: '18 May 2024, 05:25 PM' },
+              { text: 'Riwitika Gupta shared with finance team', time: '17 May 2024, 02:40 PM' },
+              { text: 'Paras Jain created document', time: '14 May 2024, 11:00 AM' }
             ].map((act, idx) => (
               <div key={idx} className="relative text-xs font-semibold">
                 <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">

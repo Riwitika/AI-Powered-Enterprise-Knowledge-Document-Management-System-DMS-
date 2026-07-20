@@ -298,7 +298,7 @@ export default function DocEditor({ selectedDocId, onBackToCatalog, allDocs, ref
           {
             id: 'c-seed',
             author: 'System Assistant',
-            authorEmail: 'assistant@enterprise.com',
+            authorEmail: 'arnim.goyal@fasttrade.com',
             content: 'Welcome to your document workspace. You can highlight any text, insert comments, and tag collaborators here.',
             timestamp: new Date(Date.now() - 3600000).toLocaleString(),
             resolved: false,
@@ -1744,7 +1744,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
                   {aiLoading && (
                     <div className="flex items-center gap-2 bg-slate-100/50 p-3 rounded-xl border border-slate-200/30">
                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                      <span className="text-slate-400 italic text-[11px]">AI Copilot processing...</span>
+                      <span className="text-slate-400 italic text-[11px]">AI Document Assistant processing...</span>
                     </div>
                   )}
                   {aiHistory.length === 0 && (
@@ -1758,7 +1758,7 @@ console.log("Enterprise KMS Sandbox Ready.");</code></pre>`;
                     type="text" 
                     value={aiQuestion}
                     onChange={(e) => setAiQuestion(e.target.value)}
-                    placeholder="Ask AI Copilot..."
+                    placeholder="Ask AI Document Assistant..."
                     className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-800 w-full"
                   />
                   <button type="submit" className="bg-blue-650 hover:bg-blue-700 text-white p-2 rounded-xl shrink-0 shadow-sm transition-colors">

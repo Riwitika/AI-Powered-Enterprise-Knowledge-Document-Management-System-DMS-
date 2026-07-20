@@ -123,7 +123,7 @@ export default function PublicDocumentViewer() {
                 {activeDoc.name}
               </span>
               <p className="text-[10.5px] text-slate-455 font-bold flex flex-wrap gap-x-2.5">
-                <span>Shared by: <strong>Amit Verma</strong></span>
+                <span>Shared by: <strong>Paras Jain</strong></span>
                 <span className="text-slate-250">&bull;</span>
                 <span>Department: <strong>Finance</strong></span>
                 <span className="text-slate-250">&bull;</span>
@@ -426,7 +426,7 @@ export default function PublicDocumentViewer() {
             <div className="space-y-3.5 text-xs font-semibold text-slate-700 leading-normal">
               <div className="flex justify-between">
                 <span className="text-slate-450">Owner</span>
-                <span className="text-slate-800 font-extrabold">Amit Verma</span>
+                <span className="text-slate-800 font-extrabold">Paras Jain</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-450">Department</span>

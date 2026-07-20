@@ -7,7 +7,7 @@ import {
   Maximize2 
 } from 'lucide-react';
 
-export default function ImageViewer() {
+export default function ImageViewer({ activeDoc }: { activeDoc: any }) {
   const [rotation, setRotation] = useState(0);
   const [scale, setScale] = useState(1);
 
@@ -154,11 +154,11 @@ export default function ImageViewer() {
           <div className="space-y-2 text-[11px] font-semibold text-slate-700">
             <div className="flex flex-col">
               <span className="text-slate-400 text-[9.5px]">Type</span>
-              <span className="text-slate-800 font-bold">JPG Image</span>
+              <span className="text-slate-800 font-bold">{activeDoc?.fileType || 'Image'} File</span>
             </div>
             <div className="flex flex-col">
               <span className="text-slate-400 text-[9.5px]">Size</span>
-              <span className="text-slate-800 font-bold">2.4 MB</span>
+              <span className="text-slate-800 font-bold">{activeDoc?.size || '2.4 MB'}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-slate-400 text-[9.5px]">Dimension</span>
@@ -166,11 +166,11 @@ export default function ImageViewer() {
             </div>
             <div className="flex flex-col">
               <span className="text-slate-400 text-[9.5px]">Uploaded by</span>
-              <span className="text-slate-800 font-bold">Neha Gupta</span>
+              <span className="text-slate-800 font-bold">{activeDoc?.ownerName || 'Paras Jain'}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-slate-400 text-[9.5px]">Uploaded on</span>
-              <span className="text-slate-500 font-medium">17 May 2024, 02:10 PM</span>
+              <span className="text-slate-500 font-medium">{activeDoc?.lastModified || '17 May 2026, 02:10 PM'}</span>
             </div>
           </div>
         </div>

@@ -11,7 +11,12 @@ import {
   StickyNote, 
   RefreshCw,
   ChevronRight,
-  BrainCircuit
+  BrainCircuit,
+  ChevronDown,
+  Paperclip,
+  FileText,
+  FileWarning,
+  Layers
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { aiService } from '../services/aiService';
@@ -25,30 +30,41 @@ interface Message {
   isRegenerated?: boolean;
 }
 
-const QUICK_ACTIONS = [
+const DOCUMENT_ACTIONS = [
   { label: 'Summarize Document', prompt: 'Summarize the current document.' },
-  { label: 'Explain Document', prompt: 'Explain the details of this document.' },
-  { label: 'Key Risks', prompt: 'Extract all potential key risks and compliance vulnerabilities from this document.' },
-  { label: 'Deadlines', prompt: 'Extract all deadlines and timeline constraints from this document.' },
+  { label: 'Executive Summary', prompt: 'Generate an executive summary of this document.' },
   { label: 'Rewrite Professionally', prompt: 'Rewrite the document professionally.' },
-  { label: 'Convert to Table', prompt: 'Convert the primary specifications of this document into a structured Markdown table.' },
-  { label: 'Action Items', prompt: 'Generate a list of action items, decisions and checklist.' }
+  { label: 'Improve Grammar', prompt: 'Improve the grammar and language mechanics of the text.' },
+  { label: 'Explain Document', prompt: 'Explain the details of this document.' }
+];
+
+const ANALYSIS_ACTIONS = [
+  { label: 'Extract Risks', prompt: 'Extract all potential key risks and compliance vulnerabilities from this document.' },
+  { label: 'Extract Decisions', prompt: 'Extract key decisions from this document.' },
+  { label: 'Extract Deadlines', prompt: 'Extract all deadlines and timeline constraints from this document.' },
+  { label: 'Action Items', prompt: 'Generate meeting action items and decisions from this document.' },
+  { label: 'Compliance Check', prompt: 'Perform a compliance check audit on this document.' }
+];
+
+const CREATION_ACTIONS = [
+  { label: 'Meeting Minutes', prompt: 'Create Meeting Minutes Sync' },
+  { label: 'SOP', prompt: 'Create standard operating compliance SOP' },
+  { label: 'Policy', prompt: 'Create HR policy outline' },
+  { label: 'Proposal', prompt: 'Create Project Proposal Outline' },
+  { label: 'Technical Document', prompt: 'Create Technical specification outline' }
 ];
 
 export default function FloatingAIChat() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
-  const [provider, setProvider] = useState<AIProvider>('mock');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Hello! I am your Enterprise AI Assistant. I have loaded your current document context. Ask me to summarize, review risks, rewrite parts, or generate tables.',
-      timestamp: new Date()
-    }
-  ]);
-  const [isThinking, setIsThinking] = useState(false);
+  const [provider] = useState<AIProvider>('mock');
+  
+  // Custom loading status cycle
+  const [loadingStatus, setLoadingStatus] = useState('AI Thinking...');
+
+  // Active accordion quick actions
+  const [activeGroup, setActiveGroup] = useState<'doc' | 'analysis' | 'creation' | null>(null);
 
   // Document context state
   const [docContext, setDocContext] = useState<DocumentContext>({
@@ -62,12 +78,44 @@ export default function FloatingAIChat() {
     fullContent: ''
   });
 
+  const [selectedMeta, setSelectedMeta] = useState<{ text: string; locationType: string }>({
+    text: '',
+    locationType: ''
+  });
+
+  // Route-based context checks
+  const isDocumentPage = location.pathname.includes('/documents/') && !location.pathname.endsWith('/documents');
+  const hasActiveDoc = isDocumentPage && docContext.title && docContext.title !== 'General Workspace';
+  const activeMode = hasActiveDoc ? 'document' : 'repository';
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: "Welcome! I'm your AI Document Assistant. I can search your repository, summarize documents, explain policies, generate new content, and answer questions using your organization's knowledge.",
+      timestamp: new Date()
+    }
+  ]);
+  const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const displayStatus = isThinking ? "Generating..." : "Ready";
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
+
+  // Format welcome message when mode/doc changes
+  useEffect(() => {
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: `Welcome! I'm your AI Document Assistant. ${hasActiveDoc ? `I have loaded context for "${docContext.title}".` : 'I have loaded your organization repository.'} I can search your repository, summarize documents, explain policies, generate new content, and answer questions using your organization's knowledge.`,
+        timestamp: new Date()
+      }
+    ]);
+  }, [activeMode, docContext.title]);
 
   // Listen for editor events
   useEffect(() => {
@@ -94,6 +142,10 @@ export default function FloatingAIChat() {
     const handleSelection = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail) {
+        setSelectedMeta({
+          text: customEvent.detail.text,
+          locationType: customEvent.detail.locationType || 'Paragraph'
+        });
         setDocContext(prev => ({
           ...prev,
           selectedText: customEvent.detail.text
@@ -122,9 +174,22 @@ export default function FloatingAIChat() {
     };
   }, [docContext]);
 
-  // Clear selections when navigating between pages
+  // Clear notifications and reset document context when navigating away from document views
   useEffect(() => {
     setShowNotification(null);
+    const isDocPage = location.pathname.includes('/documents/') && !location.pathname.endsWith('/documents');
+    if (!isDocPage) {
+      setDocContext({
+        title: 'General Workspace',
+        fileType: 'System Context',
+        department: 'All Departments',
+        owner: 'Fast Trade KMS',
+        tags: ['Workspace'],
+        version: 'v1.0',
+        selectedText: '',
+        fullContent: ''
+      });
+    }
   }, [location.pathname]);
 
   const [showNotification, setShowNotification] = useState<string | null>(null);
@@ -146,23 +211,54 @@ export default function FloatingAIChat() {
 
     setMessages(prev => [...prev, userMessage]);
     setIsThinking(true);
+    
+    // Start Loading Status cycler
+    setLoadingStatus('Searching repository...');
+    const statusCycle = ['Searching repository...', 'Reading documents...', 'Generating response...'];
+    let cycleIdx = 0;
+    const cycleInterval = setInterval(() => {
+      cycleIdx = (cycleIdx + 1) % statusCycle.length;
+      setLoadingStatus(statusCycle[cycleIdx]);
+    }, 700);
 
     try {
       const response = await aiService.ask(queryText, {
         provider,
         documentContext: docContext,
-        history: messages.map(m => ({ role: m.role, content: m.content }))
+        history: messages.map(m => ({ role: m.role, content: m.content })),
+        mode: activeMode
       });
 
+      clearInterval(cycleInterval);
+      const assistantMessageId = Math.random().toString();
       const assistantMessage: Message = {
-        id: Math.random().toString(),
+        id: assistantMessageId,
         role: 'assistant',
-        content: response.answer,
+        content: '',
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      setIsThinking(false);
+
+      // Streaming Typewriter simulation
+      const words = response.answer.split(' ');
+      let currentWordIndex = 0;
+      let currentContent = '';
+
+      const streamInterval = setInterval(() => {
+        if (currentWordIndex < words.length) {
+          currentContent += (currentWordIndex === 0 ? '' : ' ') + words[currentWordIndex];
+          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: currentContent } : m));
+          currentWordIndex++;
+        } else {
+          clearInterval(streamInterval);
+        }
+      }, 20);
+
     } catch (err) {
+      clearInterval(cycleInterval);
+      setIsThinking(false);
       const errorMessage: Message = {
         id: Math.random().toString(),
         role: 'assistant',
@@ -170,8 +266,6 @@ export default function FloatingAIChat() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsThinking(false);
     }
   };
 
@@ -183,12 +277,23 @@ export default function FloatingAIChat() {
     handleAsk(query);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (question.trim()) {
+        const query = question;
+        setQuestion('');
+        handleAsk(query);
+      }
+    }
+  };
+
   const handleClearConversation = () => {
     setMessages([
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'Conversation history cleared. How can I assist you with your document content today?',
+        content: `Welcome! I'm your AI Document Assistant. ${hasActiveDoc ? `I have loaded context for "${docContext.title}".` : 'I have loaded your organization repository.'} I can search your repository, summarize documents, explain policies, generate new content, and answer questions using your organization's knowledge.`,
         timestamp: new Date()
       }
     ]);
@@ -200,7 +305,7 @@ export default function FloatingAIChat() {
       {
         id: 'welcome',
         role: 'assistant',
-        content: `Started new conversation. Context loaded: ${docContext.title}`,
+        content: `Welcome! I'm your AI Document Assistant. ${hasActiveDoc ? `I have loaded context for "${docContext.title}".` : 'I have loaded your organization repository.'} I can search your repository, summarize documents, explain policies, generate new content, and answer questions using your organization's knowledge.`,
         timestamp: new Date()
       }
     ]);
@@ -242,16 +347,19 @@ export default function FloatingAIChat() {
   const regenerateResponse = (userQueryIndex: number) => {
     if (userQueryIndex < 0 || isThinking) return;
     const lastUserQuery = messages[userQueryIndex].content;
-    // Remove all messages after this query
     setMessages(prev => prev.slice(0, userQueryIndex + 1));
     handleAsk(lastUserQuery);
+  };
+
+  const toggleAccordion = (group: 'doc' | 'analysis' | 'creation') => {
+    setActiveGroup(prev => prev === group ? null : group);
   };
 
   return (
     <>
       {/* Toast Notification */}
       {showNotification && (
-        <div className="fixed bottom-24 right-6 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg z-[99999] animate-in fade-in slide-in-from-bottom-3 duration-250 select-none">
+        <div className="fixed bottom-24 right-6 bg-slate-950 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl z-[99999] animate-in fade-in slide-in-from-bottom-3 duration-250 select-none font-semibold">
           {showNotification}
         </div>
       )}
@@ -277,20 +385,20 @@ export default function FloatingAIChat() {
 
       {/* Right Side Sliding Panel */}
       <div 
-        className={`fixed top-0 right-0 h-screen w-[440px] bg-white border-l border-slate-200/90 shadow-[0_0_40px_rgba(0,0,0,0.08)] z-[9999] flex flex-col transition-all duration-300 ease-out transform ${
+        className={`fixed top-0 right-0 h-screen w-[440px] bg-white border-l border-slate-200/90 shadow-[0_0_40px_rgba(0,0,0,0.06)] z-[9999] flex flex-col transition-all duration-300 ease-out transform ${
           isOpen ? 'translate-x-0 opacity-100 pointer-events-auto' : 'translate-x-full opacity-0 pointer-events-none'
         }`}
       >
         {/* Panel Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-              <BrainCircuit className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-600">
+              <BrainCircuit className="h-5 w-5 animate-pulse" />
             </div>
             <div>
               <span className="font-extrabold text-xs text-slate-900 block">AI Document Assistant</span>
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5">
-                Fast Trade AI Core
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-0.5 select-none">
+                {activeMode === 'document' ? 'Document Assistant Mode' : 'Repository Assistant Mode'}
               </span>
             </div>
           </div>
@@ -306,14 +414,14 @@ export default function FloatingAIChat() {
             <button
               onClick={handleClearConversation}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-850 transition-colors"
-              title="Clear Thread"
+              title="Clear Conversation"
             >
               <Trash2 className="h-4 w-4" />
             </button>
             <div className="w-[1px] h-4 bg-slate-200 mx-1" />
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-450 hover:text-slate-700 transition-colors"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-455 hover:text-slate-700 transition-colors"
               title="Close Panel"
             >
               <ChevronRight className="h-5 w-5" />
@@ -321,29 +429,66 @@ export default function FloatingAIChat() {
           </div>
         </div>
 
-        {/* Document Context Card */}
-        <div className="px-5 py-3 border-b border-slate-100 bg-blue-50/20 text-[10px] text-slate-600 flex items-center justify-between select-none">
-          <div className="flex flex-col truncate pr-4">
-            <span className="font-extrabold text-slate-850 truncate">Context: {docContext.title}</span>
-            <span className="text-[9px] text-slate-450 mt-0.5">
-              Type: {docContext.fileType} | Version: {docContext.version} | Owner: {docContext.owner}
-            </span>
+        {/* Dynamic Context Header Card (Polished UI Indicator) */}
+        <div className="px-5 py-3 border-b border-slate-100 bg-blue-50/15 text-[10px] text-slate-655 flex items-center justify-between select-none shrink-0 shadow-[inset_0_1px_2px_rgba(0,0,0,0.005)]">
+          {hasActiveDoc ? (
+            <div className="flex flex-col truncate pr-4">
+              <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider block">Current Document:</span>
+              <span className="font-extrabold text-slate-850 truncate">{docContext.title}</span>
+              <div className="flex items-center gap-2 text-[9px] text-slate-455 mt-0.5 font-bold">
+                <span>Version: {docContext.version}</span>
+                <span>•</span>
+                <span>Status: {displayStatus}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col truncate pr-4">
+              <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider block">Workspace:</span>
+              <span className="font-extrabold text-slate-850 truncate">Finance / Reports</span>
+              <div className="flex items-center gap-2 text-[9px] text-slate-455 mt-0.5 font-bold">
+                <span>Repository Status: {displayStatus}</span>
+              </div>
+            </div>
+          )}
+          
+          <div className="bg-blue-500/10 border border-blue-200/50 rounded-lg px-2.5 py-1 font-extrabold text-[8px] text-blue-700 tracking-wider uppercase select-none shrink-0 shadow-sm">
+            Enterprise AI (Auto)
           </div>
-          <select 
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as AIProvider)}
-            className="bg-white border border-slate-200 rounded px-1.5 py-0.5 font-bold text-[9px] text-slate-550 focus:outline-none focus:border-blue-500 shadow-sm shrink-0"
-          >
-            <option value="mock">Mock LLM</option>
-            <option value="openai">OpenAI GPT-4</option>
-            <option value="gemini">Google Gemini 1.5</option>
-            <option value="claude">Anthropic Claude 3</option>
-            <option value="azure">Azure LLM</option>
-          </select>
         </div>
 
         {/* Message Container Area */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/50 custom-scrollbar">
+          
+          {/* Smart Empty State suggestions */}
+          {messages.length <= 1 && (
+            <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] space-y-3.5 mt-1 mb-2 animate-in fade-in slide-in-from-top-3 duration-250 border-dashed">
+              <span className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-widest block select-none">
+                I can help you:
+              </span>
+              <div className="grid grid-cols-1 gap-1 text-xs font-bold text-slate-650">
+                {[
+                  { text: 'Search company documents', prompt: 'Find Finance Policies' },
+                  { text: 'Summarize active files', prompt: 'Summarize the current document.' },
+                  { text: 'Explain loaded terms', prompt: 'Explain the details of this document.' },
+                  { text: 'Generate draft proposals', prompt: 'Locate Project Proposal' },
+                  { text: 'Create standard compliance SOPs', prompt: 'Create standard operating compliance SOP' },
+                  { text: 'Extract timelines and milestones', prompt: 'Extract all deadlines and timeline constraints from this document.' },
+                  { text: 'Answer general repository queries', prompt: 'What is Fast Trade?' }
+                ].map((item, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => handleAsk(item.prompt)}
+                    className="flex items-center gap-2.5 p-2 hover:bg-slate-50 rounded-xl text-left transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                    <span>{item.text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {messages.map((msg, idx) => {
             const isUser = msg.role === 'user';
             return (
@@ -355,15 +500,14 @@ export default function FloatingAIChat() {
                 )}
                 
                 <div className="max-w-[85%] space-y-2">
-                  <div className={`rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm ${
+                  <div className={`rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm relative ${
                     isUser 
                       ? 'bg-blue-600 text-white rounded-tr-none' 
-                      : 'bg-white text-slate-850 border border-slate-200/80 rounded-tl-none'
+                      : 'bg-white text-slate-855 border border-slate-200/80 rounded-tl-none'
                   }`}>
                     {/* Render Content */}
                     <div className="space-y-2 whitespace-pre-wrap">
                       {msg.content.startsWith('###') ? (
-                        // Render simple markdown headlines and tables
                         msg.content.split('\n').map((line, lIdx) => {
                           if (line.startsWith('### ')) {
                             return <h3 key={lIdx} className="font-extrabold text-[12px] text-slate-900 mt-2 mb-1">{line.replace('### ', '')}</h3>;
@@ -375,9 +519,8 @@ export default function FloatingAIChat() {
                             return <li key={lIdx} className="ml-3 list-disc text-slate-655 font-medium">{line.replace('* ', '')}</li>;
                           }
                           if (line.startsWith('|')) {
-                            // Render mock tables cleanly
                             return (
-                              <div key={lIdx} className="font-mono text-[10px] bg-slate-50 p-1 border border-slate-100 rounded my-0.5 overflow-x-auto text-slate-600">
+                              <div key={lIdx} className="font-mono text-[10px] bg-slate-50 p-1.5 border border-slate-100 rounded my-0.5 overflow-x-auto text-slate-600">
                                 {line}
                               </div>
                             );
@@ -388,6 +531,10 @@ export default function FloatingAIChat() {
                         msg.content
                       )}
                     </div>
+                    {/* Timestamp bubble indicator */}
+                    <span className={`text-[8px] block mt-1.5 select-none font-bold ${isUser ? 'text-blue-200 text-right' : 'text-slate-400 text-left'}`}>
+                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
 
                   {/* Actions for Assistant Message */}
@@ -398,23 +545,23 @@ export default function FloatingAIChat() {
                         className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-sm"
                         title="Copy to clipboard"
                       >
-                        <Copy className="h-3 w-3" /> Copy
+                        <Copy className="h-3 w-3 text-slate-400" /> Copy
                       </button>
                       <button
                         onClick={() => insertAtCursor(msg.content)}
                         className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-sm"
                         title="Insert at cursor"
                       >
-                        <CornerDownLeft className="h-3 w-3" /> Insert
+                        <CornerDownLeft className="h-3 w-3 text-slate-400" /> Insert
                       </button>
                       
                       {docContext.selectedText && (
                         <button
                           onClick={() => replaceSelection(msg.content)}
-                          className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/60 rounded-lg transition-colors shadow-sm"
+                          className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-blue-650 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/60 rounded-lg transition-colors shadow-sm"
                           title="Replace selected highlight"
                         >
-                          <ArrowLeftRight className="h-3 w-3" /> Replace Selection
+                          <ArrowLeftRight className="h-3 w-3 text-blue-500" /> Replace Selection
                         </button>
                       )}
 
@@ -423,7 +570,7 @@ export default function FloatingAIChat() {
                         className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-sm"
                         title="Save as notebook note"
                       >
-                        <StickyNote className="h-3 w-3" /> Save Note
+                        <StickyNote className="h-3 w-3 text-slate-400" /> Save Note
                       </button>
 
                       {/* Find index of matching user query */}
@@ -436,7 +583,7 @@ export default function FloatingAIChat() {
                               className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-extrabold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-sm"
                               title="Regenerate response"
                             >
-                              <RefreshCw className="h-3 w-3" /> Regenerate
+                              <RefreshCw className="h-3 w-3 text-slate-400" /> Regenerate
                             </button>
                           );
                         }
@@ -449,66 +596,173 @@ export default function FloatingAIChat() {
             );
           })}
 
-          {/* Thinking Loader */}
+          {/* Thinking Loader (Dynamic Enterprise status indicators) */}
           {isThinking && (
-            <div className="flex gap-3 justify-start">
+            <div className="flex gap-3 justify-start animate-pulse">
               <div className="h-7 w-7 rounded-full bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center font-black text-[9px] shrink-0 select-none">
                 AI
               </div>
-              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-2 text-xs text-slate-450 italic">
+              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-2.5 text-xs text-slate-450 italic">
                 <Loader2 className="h-4.5 w-4.5 animate-spin text-blue-500" />
-                <span>AI Thinking...</span>
+                <span className="font-semibold text-slate-550">{loadingStatus}</span>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggestion actions panel (Visible only when not generating) */}
+        {/* Collapsible Action Sections (Counts + Outlined Icons + Consistent Spacing) */}
         {!isThinking && (
-          <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap gap-1.5 select-none shrink-0 max-h-[100px] overflow-y-auto">
-            {QUICK_ACTIONS.map((act, index) => (
+          <div className="border-t border-slate-100 bg-slate-50/50 flex flex-col select-none shrink-0 select-none transition-all duration-200">
+            {/* Category 1: Document Actions */}
+            <div className="border-b border-slate-200/50">
               <button
-                key={index}
-                onClick={() => handleAsk(act.prompt)}
-                className="text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-full px-2.5 py-1 transition-all shadow-sm hover:border-slate-300"
+                type="button"
+                onClick={() => toggleAccordion('doc')}
+                className="w-full px-5 py-2.5 flex items-center justify-between text-[10px] font-extrabold text-slate-550 hover:bg-slate-100/40 transition-colors uppercase tracking-widest"
               >
-                {act.label}
+                <div className="flex items-center gap-2 text-slate-600">
+                  <FileText className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Document Actions ({DOCUMENT_ACTIONS.length})</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${activeGroup === 'doc' ? 'rotate-180' : ''}`} />
               </button>
-            ))}
+              {activeGroup === 'doc' && (
+                <div className="px-5 pb-3 pt-0.5 flex flex-wrap gap-1.5 animate-in fade-in duration-200">
+                  {DOCUMENT_ACTIONS.map((act, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleAsk(act.prompt)}
+                      className="text-[9px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-100/50 border border-slate-200 hover:border-slate-300 rounded-full px-2.5 py-1 transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+                      <span>{act.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Category 2: Analysis Actions */}
+            <div className="border-b border-slate-200/50">
+              <button
+                type="button"
+                onClick={() => toggleAccordion('analysis')}
+                className="w-full px-5 py-2.5 flex items-center justify-between text-[10px] font-extrabold text-slate-550 hover:bg-slate-100/40 transition-colors uppercase tracking-widest"
+              >
+                <div className="flex items-center gap-2 text-slate-600">
+                  <FileWarning className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Analysis Actions ({ANALYSIS_ACTIONS.length})</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${activeGroup === 'analysis' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeGroup === 'analysis' && (
+                <div className="px-5 pb-3 pt-0.5 flex flex-wrap gap-1.5 animate-in fade-in duration-200">
+                  {ANALYSIS_ACTIONS.map((act, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleAsk(act.prompt)}
+                      className="text-[9px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-100/50 border border-slate-200 hover:border-slate-300 rounded-full px-2.5 py-1 transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                      <span>{act.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Category 3: Creation Blueprints */}
+            <div>
+              <button
+                type="button"
+                onClick={() => toggleAccordion('creation')}
+                className="w-full px-5 py-2.5 flex items-center justify-between text-[10px] font-extrabold text-slate-550 hover:bg-slate-100/40 transition-colors uppercase tracking-widest"
+              >
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Creation Blueprints ({CREATION_ACTIONS.length})</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${activeGroup === 'creation' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeGroup === 'creation' && (
+                <div className="px-5 pb-3 pt-0.5 flex flex-wrap gap-1.5 animate-in fade-in duration-200">
+                  {CREATION_ACTIONS.map((act, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleAsk(act.prompt)}
+                      className="text-[9px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-100/50 border border-slate-200 hover:border-slate-300 rounded-full px-2.5 py-1 transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-emerald-500" />
+                      <span>{act.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Selected text context banner */}
         {docContext.selectedText && (
-          <div className="px-5 py-1.5 border-t border-blue-100 bg-blue-50/30 text-[9px] font-bold text-blue-700 flex items-center justify-between shrink-0 select-none truncate">
-            <span className="truncate pr-4">Active Selection: "{docContext.selectedText}"</span>
-            <button 
-              onClick={() => setDocContext(prev => ({ ...prev, selectedText: '' }))}
-              className="text-blue-500 hover:text-blue-700 shrink-0 font-extrabold uppercase"
-            >
-              Clear Selection
-            </button>
+          <div className="px-5 py-2.5 border-t border-blue-100 bg-blue-50/30 text-[9.5px] font-bold text-blue-700 flex flex-col shrink-0 select-none">
+            <div className="flex items-center justify-between">
+              <span className="uppercase text-[8px] text-blue-500 font-extrabold">Active Selection (in {selectedMeta.locationType}):</span>
+              <button 
+                onClick={() => {
+                  setSelectedMeta({ text: '', locationType: '' });
+                  setDocContext(prev => ({ ...prev, selectedText: '' }));
+                }}
+                className="text-blue-500 hover:text-blue-750 font-extrabold uppercase text-[8px]"
+              >
+                Clear Selection
+              </button>
+            </div>
+            <span className="truncate mt-0.5 text-slate-700 font-semibold bg-white/50 px-2 py-1 rounded border border-blue-200/20">"{docContext.selectedText}"</span>
           </div>
         )}
 
-        {/* Input Form */}
-        <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0 select-none">
-          <input
-            type="text"
+        {/* Input Form with attachment, submit, and clear buttons */}
+        <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-100 bg-white flex flex-col gap-2 shrink-0 select-none">
+          <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={handleKeyDown}
             disabled={isThinking}
-            placeholder={docContext.selectedText ? "Ask about selection..." : "Ask about document..."}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 transition-all placeholder-slate-400 disabled:opacity-50"
+            rows={2}
+            placeholder={docContext.selectedText ? "Ask about selection..." : "Ask anything about your documents or type / for AI commands..."}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 transition-all placeholder-slate-400 disabled:opacity-50 resize-none max-h-24 overflow-y-auto"
           />
-          <button
-            type="submit"
-            disabled={!question.trim() || isThinking}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-2.5 shadow-sm transition-all disabled:opacity-50 flex items-center justify-center border border-blue-500 shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          <div className="flex items-center justify-between mt-1 px-1">
+            <div className="flex items-center gap-3">
+              {/* UI Only Attachment Icon */}
+              <button
+                type="button"
+                onClick={() => triggerToast('Attachment upload UI simulated')}
+                className="p-1 text-slate-400 hover:text-slate-650 transition-colors"
+                title="Attach Document Reference"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+              {/* Clear thread helper */}
+              <button
+                type="button"
+                onClick={handleClearConversation}
+                className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                title="Clear Chat Logs"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              type="submit"
+              disabled={!question.trim() || isThinking}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 border border-blue-500"
+            >
+              <span>Send</span>
+              <Send className="h-3 w-3" />
+            </button>
+          </div>
         </form>
       </div>
     </>

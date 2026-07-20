@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Undo2, Redo2 } from 'lucide-react';
 
-export default function TxtEditor() {
-  const [text, setText] = useState(
-    `Fast Trade Technologies Pvt. Ltd. — Technical Notes\n\n` +
-    `1. API endpoints are configured in api/client.ts.\n` +
-    `2. Routing guards are declared in App.tsx.\n` +
-    `3. Development session bypass is governed by VITE_DEV_BYPASS_AUTO_LOGIN inside .env.\n\n` +
-    `Please refer to Global Knowledge database for specific architecture instructions.`
-  );
+export default function TxtEditor({ activeDoc }: { activeDoc: any }) {
+  const [text, setText] = useState(() => {
+    return `Fast Trade Technologies Pvt. Ltd. — Technical Raw Notes\n\n` +
+      `File Name: ${activeDoc?.name || 'document.txt'}\n` +
+      `Last Modified: ${activeDoc?.lastModified || 'Just now'}\n` +
+      `Owner: ${activeDoc?.ownerName || 'Paras Jain'}\n\n` +
+      `This plain text document is loaded dynamically in the KMS raw text preview editor workspace.`;
+  });
 
   return (
     <div className="flex flex-col h-full bg-[#f3f4f6]/40 select-none">

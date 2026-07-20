@@ -1,20 +1,59 @@
 import { useState } from 'react';
 import { Search, ZoomIn, ZoomOut } from 'lucide-react';
 
-export default function XlsxViewer() {
+export default function XlsxViewer({ activeDoc }: { activeDoc: any }) {
   const [searchVal, setSearchVal] = useState('');
   const [zoom, setZoom] = useState(100);
 
   // Spreadsheet cells configuration
   const columns = ['A', 'B', 'C', 'D', 'E', 'F'];
-  const headers = ['Category', 'Sales (₹)', 'Target (₹)', 'Achievement %', 'Growth %', 'Comment'];
-  
-  const rows = [
-    { cat: 'Electronics', sales: '125,000', target: '110,000', achieve: '114%', growth: '18%', comment: 'Target exceeded' },
-    { cat: 'Accessories', sales: '85,500', target: '80,000', achieve: '107%', growth: '12%', comment: 'Solid sales growth' },
-    { cat: 'Services', sales: '45,300', target: '40,000', achieve: '113%', growth: '16%', comment: 'Renewals active' },
-    { cat: 'Total', sales: '255,800', target: '230,000', achieve: '111%', growth: '15%', comment: 'Consistent Q2 start' }
-  ];
+
+  const getSheetContent = () => {
+    const name = activeDoc?.name || '';
+    if (name.toLowerCase().includes('expense')) {
+      return {
+        tabName: 'Expense Summary',
+        fxVal: '500000',
+        activeCellLabel: 'B2',
+        headers: ['Department', 'Budget (₹)', 'Spent (₹)', 'Remaining (₹)', 'Burn Rate %', 'Status'],
+        rows: [
+          { c1: 'Engineering', c2: '500,000', c3: '480,000', c4: '20,000', c5: '96%', c6: 'On Track' },
+          { c1: 'Marketing', c2: '200,000', c3: '210,000', c4: '-10,000', c5: '105%', c6: 'Over Budget' },
+          { c1: 'HR & Admin', c2: '150,000', c3: '120,000', c4: '30,000', c5: '80%', c6: 'Under Budget' },
+          { c1: 'Total', c2: '850,000', c3: '810,000', c4: '40,000', c5: '95.3%', c6: 'On Track' }
+        ]
+      };
+    } else if (name.toLowerCase().includes('cash')) {
+      return {
+        tabName: 'Cash Flow',
+        fxVal: '450000',
+        activeCellLabel: 'B2',
+        headers: ['Month', 'Operating (₹)', 'Investing (₹)', 'Financing (₹)', 'Net Cash (₹)', 'Closing Cash (₹)'],
+        rows: [
+          { c1: 'January', c2: '450,000', c3: '-120,000', c4: '-50,000', c5: '280,000', c6: '2.80M' },
+          { c1: 'February', c2: '520,000', c3: '-80,000', c4: '-50,000', c5: '390,000', c6: '3.19M' },
+          { c1: 'March', c2: '610,000', c3: '-150,000', c4: '-50,000', c5: '410,000', c6: '3.60M' },
+          { c1: 'Total', c2: '1,580,000', c3: '-350,000', c4: '-150,050', c5: '1,080,000', c6: '3.60M' }
+        ]
+      };
+    } else {
+      // Default to Sales Report
+      return {
+        tabName: 'April Sales',
+        fxVal: '125000',
+        activeCellLabel: 'B2',
+        headers: ['Category', 'Sales (₹)', 'Target (₹)', 'Achievement %', 'Growth %', 'Comment'],
+        rows: [
+          { c1: 'Electronics', c2: '125,000', c3: '110,000', c4: '114%', c5: '18%', c6: 'Target exceeded' },
+          { c1: 'Accessories', c2: '85,500', c3: '80,000', c4: '107%', c5: '12%', c6: 'Solid sales growth' },
+          { c1: 'Services', c2: '45,300', c3: '40,000', c4: '113%', c5: '16%', c6: 'Renewals active' },
+          { c1: 'Total', c2: '255,800', c3: '230,000', c4: '111%', c5: '15%', c6: 'Consistent Q2 start' }
+        ]
+      };
+    }
+  };
+
+  const sheetData = getSheetContent();
 
   return (
     <div className="flex flex-col h-full bg-[#f3f4f6]/40 select-none">
@@ -25,7 +64,7 @@ export default function XlsxViewer() {
         {/* Cell Position Indicator */}
         <div className="flex items-center gap-2">
           <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-0.5 text-xs font-bold text-slate-800">
-            B2
+            {sheetData.activeCellLabel}
           </div>
           <div className="h-4 w-[1px] bg-slate-200" />
           <div className="relative">
@@ -33,7 +72,7 @@ export default function XlsxViewer() {
             <input
               type="text"
               readOnly
-              value="125000"
+              value={sheetData.fxVal}
               className="bg-transparent border-none text-xs text-slate-700 font-bold focus:outline-none pl-6 w-32 cursor-default select-all"
             />
           </div>
@@ -60,7 +99,7 @@ export default function XlsxViewer() {
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-xs font-extrabold text-slate-750 w-10 text-center">{zoom}%</span>
+            <span className="text-xs font-extrabold text-slate-755 w-10 text-center">{zoom}%</span>
             <button 
               type="button" 
               onClick={() => setZoom(prev => Math.min(130, prev + 10))}
@@ -76,7 +115,7 @@ export default function XlsxViewer() {
       {/* 2. Spreadsheet Grid Canvas */}
       <div className="flex-1 overflow-auto p-4 custom-scrollbar">
         <div 
-          className="border border-slate-200 bg-white rounded-lg overflow-hidden w-fit shadow-sm"
+          className="border border-slate-200 bg-white rounded-lg overflow-hidden w-fit shadow-sm animate-in fade-in duration-200"
           style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}
         >
           <table className="border-collapse text-xs text-slate-700 font-medium">
@@ -93,7 +132,7 @@ export default function XlsxViewer() {
               {/* Row 1 Headers (Category, Sales, Target...) */}
               <tr className="bg-slate-50/50 text-slate-650 font-bold border-b border-slate-200">
                 <td className="border-r border-slate-200 py-1.5 text-center font-extrabold bg-slate-100/80">1</td>
-                {headers.map(h => (
+                {sheetData.headers.map(h => (
                   <td key={h} className="border-r border-slate-200 px-3 py-1.5 font-extrabold text-slate-750">
                     {h}
                   </td>
@@ -102,10 +141,10 @@ export default function XlsxViewer() {
             </thead>
             
             <tbody>
-              {rows.map((row, idx) => {
+              {sheetData.rows.map((row, idx) => {
                 const rowNum = idx + 2;
-                const isTotal = row.cat === 'Total';
-                const highlightElectronics = row.cat === 'Electronics' && searchVal.toLowerCase() === '';
+                const isTotal = row.c1 === 'Total';
+                const highlightTarget = row.c1.includes('Eng') || row.c1.includes('Elect');
 
                 return (
                   <tr key={idx} className={`border-b border-slate-200 ${isTotal ? 'bg-slate-50/60 font-bold' : ''}`}>
@@ -115,19 +154,19 @@ export default function XlsxViewer() {
                     </td>
 
                     {/* Cell Data */}
-                    <td className="border-r border-slate-200 px-3 py-2 font-bold text-slate-800">{row.cat}</td>
+                    <td className="border-r border-slate-200 px-3 py-2 font-bold text-slate-800">{row.c1}</td>
                     
-                    {/* Sales cell (styled active in mockup) */}
+                    {/* Cell 2 (styled active in mockup) */}
                     <td className={`border-r border-slate-200 px-3 py-2 select-text font-bold text-right ${
-                      highlightElectronics ? 'bg-emerald-50 text-emerald-800 border-2 border-emerald-600' : ''
+                      highlightTarget && searchVal.trim() === '' ? 'bg-emerald-50 text-emerald-800 border-2 border-emerald-600' : ''
                     }`}>
-                      {row.sales}
+                      {row.c2}
                     </td>
                     
-                    <td className="border-r border-slate-200 px-3 py-2 text-right">{row.target}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-blue-600">{row.achieve}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-emerald-600">{row.growth}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-slate-500 italic font-medium">{row.comment}</td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-right">{row.c3}</td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-blue-600">{row.c4}</td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-emerald-600">{row.c5}</td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-slate-500 italic font-medium">{row.c6}</td>
                   </tr>
                 );
               })}
@@ -155,7 +194,7 @@ export default function XlsxViewer() {
             type="button" 
             className="px-3 py-1 bg-white border-x border-t border-slate-200 text-xs font-bold text-emerald-600 border-b-2 border-b-emerald-500 flex items-center justify-center shrink-0 shadow-sm"
           >
-            April Sales
+            {sheetData.tabName}
           </button>
           
           <button 

@@ -169,7 +169,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <div className="flex items-center justify-between p-2.5 bg-slate-50/50 rounded-xl text-xs">
               <div>
                 <span className="font-bold text-slate-900 block">{selectedDoc.owner?.full_name || 'System Administrator'}</span>
-                <span className="text-[10px] text-slate-455 block">{selectedDoc.owner?.email || 'admin@enterprise.com'}</span>
+                <span className="text-[10px] text-slate-455 block">{selectedDoc.owner?.email || 'arnim.goyal@fasttrade.com'}</span>
               </div>
               <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">Owner</span>
             </div>

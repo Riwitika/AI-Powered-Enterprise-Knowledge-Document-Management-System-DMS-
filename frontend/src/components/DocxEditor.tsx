@@ -70,10 +70,10 @@ const PALETTE_COLORS = [
   { name: 'Purple', hex: '#8b5cf6' }
 ];
 
-const getTemplateContent = (path: string) => {
-  const lowercasePath = path.toLowerCase();
+const getTemplateContent = (nameOrPath: string, activeDoc?: any) => {
+  const lowercasePath = nameOrPath.toLowerCase();
   
-  if (lowercasePath.includes('meeting-minutes')) {
+  if (lowercasePath.includes('meeting-minutes') || lowercasePath.includes('meeting minutes')) {
     return (
       <div>
         <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
@@ -81,8 +81,8 @@ const getTemplateContent = (path: string) => {
         </h1>
         <div className="bg-slate-50 border rounded-xl p-3 text-[11px] text-slate-655 font-bold space-y-1 my-3">
           <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
-          <div><strong>Attendees:</strong> Rahul, Amit, Priyesh, Sarah</div>
-          <div><strong>Facilitator:</strong> Amit Verma</div>
+          <div><strong>Attendees:</strong> Arun Goyal, Arnim Goyal, Riwitika Gupta, Paras Jain</div>
+          <div><strong>Facilitator:</strong> Arnim Goyal</div>
         </div>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">1. Meeting Agenda</h2>
         <p>Review current design deliverables, timeline alignment, and next sprint tasks.</p>
@@ -100,28 +100,17 @@ const getTemplateContent = (path: string) => {
     );
   }
 
-  if (lowercasePath.includes('nda')) {
+  if (lowercasePath.includes('nda') || lowercasePath.includes('non-disclosure')) {
     return (
       <div>
         <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
           Non-Disclosure Agreement (NDA)
         </h1>
-        <p className="italic text-slate-500 my-3">This Mutual Non-Disclosure Agreement ("Agreement") is entered into on {new Date().toLocaleDateString()} between FastTrade Corp and the Undersigned Partner.</p>
+        <p className="italic text-slate-500 my-3">This Mutual Non-Disclosure Agreement ("Agreement") is entered into between FastTrade Corp and the Undersigned Partner.</p>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">1. Confidential Information</h2>
         <p>Confidential Information refers to proprietary specifications, code, designs, and business workflows shared during meetings.</p>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Obligations</h2>
         <p>The receiving party agrees to hold all confidential information in strict confidence and shall not disclose it to any third party without written consent.</p>
-        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">3. Signatures</h2>
-        <div className="grid grid-cols-2 gap-8 pt-6">
-          <div className="border-t border-slate-300 pt-2">
-            <div className="font-extrabold text-slate-800">FastTrade Corp Representative</div>
-            <div className="text-[10px] text-slate-500">Authorized Signature</div>
-          </div>
-          <div className="border-t border-slate-300 pt-2">
-            <div className="font-extrabold text-slate-800">Partner Representative</div>
-            <div className="text-[10px] text-slate-500">Authorized Signature</div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -136,13 +125,11 @@ const getTemplateContent = (path: string) => {
         <p>Provide a high-level summary of the business need, goals, and solution proposal.</p>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Scope of Work</h2>
         <p>Enumerate key features, requirements, deliverables, and engineering sprints.</p>
-        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">3. Budget & Resource Estimates</h2>
-        <p>Detail departmental budgets, labor estimates, and timeline constraints.</p>
       </div>
     );
   }
 
-  if (lowercasePath.includes('sop')) {
+  if (lowercasePath.includes('sop') || lowercasePath.includes('standard operating')) {
     return (
       <div>
         <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
@@ -150,17 +137,11 @@ const getTemplateContent = (path: string) => {
         </h1>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">1. Purpose & Scope</h2>
         <p>Outline the purpose of this SOP and the departments that must strictly comply with its instructions.</p>
-        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Procedure Steps</h2>
-        <ol className="list-decimal pl-5 space-y-2 text-slate-700 my-3">
-          <li>Verify client details and contract completeness.</li>
-          <li>Log project metadata into the FastTrade KMS catalog folder.</li>
-          <li>Trigger automated compliance checking scripts.</li>
-        </ol>
       </div>
     );
   }
 
-  if (lowercasePath.includes('technical-doc') || lowercasePath.includes('technical-documentation')) {
+  if (lowercasePath.includes('technical-doc') || lowercasePath.includes('technical-documentation') || lowercasePath.includes('roadmap')) {
     return (
       <div>
         <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
@@ -168,29 +149,20 @@ const getTemplateContent = (path: string) => {
         </h1>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">1. Architecture Overview</h2>
         <p>This technical guide details the cloud microservices architecture for the Enterprise Knowledge Management System.</p>
-        <pre className="bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-[10.5px] text-slate-700 my-3">
-{`const config = {
-  kmsServiceUrl: "https://api.kms.fasttrade.com",
-  timeout: 5000,
-  retryStrategy: "ExponentialBackoff"
-};`}
-        </pre>
-        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Data Models</h2>
-        <p>Database structure templates represent relational configurations for Template Versions and Template Favorites.</p>
       </div>
     );
   }
 
-  if (lowercasePath.includes('hr-policy')) {
+  if (lowercasePath.includes('policy') || lowercasePath.includes('hr-policy')) {
     return (
       <div>
         <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
-          HR Policy Guidebook
+          {activeDoc?.name?.replace('.docx', '') || 'Financial Policy'}
         </h1>
         <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">1. Code of Conduct</h2>
         <p>All employees are expected to maintain professional standards of behavior, collaboration, and confidentiality.</p>
-        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Work From Home Policy</h2>
-        <p>FastTrade supports hybrid working modes depending on role guidelines. Standard core collaboration hours are 10 AM to 4 PM.</p>
+        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">2. Policy Directives</h2>
+        <p>FastTrade supports hybrid working modes and strict compliance with global document archiving guidelines.</p>
       </div>
     );
   }
@@ -206,17 +178,17 @@ const getTemplateContent = (path: string) => {
     );
   }
 
-  // Default fallback (e.g. Budget report)
+  // Fallback / Specific document contents:
   return (
     <div>
       <h1 className="text-2xl font-black text-slate-900 border-b border-slate-150 pb-2 tracking-tight select-all">
-        Q2 Budget Report
+        {activeDoc?.name?.replace('.docx', '') || 'Q2 Budget Report'}
       </h1>
       <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">
         1. Executive Summary
       </h2>
       <p>
-        This report provides a comprehensive overview of the financial performance and budget allocations for Q2 2024. During this timeframe, engineering expenditures grew due to scheduled infrastructure upgrades. General operations remained flat, matching prior projections.
+        This report provides a comprehensive overview of the financial performance and budget allocations. During this timeframe, engineering expenditures grew due to scheduled infrastructure upgrades. General operations remained flat, matching prior projections.
       </p>
       <h2 className="text-sm font-extrabold text-slate-800 tracking-tight pt-2">
         2. Key Highlights
@@ -226,9 +198,6 @@ const getTemplateContent = (path: string) => {
         <li>Operational expenses are within the planned budget constraints.</li>
         <li>Net profit shows a growth of 22%.</li>
       </ul>
-      <p className="pt-2">
-        Further audits will be conducted by mid-June to verify that compliance guidelines are fully met for all operations. Recommended cost optimizations will be applied starting in Q3.
-      </p>
     </div>
   );
 };
@@ -302,7 +271,7 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
       title,
       fileType: activeDoc?.fileType || 'DOCX',
       department: activeDoc?.locationPath?.split('/')[1] || 'Operations',
-      owner: activeDoc?.ownerName || 'Amit Verma',
+      owner: activeDoc?.ownerName || 'Paras Jain',
       tags: activeDoc?.tags || [],
       version: activeDoc?.version || 'v1.0',
       fullContent: editorRef.current?.innerText || ''
@@ -334,6 +303,17 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           
+          let locationType = 'Paragraph';
+          let parentNode = selection.anchorNode?.parentNode;
+          while (parentNode && parentNode !== editorRef.current) {
+            const nodeName = parentNode.nodeName.toLowerCase();
+            if (nodeName.match(/h[1-6]/)) {
+              locationType = 'Heading';
+              break;
+            }
+            parentNode = parentNode.parentNode;
+          }
+
           setSelectedText(text);
           setSelectedRange(range.cloneRange());
           setFloatingAiToolbarPos({
@@ -344,14 +324,14 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
           
           // Notify AI Chat
           window.dispatchEvent(new CustomEvent('kms-editor-selection', {
-            detail: { text }
+            detail: { text, locationType }
           }));
         } else {
           setShowFloatingAiToolbar(false);
           setSelectedText('');
           setSelectedRange(null);
           window.dispatchEvent(new CustomEvent('kms-editor-selection', {
-            detail: { text: '' }
+            detail: { text: '', locationType: '' }
           }));
         }
       }
@@ -1212,7 +1192,7 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
             lineHeight: lineSpacing
           }}
         >
-          {getTemplateContent(window.location.pathname)}
+          {getTemplateContent(activeDoc?.name || window.location.pathname, activeDoc)}
         </div>
 
         {/* Floating Selection AI Toolbar */}

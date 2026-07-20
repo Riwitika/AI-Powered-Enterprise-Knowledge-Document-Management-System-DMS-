@@ -66,7 +66,7 @@ export default function AIChat() {
   const suggestedQuestions = [
     'Summarize the Sales Report - April.xlsx',
     'What are the pending approvals?',
-    'Show documents uploaded by Amit Verma',
+    'Show documents uploaded by Paras Jain',
     'Compare Q2 and Q1 revenue',
     'List HR policies and documents'
   ];

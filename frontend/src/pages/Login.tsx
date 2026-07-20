@@ -561,10 +561,9 @@ export default function Login() {
               </div>
 
               {/* Seeding Box - Hidden in clean UI but available on hover / tiny details */}
-              <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1 text-[10px] text-slate-450">
+              <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1 text-[10px] text-slate-450 font-medium">
                 <div className="flex justify-between font-mono">
-                  <span>Demo: admin@enterprise.com</span>
-                  <span>adminpassword</span>
+                  <span>Demo: arun.goyal@fasttrade.com (Super Admin) / arnim.goyal@fasttrade.com (Admin) / riwitika.gupta@fasttrade.com (Manager/Employee)</span>
                 </div>
               </div>
             </div>

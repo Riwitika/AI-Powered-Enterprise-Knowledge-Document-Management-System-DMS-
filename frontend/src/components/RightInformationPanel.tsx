@@ -41,6 +41,110 @@ export default function RightInformationPanel({
     );
   }
 
+  const getDynamicDetails = () => {
+    const name = item.name.toLowerCase();
+    
+    // Default fallback values
+    let location = `/Corporate Knowledge/${(item as any).folderId || ''}`;
+    let createdOn = '14 May 2026, 11:00 AM';
+    let tags = [item.fileType, 'Knowledge'];
+    let description = `Enterprise records and metadata details for ${item.name}`;
+    let whoCanAccess = 'All Employees';
+    let accessType = 'Can view, download, edit';
+
+    // Map default documents:
+    if (item.id === 'doc-1') {
+      location = '/02_Finance/Reports';
+      createdOn = '14 May 2026, 11:00 AM';
+      tags = ['Budget', 'Q2', 'Finance'];
+      description = 'Quarter 2 budget report including departmental allocations, variances and forecasts.';
+      whoCanAccess = 'Finance Team, Managers';
+      accessType = 'Can view, download';
+    } else if (item.id === 'doc-2') {
+      location = '/02_Finance/Reports';
+      createdOn = '15 May 2026, 09:00 AM';
+      tags = ['Sales', 'April', 'Reports'];
+      description = 'Departmental sales records for April showing achievements against targets.';
+      whoCanAccess = 'Sales Team, Executive Board';
+      accessType = 'Can view, download, edit';
+    } else if (item.id === 'doc-3') {
+      location = '/05_Legal/Agreements';
+      createdOn = '10 May 2026, 02:30 PM';
+      tags = ['Legal', 'Vendor', 'Agreements'];
+      description = 'Standard services procurement vendor agreement including terms and conditions.';
+      whoCanAccess = 'Legal Team, Procurement Managers';
+      accessType = 'Can view, download';
+    } else if (item.id === 'doc-4') {
+      location = '/00_Company_Information';
+      createdOn = '12 May 2026, 10:00 AM';
+      tags = ['Roadmap', 'Product', 'Presentation'];
+      description = '2024 overview roadmap for the primary enterprise software release.';
+      whoCanAccess = 'All Employees';
+      accessType = 'Can view';
+    } else if (item.id === 'doc-5') {
+      location = '/02_Finance/Policies';
+      createdOn = '14 May 2026, 09:30 AM';
+      tags = ['Policy', 'Finance'];
+      description = 'Corporate financial policy outlining internal control parameters and review timelines.';
+      whoCanAccess = 'Finance Team, Audit Officers';
+      accessType = 'Can view, edit';
+    } else if (item.id === 'doc-6') {
+      location = '/02_Finance/Budgets';
+      createdOn = '12 May 2026, 11:00 AM';
+      tags = ['Expense', 'Analysis', 'Finance'];
+      description = 'Analytical sheet detailing departmental expense balances against initial allocations.';
+      whoCanAccess = 'Finance Managers, Directors';
+      accessType = 'Can view, download, edit';
+    } else if (item.id === 'doc-7') {
+      location = '/02_Finance/Budgets';
+      createdOn = '11 May 2026, 03:00 PM';
+      tags = ['Annual', 'Summary', 'Finance'];
+      description = 'Year-end summary covering gross sales, tax compliance parameters and margin audits.';
+      whoCanAccess = 'Audit Board, Shareholders';
+      accessType = 'Can view, download';
+    } else if (item.id === 'doc-8') {
+      location = '/02_Finance/Budgets';
+      createdOn = '10 May 2026, 04:00 PM';
+      tags = ['Presentation', 'Budget', 'Q2'];
+      description = 'Slides deck prepared for board review of the Q2 budget plans.';
+      whoCanAccess = 'Executive Board, Managers';
+      accessType = 'Can view, share';
+    } else if (item.id === 'doc-9') {
+      location = '/02_Finance';
+      createdOn = '09 May 2026, 02:00 PM';
+      tags = ['Cashflow', 'Statement'];
+      description = 'Operational, investment and financing cash flow logs.';
+      whoCanAccess = 'Finance Team';
+      accessType = 'Can view, edit';
+    } else if (item.id === 'doc-10') {
+      location = '/02_Finance';
+      createdOn = '08 May 2026, 10:00 AM';
+      tags = ['Tax', 'Compliance'];
+      description = 'Guideline rules for regional corporate taxation filing cycles.';
+      whoCanAccess = 'Finance Team, HR Officers';
+      accessType = 'Can view, download';
+    } else {
+      if (name.includes('budget') || name.includes('report')) {
+        tags = ['Budget', 'Report'];
+      } else if (name.includes('sale')) {
+        tags = ['Sales', 'Data'];
+      } else if (name.includes('agreement') || name.includes('contract')) {
+        tags = ['Legal', 'Contract'];
+      }
+    }
+
+    return {
+      location,
+      createdOn,
+      tags,
+      description,
+      whoCanAccess,
+      accessType
+    };
+  };
+
+  const details = getDynamicDetails();
+
   const getFileTypeColor = (fileType: string) => {
     const type = fileType.toLowerCase();
     if (type === 'docx' || type === 'doc') return 'bg-blue-50 text-blue-650 border-blue-100';
@@ -165,7 +269,7 @@ export default function RightInformationPanel({
 
               <div className="grid grid-cols-3 gap-y-3.5 text-xs font-semibold text-slate-700">
                 <span className="text-slate-400 text-[10.5px] font-bold">Location</span>
-                <span className="col-span-2 text-slate-650 font-mono text-[10.5px] select-all">/02_Finance/Reports</span>
+                <span className="col-span-2 text-slate-650 font-mono text-[10.5px] select-all">{details.location}</span>
 
                 <span className="text-slate-400 text-[10.5px] font-bold">Owner</span>
                 <span className="col-span-2 text-slate-800 font-bold">{item.ownerName}</span>
@@ -173,7 +277,7 @@ export default function RightInformationPanel({
                 <span className="text-slate-400 text-[10.5px] font-bold">Created on</span>
                 <span className="col-span-2 text-slate-500 font-medium flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-slate-350 shrink-0" />
-                  <span>14 May 2024, 11:00 AM</span>
+                  <span>{details.createdOn}</span>
                 </span>
 
                 <span className="text-slate-400 text-[10.5px] font-bold">Last modified</span>
@@ -184,7 +288,7 @@ export default function RightInformationPanel({
 
                 <span className="text-slate-400 text-[10.5px] font-bold">Tags</span>
                 <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
-                  {['Budget', 'Q2', 'Finance'].map(t => (
+                  {details.tags.map(t => (
                     <span key={t} className="px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-[9px] font-bold text-blue-600 flex items-center gap-0.5">
                       <Tag className="w-2.5 h-2.5" />
                       <span>{t}</span>
@@ -201,8 +305,8 @@ export default function RightInformationPanel({
                 </div>
 
                 <span className="text-slate-400 text-[10.5px] font-bold self-start mt-0.5">Description</span>
-                <p className="col-span-2 text-[11px] text-slate-600 leading-relaxed font-medium">
-                  Quarter 2 budget report including departmental allocations, variances and forecasts.
+                <p className="col-span-2 text-[11px] text-slate-650 leading-relaxed font-medium">
+                  {details.description}
                 </p>
               </div>
             </div>
@@ -222,10 +326,10 @@ export default function RightInformationPanel({
 
               <div className="grid grid-cols-3 gap-y-3.5 text-xs font-semibold text-slate-700">
                 <span className="text-slate-400 text-[10.5px] font-bold">Who can access</span>
-                <span className="col-span-2 text-slate-800 font-bold">Finance Team, Managers</span>
+                <span className="col-span-2 text-slate-800 font-bold">{details.whoCanAccess}</span>
 
                 <span className="text-slate-400 text-[10.5px] font-bold">Access type</span>
-                <span className="col-span-2 text-slate-500 font-medium">Can view, download</span>
+                <span className="col-span-2 text-slate-500 font-medium">{details.accessType}</span>
               </div>
             </div>
           </>
@@ -234,9 +338,8 @@ export default function RightInformationPanel({
         {activeTab === 'activity' && (
           <div className="relative pl-4 border-l border-slate-200 space-y-5 py-2">
             {[
-              { text: 'Amit Verma updated version to v2.1', time: '19 May 2024, 10:30 AM' },
-              { text: 'Rohit Sharma shared with finance team', time: '17 May 2024, 02:40 PM' },
-              { text: 'Amit Verma created document', time: '14 May 2024, 11:00 AM' }
+              { text: `${item.ownerName} modified version`, time: `${item.modifiedAt}` },
+              { text: 'System indexed file properties', time: `${details.createdOn}` }
             ].map((act, idx) => (
               <div key={idx} className="relative text-xs font-semibold">
                 <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">
@@ -252,9 +355,7 @@ export default function RightInformationPanel({
         {activeTab === 'versions' && (
           <div className="space-y-4">
             {[
-              { ver: 'v2.1', time: '19 May 2024, 10:30 AM', author: 'Amit Verma', size: '2.4 MB', current: true },
-              { ver: 'v2.0', time: '18 May 2024, 04:15 PM', author: 'Amit Verma', size: '2.3 MB' },
-              { ver: 'v1.0', time: '14 May 2024, 11:00 AM', author: 'Amit Verma', size: '1.2 MB' }
+              { ver: item.version || 'v1.0', time: item.modifiedAt, author: item.ownerName, size: item.size, current: true }
             ].map((v, idx) => (
               <div key={idx} className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-150/60 rounded-xl">
                 <div>
@@ -277,8 +378,8 @@ export default function RightInformationPanel({
           <div className="space-y-4">
             <div className="space-y-3.5">
               {[
-                { author: 'Amit Verma', initials: 'AV', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
-                { author: 'Neha Gupta', initials: 'NG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
+                { author: 'Paras Jain', initials: 'PJ', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
+                { author: 'Yukti Gupta', initials: 'YG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
               ].map((c, idx) => (
                 <div key={idx} className="flex gap-2.5 text-xs p-2 border border-slate-100 rounded-xl bg-slate-50/50">
                   <div className="w-6.5 h-6.5 rounded-full bg-slate-200 flex items-center justify-center shrink-0 font-extrabold text-[9px] text-slate-700">

@@ -127,7 +127,7 @@ export default function Dashboard() {
         fileType: 'docx',
         badgeText: '2.4 MB',
         badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Ritika Sharma',
+        ownerName: 'Yukti Gupta',
         ownerAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
       },
       {
@@ -138,7 +138,7 @@ export default function Dashboard() {
         fileType: 'xlsx',
         badgeText: '1.1 MB',
         badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Amit Verma',
+        ownerName: 'Paras Jain',
         ownerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
       },
       {
@@ -149,7 +149,7 @@ export default function Dashboard() {
         fileType: 'pdf',
         badgeText: '890 KB',
         badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Neha Gupta',
+        ownerName: 'Riwitika Gupta',
         ownerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
       },
       {
@@ -160,7 +160,7 @@ export default function Dashboard() {
         fileType: 'pptx',
         badgeText: '5.6 MB',
         badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Rohit Sharma',
+        ownerName: 'Uttam Gupta',
         ownerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'
       },
       {
@@ -294,8 +294,8 @@ export default function Dashboard() {
             
             <div className="space-y-4">
               {[
-                { label: 'New user added:', user: 'Priya Mehta', detail: 'by Arnim Goyal', time: '2h ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' },
-                { label: 'Document uploaded:', user: 'Competitor Analysis.xlsx', detail: 'by Amit Verma', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+                { label: 'New user added:', user: 'Yukti Gupta', detail: 'by Arnim Goyal', time: '2h ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' },
+                { label: 'Document uploaded:', user: 'Competitor Analysis.xlsx', detail: 'by Paras Jain', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
                 { label: 'Approval completed:', user: 'Q2 Budget Report.pdf', detail: 'by Riwitika Gupta', time: '5h ago', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150' },
                 { label: 'Role updated:', user: 'Project Manager', detail: 'by Arnim Goyal', time: '1d ago' },
                 { label: 'Permission updated:', user: 'Sales Team', detail: 'by Arnim Goyal', time: '1d ago' }
@@ -573,10 +573,10 @@ export default function Dashboard() {
               
               <div className="space-y-3.5">
                 {[
-                  { name: 'Q2 Budget Report.pdf', requester: 'Amit Verma', time: '2h ago', priority: 'High', style: 'bg-red-50 text-red-650 border-red-100' },
-                  { name: 'Vendor Agreement.docx', requester: 'Neha Gupta', time: '4h ago', priority: 'Medium', style: 'bg-amber-50 text-amber-700 border-amber-100' },
-                  { name: 'Sales Forecast - May.xlsx', requester: 'Rohit Sharma', time: '1d ago', priority: 'Medium', style: 'bg-amber-50 text-amber-700 border-amber-100' },
-                  { name: 'Marketing Plan.pptx', requester: 'Ritika Sharma', time: '1d ago', priority: 'Low', style: 'bg-green-50 text-green-700 border-green-100' }
+                  { name: 'Q2 Budget Report.pdf', requester: 'Paras Jain', time: '2h ago', priority: 'High', style: 'bg-red-50 text-red-650 border-red-100' },
+                  { name: 'Vendor Agreement.docx', requester: 'Riwitika Gupta', time: '4h ago', priority: 'Medium', style: 'bg-amber-50 text-amber-700 border-amber-100' },
+                  { name: 'Sales Forecast - May.xlsx', requester: 'Uttam Gupta', time: '1d ago', priority: 'Medium', style: 'bg-amber-50 text-amber-700 border-amber-100' },
+                  { name: 'Marketing Plan.pptx', requester: 'Yukti Gupta', time: '1d ago', priority: 'Low', style: 'bg-green-50 text-green-700 border-green-100' }
                 ].map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center p-2.5 bg-slate-50/50 border border-slate-150/60 rounded-xl hover:border-slate-300 transition-colors">
                     <div>
@@ -633,11 +633,11 @@ export default function Dashboard() {
               
               <div className="space-y-4">
                 {[
-                  { name: 'Amit Verma', initials: 'AV', text: 'uploaded Sales Report - April.xlsx', time: '1h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
-                  { name: 'Neha Gupta', initials: 'NG', text: 'uploaded Client Onboarding.docx', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
-                  { name: 'Rohit Sharma', initials: 'RS', text: 'updated Product Roadmap.pptx', time: '5h ago', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150' },
-                  { name: 'Ritika Sharma', initials: 'RS', text: 'shared Marketing Strategy.pdf', time: '6h ago', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150' },
-                  { name: 'Priya Mehta', initials: 'PM', text: 'uploaded Competitor Analysis.xlsx', time: '1d ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' }
+                  { name: 'Paras Jain', initials: 'PJ', text: 'uploaded Sales Report - April.xlsx', time: '1h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+                  { name: 'Riwitika Gupta', initials: 'RG', text: 'uploaded Client Onboarding.docx', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
+                  { name: 'Uttam Gupta', initials: 'UG', text: 'updated Product Roadmap.pptx', time: '5h ago', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150' },
+                  { name: 'Yukti Gupta', initials: 'YG', text: 'shared Marketing Strategy.pdf', time: '6h ago', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150' },
+                  { name: 'Paras Jain', initials: 'PJ', text: 'uploaded Competitor Analysis.xlsx', time: '1d ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' }
                 ].map((act, idx) => (
                   <div key={idx} className="flex items-center gap-3 text-xs p-0.5">
                     <img 
@@ -1023,9 +1023,9 @@ export default function Dashboard() {
             
             <div className="space-y-3.5">
               {[
-                { name: 'Amit Verma', initials: 'AV', text: 'shared "Sales Report - April.xlsx"', time: '5h ago' },
-                { name: 'Ritika Sharma', initials: 'RS', text: 'shared "Marketing Strategy.pdf"', time: '2h ago' },
-                { name: 'Neha Gupta', initials: 'NG', text: 'shared "Client Onboarding Process.docx"', time: '1d ago' }
+                { name: 'Paras Jain', initials: 'PJ', text: 'shared "Sales Report - April.xlsx"', time: '5h ago' },
+                { name: 'Yukti Gupta', initials: 'YG', text: 'shared "Marketing Strategy.pdf"', time: '2h ago' },
+                { name: 'Riwitika Gupta', initials: 'RG', text: 'shared "Client Onboarding Process.docx"', time: '1d ago' }
               ].map((act, idx) => (
                 <div key={idx} className="flex items-center gap-3 text-xs p-1">
                   <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-[10px] font-extrabold text-slate-700 select-none">

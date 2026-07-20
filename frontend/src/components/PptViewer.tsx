@@ -15,91 +15,141 @@ interface Slide {
   content: React.ReactNode;
 }
 
-export default function PptViewer() {
+export default function PptViewer({ activeDoc }: { activeDoc: any }) {
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [zoom, setZoom] = useState(60);
 
-  const slides: Slide[] = [
-    {
-      id: 1,
-      title: 'Product Roadmap',
-      subtitle: '2024 Overview',
-      content: (
-        <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
-          <div className="space-y-2">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Product Roadmap</h2>
-            <p className="text-slate-400 font-extrabold text-xs uppercase tracking-widest">2024 Overview</p>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-4 w-full max-w-[560px] pt-4 select-none">
-            {[
-              { label: 'Q1', title: 'Research & Planning', color: 'bg-blue-600' },
-              { label: 'Q2', title: 'MVP Development', color: 'bg-emerald-600' },
-              { label: 'Q3', title: 'Beta Test & Feedback', color: 'bg-amber-500' },
-              { label: 'Q4', title: 'Launch & Scale', color: 'bg-purple-600' }
-            ].map((q) => (
-              <div key={q.label} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col items-center shadow-sm">
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${q.color}`}>
-                  {q.label}
-                </span>
-                <span className="text-[10px] text-slate-700 font-extrabold mt-3 text-center leading-normal">
-                  {q.title}
-                </span>
+  const getPptSlides = (): Slide[] => {
+    const name = activeDoc?.name || '';
+    if (name.toLowerCase().includes('budget') || name.toLowerCase().includes('finance')) {
+      return [
+        {
+          id: 1,
+          title: 'Budget Allocation Review',
+          subtitle: 'Q2 Performance & Operations',
+          content: (
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Q2 Budget Review</h2>
+                <p className="text-slate-400 font-extrabold text-xs uppercase tracking-widest">Department Expenditures Overview</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 2,
-      title: 'Q1 Achievements',
-      subtitle: 'Completed Milestones',
-      content: (
-        <div className="h-full flex flex-col justify-center space-y-4 px-12">
-          <h3 className="text-xl font-extrabold text-slate-950 border-b border-slate-200 pb-2">Q1 Achievements</h3>
-          <ul className="list-disc pl-5 space-y-2 text-xs font-semibold text-slate-600">
-            <li>User experience research complete (50+ user interviews conducted).</li>
-            <li>System architecture finalized and approved by engineering leadership.</li>
-            <li>Initial visual wireframes signed off by management team.</li>
-          </ul>
-        </div>
-      )
-    },
-    {
-      id: 3,
-      title: 'Q2 Objectives',
-      subtitle: 'Core Focus Areas',
-      content: (
-        <div className="h-full flex flex-col justify-center space-y-4 px-12">
-          <h3 className="text-xl font-extrabold text-slate-950 border-b border-slate-200 pb-2">Q2 Objectives</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-blue-50/50 border border-blue-100 p-3.5 rounded-xl">
-              <h4 className="font-extrabold text-blue-700 text-xs">Development Phase</h4>
-              <p className="text-[10px] text-slate-500 font-medium mt-1 leading-normal">Build clean modular UI components and core data structures.</p>
+              <div className="grid grid-cols-3 gap-4 w-full max-w-[500px] pt-4 select-none">
+                {[
+                  { label: 'Engineering', val: '₹1.2 Cr', color: 'bg-blue-600' },
+                  { label: 'Operations', val: '₹85 L', color: 'bg-emerald-600' },
+                  { label: 'Marketing', val: '₹45 L', color: 'bg-purple-650' }
+                ].map((q) => (
+                  <div key={q.label} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col items-center shadow-sm">
+                    <span className="text-[10px] text-slate-450 font-black">{q.label}</span>
+                    <span className={`text-base font-extrabold mt-2 px-3 py-1 rounded-lg text-white ${q.color}`}>{q.val}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-xl">
-              <h4 className="font-extrabold text-emerald-700 text-xs">Security Audits</h4>
-              <p className="text-[10px] text-slate-500 font-medium mt-1 leading-normal">Implement role permissions and user validation hooks.</p>
+          )
+        },
+        {
+          id: 2,
+          title: 'Strategic Objectives',
+          subtitle: 'Key Goals achieved',
+          content: (
+            <div className="h-full flex flex-col justify-center space-y-4 px-12">
+              <h3 className="text-xl font-extrabold text-slate-950 border-b border-slate-200 pb-2">Strategic Goals</h3>
+              <ul className="list-disc pl-5 space-y-2 text-xs font-semibold text-slate-655">
+                <li>Reduced infrastructure cloud cost overhead by 12% in Q1.</li>
+                <li>Completed regulatory audit cycle compliance checklist updates.</li>
+                <li>Aligned engineering roadmap budget with corporate strategy.</li>
+              </ul>
             </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 4,
-      title: 'Summary & Goals',
-      subtitle: 'Q3 & Q4 Vision',
-      content: (
-        <div className="h-full flex flex-col justify-center items-center text-center space-y-4">
-          <h3 className="text-2xl font-extrabold text-slate-950">Summary & Future Goals</h3>
-          <p className="text-xs text-slate-400 font-semibold max-w-[400px]">
-            Our product is positioned to launch into closed beta in early Q3, leading to full enterprise commercial availability by late Q4.
-          </p>
-        </div>
-      )
+          )
+        }
+      ];
     }
-  ];
+
+    return [
+      {
+        id: 1,
+        title: 'Product Roadmap',
+        subtitle: '2026 Overview',
+        content: (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Product Roadmap</h2>
+              <p className="text-slate-400 font-extrabold text-xs uppercase tracking-widest">2026 Overview</p>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-4 w-full max-w-[560px] pt-4 select-none">
+              {[
+                { label: 'Q1', title: 'Research & Planning', color: 'bg-blue-600' },
+                { label: 'Q2', title: 'MVP Development', color: 'bg-emerald-600' },
+                { label: 'Q3', title: 'Beta Test & Feedback', color: 'bg-amber-500' },
+                { label: 'Q4', title: 'Launch & Scale', color: 'bg-purple-600' }
+              ].map((q) => (
+                <div key={q.label} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col items-center shadow-sm">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${q.color}`}>
+                    {q.label}
+                  </span>
+                  <span className="text-[10px] text-slate-700 font-extrabold mt-3 text-center leading-normal">
+                    {q.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 2,
+        title: 'Q1 Achievements',
+        subtitle: 'Completed Milestones',
+        content: (
+          <div className="h-full flex flex-col justify-center space-y-4 px-12">
+            <h3 className="text-xl font-extrabold text-slate-950 border-b border-slate-200 pb-2">Q1 Achievements</h3>
+            <ul className="list-disc pl-5 space-y-2 text-xs font-semibold text-slate-600">
+              <li>User experience research complete (50+ user interviews conducted).</li>
+              <li>System architecture finalized and approved by engineering leadership.</li>
+              <li>Initial visual wireframes signed off by management team.</li>
+            </ul>
+          </div>
+        )
+      },
+      {
+        id: 3,
+        title: 'Q2 Objectives',
+        subtitle: 'Core Focus Areas',
+        content: (
+          <div className="h-full flex flex-col justify-center space-y-4 px-12">
+            <h3 className="text-xl font-extrabold text-slate-950 border-b border-slate-200 pb-2">Q2 Objectives</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-blue-50/50 border border-blue-100 p-3.5 rounded-xl">
+                <h4 className="font-extrabold text-blue-700 text-xs">Development Phase</h4>
+                <p className="text-[10px] text-slate-500 font-medium mt-1 leading-normal">Build clean modular UI components and core data structures.</p>
+              </div>
+              <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-xl">
+                <h4 className="font-extrabold text-emerald-700 text-xs">Security Audits</h4>
+                <p className="text-[10px] text-slate-500 font-medium mt-1 leading-normal">Implement role permissions and user validation hooks.</p>
+              </div>
+            </div>
+          </div>
+        )
+      },
+      {
+        id: 4,
+        title: 'Summary & Goals',
+        subtitle: 'Q3 & Q4 Vision',
+        content: (
+          <div className="h-full flex flex-col justify-center items-center text-center space-y-4">
+            <h3 className="text-2xl font-extrabold text-slate-950">Summary & Future Goals</h3>
+            <p className="text-xs text-slate-400 font-semibold max-w-[400px]">
+              Our product is positioned to launch into closed beta in early Q3, leading to full enterprise commercial availability by late Q4.
+            </p>
+          </div>
+        )
+      }
+    ];
+  };
+
+  const slides = getPptSlides();
 
   return (
     <div className="flex h-full bg-[#f3f4f6]/40 select-none">

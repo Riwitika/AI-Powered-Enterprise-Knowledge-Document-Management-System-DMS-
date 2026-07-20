@@ -297,7 +297,8 @@ export default function Layout() {
             <div className="relative" ref={notificationRef}>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowNotifications(!showNotifications);
                   setShowProfileDropdown(false);
                 }}
@@ -316,7 +317,7 @@ export default function Layout() {
                   </div>
                   <div className="divide-y divide-slate-50">
                     <div className="px-3.5 py-2.5 hover:bg-slate-50/50">
-                      <p className="text-slate-700 font-bold leading-normal">Amit Verma shared a document</p>
+                      <p className="text-slate-700 font-bold leading-normal">Paras Jain shared a document</p>
                       <span className="text-[9px] text-slate-400 block mt-0.5">5 minutes ago</span>
                     </div>
                     <div className="px-3.5 py-2.5 hover:bg-slate-50/50">
@@ -341,7 +342,8 @@ export default function Layout() {
             <div className="relative" ref={profileRef}>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowProfileDropdown(!showProfileDropdown);
                   setShowNotifications(false);
                 }}

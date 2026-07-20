@@ -9,14 +9,66 @@ import {
   ChevronRight 
 } from 'lucide-react';
 
-export default function PdfViewer() {
+export default function PdfViewer({ activeDoc }: { activeDoc: any }) {
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
-  const totalPages = 12;
+  const totalPages = 3;
 
   const handlePrint = () => {
     alert('Initiating print flow... (Mock)');
   };
+
+  const getPdfContent = () => {
+    const name = activeDoc?.name || '';
+    if (name.toLowerCase().includes('vendor')) {
+      return {
+        title: 'Vendor Procurement Agreement',
+        subtitle: 'Confidential Services Contract',
+        sections: [
+          {
+            title: '1. Scope of Work',
+            text: 'The vendor agrees to deliver technical development services as detailed in the Statement of Work (SOW). All source codes and builds must compile without strict warnings, complying with enterprise repository configurations.'
+          },
+          {
+            title: '2. Terms & Liabilities',
+            text: 'Payments shall resolve on Net 30 terms from invoicing cycles. Undisputed delays are subject to a statutory interest calculation. Intellectual property transfers fully to Fast Trade DMS upon payment closure.'
+          }
+        ]
+      };
+    } else if (name.toLowerCase().includes('annual') || name.toLowerCase().includes('compliance')) {
+      return {
+        title: 'Annual Financial Summary & Compliance',
+        subtitle: 'FY 2025 Consolidated Ledger Review',
+        sections: [
+          {
+            title: '1. Financial Performance Highlights',
+            text: 'Gross operating revenues resolved at ₹425.4 Cr (14.8% YoY growth). Key drivers include corporate license expansions and the cloud collaboration suite rollout. Net operating margins closed at 32.5%.'
+          },
+          {
+            title: '2. Capital Reserves & Liquidity',
+            text: 'Retained earnings increased to ₹82.6 Cr. Liquid assets remain stable at ₹40M. Interest overhead from borrowing decreases by 6.2% due to rapid debt reconciliation.'
+          }
+        ]
+      };
+    } else {
+      return {
+        title: activeDoc?.name || 'KMS Compliance Guidelines',
+        subtitle: 'Fast Trade Enterprise Knowledge Record',
+        sections: [
+          {
+            title: '1. General Regulatory Provisions',
+            text: 'All employees must record information blueprints within the designated KMS repository. Document security visibility filters remain active depending on roles (Employee, Manager, Admin).'
+          },
+          {
+            title: '2. Compliance & Audit Audits',
+            text: 'Auditing runs weekly. Authorized document exports or downloading files without proper clearances are subject to review logs.'
+          }
+        ]
+      };
+    }
+  };
+
+  const pdfData = getPdfContent();
 
   return (
     <div className="flex flex-col h-full bg-[#f3f4f6]/40 select-none">
@@ -96,7 +148,7 @@ export default function PdfViewer() {
 
           <button 
             type="button" 
-            onClick={() => alert('Download triggered (Mock)')}
+            onClick={() => alert(`Download triggered for: "${activeDoc?.name}"`)}
             className="p-1.5 hover:bg-slate-100 rounded text-slate-500"
             title="Download PDF"
           >
@@ -113,29 +165,20 @@ export default function PdfViewer() {
           style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
         >
           <div className="text-center font-extrabold text-lg uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 pb-3">
-            Vendor Agreement
+            {pdfData.title}
           </div>
 
-          <p className="font-semibold text-slate-650 italic">
-            This Agreement is made on this 18th day of May, 2024 by and between Fast Trade Technologies Pvt. Ltd. and the undersigned vendor.
+          <p className="font-semibold text-slate-650 italic text-center">
+            {pdfData.subtitle}
           </p>
 
           <div className="space-y-4 pt-4">
-            <div>
-              <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">1. Scope of Work</h3>
-              <p className="mt-1.5 text-slate-700">
-                The vendor agrees to provide the services as outlined in the Statement of Work (SOW). All deliverables must be supplied within the timelines specified under Appendix A.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">2. Terms and Conditions</h3>
-              
-              <h4 className="font-bold text-[11.5px] text-slate-800 mt-2">2.1 Payment Terms</h4>
-              <p className="mt-1 text-slate-700">
-                Payments will be made within 30 days of invoice receipt. Overdue balances shall accumulate interest at the standard regulatory interest rate.
-              </p>
-            </div>
+            {pdfData.sections.map((sect, idx) => (
+              <div key={idx} className="space-y-1.5">
+                <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">{sect.title}</h3>
+                <p className="text-slate-700 leading-relaxed">{sect.text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
