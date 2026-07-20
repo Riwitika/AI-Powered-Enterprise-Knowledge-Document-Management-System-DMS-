@@ -12,7 +12,6 @@ import {
   ClipboardList,
   CheckSquare,
   Square,
-  ShieldCheck,
   UserPlus
 } from 'lucide-react';
 import KPICard from '../components/KPICard';
