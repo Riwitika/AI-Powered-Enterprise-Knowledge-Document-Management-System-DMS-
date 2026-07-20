@@ -13,7 +13,12 @@ import {
   Bell,
   HelpCircle,
   Cloud,
-  ChevronDown
+  ChevronDown,
+  User,
+  Shield,
+  Database,
+  History,
+  LayoutGrid
 } from 'lucide-react';
 
 export default function Layout() {
@@ -145,20 +150,49 @@ export default function Layout() {
           )}
 
           {/* Settings */}
-          <Link
-            to="/settings"
-            className={`flex items-center gap-3 px-3.5 py-2.5 text-[11.5px] font-bold rounded-xl transition-all relative ${
-              location.pathname.startsWith('/settings')
-                ? 'bg-blue-50/70 text-blue-600'
-                : 'text-slate-550 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Settings className={`h-4.5 w-4.5 shrink-0 ${location.pathname.startsWith('/settings') ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Settings</span>
+          <div className="space-y-1">
+            <Link
+              to="/settings"
+              className={`flex items-center gap-3 px-3.5 py-2.5 text-[11.5px] font-bold rounded-xl transition-all relative ${
+                location.pathname.startsWith('/settings')
+                  ? 'bg-blue-50/70 text-blue-600'
+                  : 'text-slate-550 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Settings className={`h-4.5 w-4.5 shrink-0 ${location.pathname.startsWith('/settings') ? 'text-blue-600' : 'text-slate-400'}`} />
+              <span>Settings</span>
+              {location.pathname.startsWith('/settings') && (
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600" />
+              )}
+            </Link>
+
             {location.pathname.startsWith('/settings') && (
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-blue-600" />
+              <div className="pl-8 pr-4 py-2 space-y-2.5 border-l border-slate-150 ml-5.5 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                <span className="text-[9px] text-slate-450 font-extrabold uppercase tracking-wider block">Quick Links</span>
+                {[
+                  { label: 'Profile', icon: User, tab: 'profile' },
+                  { label: 'Notification Preferences', icon: Bell, tab: 'notifications' },
+                  { label: 'Security', icon: Shield, tab: 'security' },
+                  { label: 'Integrations', icon: LayoutGrid, tab: 'integrations' },
+                  { label: 'Audit Logs', icon: History, tab: 'system' },
+                  { label: 'Storage', icon: Database, tab: 'system' }
+                ].map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const event = new CustomEvent('change-settings-tab', { detail: item.tab });
+                      window.dispatchEvent(event);
+                    }}
+                    className="w-full text-left flex items-center gap-2.5 text-[11px] font-bold text-slate-500 hover:text-slate-900 transition-colors"
+                  >
+                    <item.icon className="w-3.5 h-3.5 text-slate-450 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
-          </Link>
+          </div>
         </nav>
 
         {/* Sidebar Storage Widget (at the bottom) */}
