@@ -17,10 +17,7 @@ import type { FolderNode } from '../components/FolderTree';
 import DocumentTable from '../components/DocumentTable';
 import type { DocumentRowItem } from '../components/DocumentTable';
 import RightInformationPanel from '../components/RightInformationPanel';
-import { useAuthStore } from '../stores/authStore';
-
 export default function DocumentTree() {
-  const { user } = useAuthStore();
   
   // Toggle info panel / details sidebar state
   const [showInfoPanel, setShowInfoPanel] = useState(true);
