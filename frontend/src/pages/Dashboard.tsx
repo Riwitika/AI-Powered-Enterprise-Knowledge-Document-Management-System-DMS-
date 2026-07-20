@@ -27,8 +27,29 @@ export default function Dashboard() {
   const { user } = useAuthStore();
   const isManager = user?.role?.name === 'manager';
   
-  // Use "Riwitika Gupta" as requested for Employee and Manager roles
+  // Use \"Riwitika Gupta\" as requested for Employee and Manager roles
   const userName = user?.full_name || (isManager ? 'Riwitika Gupta' : 'Riwitika Gupta');
+
+  // Helper icons mapping
+  const getFileTypeIcon = (type?: string) => {
+    const className = "w-8.5 h-8.5 shrink-0 rounded-lg flex items-center justify-center font-bold text-xs select-none border";
+    switch (type) {
+      case 'docx':
+        return <div className={`${className} bg-blue-50 text-blue-650 border-blue-100`}>W</div>;
+      case 'pdf':
+        return <div className={`${className} bg-red-50 text-red-655 border-red-100`}>P</div>;
+      case 'xlsx':
+        return <div className={`${className} bg-emerald-50 text-emerald-655 border-emerald-100`}>X</div>;
+      case 'pptx':
+        return <div className={`${className} bg-orange-50 text-orange-600 border-orange-100`}>P</div>;
+      default:
+        return <div className={`${className} bg-slate-50 text-slate-500 border-slate-200`}>D</div>;
+    }
+  };
+
+  const handleDocumentActionClick = (row: DataRow, _e: React.MouseEvent) => {
+    alert(`Mock operations for "${row.name}" triggered.`);
+  };
 
   // Employee Tasks checkbox state
   const [employeeTasks, setEmployeeTasks] = useState([
@@ -148,9 +169,7 @@ export default function Dashboard() {
       }
     ];
 
-    const handleDocumentActionClick = (row: DataRow, _e: React.MouseEvent) => {
-      alert(`Mock operations for "${row.name}" triggered.`);
-    };
+
 
     return (
       <div className="space-y-7 max-w-7xl mx-auto font-sans text-slate-800 pb-12 select-none">

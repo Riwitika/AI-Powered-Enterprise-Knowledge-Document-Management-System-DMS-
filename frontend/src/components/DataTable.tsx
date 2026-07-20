@@ -10,6 +10,9 @@ export interface DataRow {
   fileType?: string;
   badgeText?: string;
   badgeStyle?: string;
+  ownerAvatar?: string;
+  ownerInitials?: string;
+  ownerName?: string;
 }
 
 interface DataTableProps {
