@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { X, Send, Sparkles, Loader2, Globe } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { X, Send, Sparkles, Loader2, Globe, Maximize2 } from 'lucide-react';
+import { useLocation, Link } from 'react-router-dom';
 
 interface Message {
   id: string;
@@ -150,12 +150,22 @@ export default function FloatingAIChat() {
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-white/80 hover:text-white transition-colors"
-            >
-              <X className="h-4.5 w-4.5" />
-            </button>
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/chat"
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white transition-colors p-0.5 hover:bg-white/10 rounded"
+                title="Open in Full Workspace"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Link>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
