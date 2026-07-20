@@ -93,10 +93,21 @@ const mockDocsList: Record<string, MockDoc> = {
 export default function DocumentViewer() {
   const { id } = useParams<{ id: string }>();
   const [activeFormat, setActiveFormat] = useState<string>('DOCX');
-  const [showInfoSidebar, setShowInfoSidebar] = useState(true);
+  const [showInfoSidebar, setShowInfoSidebar] = useState(() => {
+    const saved = localStorage.getItem('kms-editor-sidebar');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const handleToggleSidebar = () => {
+    setShowInfoSidebar(prev => {
+      const next = !prev;
+      localStorage.setItem('kms-editor-sidebar', JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Read routing details or fall back to default
-  const activeDoc: MockDoc = id && mockDocsList[id] ? mockDocsList[id] : {
+  let activeDoc: MockDoc = id && mockDocsList[id] ? mockDocsList[id] : {
     id: 'doc-default',
     name: 'Q2 Budget Report.docx',
     fileType: 'DOCX',
@@ -111,6 +122,24 @@ export default function DocumentViewer() {
     aiSummaryText: 'This budget document outlines expenditure plans for the second quarter. Engineering operations receive a 24% allocation, with compliance and legal audits remaining unchanged.'
   };
 
+  if (id && id.startsWith('temp-')) {
+    const rawName = id.replace('temp-', '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    activeDoc = {
+      id: id,
+      name: `${rawName}.docx`,
+      fileType: 'DOCX',
+      version: 'v1.0',
+      lastModified: 'Just now',
+      ownerName: 'Amit Verma (Template Creator)',
+      locationPath: '/Templates',
+      tags: ['Template', rawName],
+      description: `New editable document generated from the standard ${rawName} template.`,
+      whoCanAccess: 'All Employees',
+      accessType: 'Can view, edit, share',
+      aiSummaryText: `This document was instantiated from the corporate ${rawName} template. Content outlines departmental goals.`
+    };
+  }
+
   // Switch format based on user testing selectors
   const handleFormatChange = (format: string) => {
     setActiveFormat(format);
@@ -119,7 +148,7 @@ export default function DocumentViewer() {
   const renderActiveWorkspace = () => {
     switch (activeFormat.toUpperCase()) {
       case 'DOCX':
-        return <DocxEditor />;
+        return <DocxEditor activeDoc={activeDoc} />;
       case 'PDF':
         return <PdfViewer />;
       case 'PPTX':
@@ -133,7 +162,7 @@ export default function DocumentViewer() {
       case 'TXT':
         return <TxtEditor />;
       default:
-        return <DocxEditor />;
+        return <DocxEditor activeDoc={activeDoc} />;
     }
   };
 
@@ -181,7 +210,7 @@ export default function DocumentViewer() {
         {/* Info panel toggle button */}
         <button
           type="button"
-          onClick={() => setShowInfoSidebar(!showInfoSidebar)}
+          onClick={handleToggleSidebar}
           className={`px-3 py-1 border rounded-lg text-[10.5px] font-extrabold transition-all shadow-sm flex items-center gap-1.5 bg-white ${
             showInfoSidebar
               ? 'border-blue-600 text-blue-600'

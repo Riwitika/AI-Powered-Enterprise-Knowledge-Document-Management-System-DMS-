@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import FloatingAIChat from './FloatingAIChat';
@@ -29,6 +29,47 @@ export default function Layout() {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const profileRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on page navigation
+  useEffect(() => {
+    setShowProfileDropdown(false);
+    setShowNotifications(false);
+  }, [location.pathname]);
+
+  // Click outside, Escape, and custom overlay close triggers
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setShowProfileDropdown(false);
+        setShowNotifications(false);
+      }
+    }
+    const handleCloseAll = () => {
+      setShowProfileDropdown(false);
+      setShowNotifications(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('kms-close-layout-dropdowns', handleCloseAll);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('kms-close-layout-dropdowns', handleCloseAll);
+    };
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -80,7 +121,7 @@ export default function Layout() {
     <div className="flex h-screen w-screen bg-slate-50 text-slate-800 overflow-hidden font-sans relative">
       
       {/* SIDEBAR NAVIGATION PANEL */}
-      <aside className="w-[260px] border-r border-slate-200/80 bg-white flex flex-col shrink-0 relative z-20 transition-all duration-300">
+      <aside className="w-[260px] border-r border-slate-200/80 bg-white flex flex-col shrink-0 relative z-30 transition-all duration-300">
         
         {/* Brand Ftt Logo Section */}
         <div className="h-16 flex items-center gap-2.5 px-6 border-b border-slate-100 shrink-0 bg-white">
@@ -223,10 +264,10 @@ export default function Layout() {
       </aside>
 
       {/* MAIN LAYOUT WRAPPER */}
-      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* TOP NAVBAR CONTAINER */}
-        <header className="h-16 border-b border-slate-200/80 bg-white flex items-center justify-between px-8 shrink-0 relative z-30 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
+        <header className="h-16 border-b border-slate-200/80 bg-white flex items-center justify-between px-8 shrink-0 relative z-20 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
           {/* Section Indicator or Blank space */}
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-400 select-none uppercase tracking-widest">
@@ -253,10 +294,13 @@ export default function Layout() {
           <div className="flex items-center gap-4">
             
             {/* Notification triggers */}
-            <div className="relative">
+            <div className="relative" ref={notificationRef}>
               <button
                 type="button"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setShowProfileDropdown(false);
+                }}
                 className="p-1.5 hover:bg-slate-105 rounded-lg text-slate-500 hover:text-slate-800 transition-all relative flex items-center justify-center border border-transparent hover:border-slate-100"
               >
                 <Bell className="h-4.5 w-4.5 text-slate-600" />
@@ -294,14 +338,17 @@ export default function Layout() {
             </button>
 
             {/* User Profile avatar dropdown */}
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
                 type="button"
-                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                onClick={() => {
+                  setShowProfileDropdown(!showProfileDropdown);
+                  setShowNotifications(false);
+                }}
                 className="flex items-center gap-3 py-1 px-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all"
               >
                 {/* Dynamic user profile picture or fallback initials */}
-                <div className="h-7.5 w-7.5 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-extrabold text-[10px] overflow-hidden shrink-0">
+                <div className="h-8 w-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-extrabold text-[10px] overflow-hidden shrink-0">
                   {getAvatarUrl(user?.full_name) ? (
                     <img src={getAvatarUrl(user?.full_name)} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -316,7 +363,7 @@ export default function Layout() {
               </button>
 
               {showProfileDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs text-left animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-25 text-xs text-left animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-3.5 py-2 border-b border-slate-100 select-none">
                     <p className="font-extrabold text-slate-800 truncate">{user?.full_name || 'Riwitika Gupta'}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5 truncate">{user?.email || 'riwitika@efasttrade.com'}</p>
