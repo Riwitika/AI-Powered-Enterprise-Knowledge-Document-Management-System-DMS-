@@ -31,8 +31,22 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Phase 1 UI/UX: Fallback to mock session if in bypass development mode
       if (import.meta.env.VITE_DEV_BYPASS_AUTO_LOGIN === 'true') {
         const lowerUser = username.toLowerCase();
-        const roleName = lowerUser.includes('manager') ? 'manager' : lowerUser.includes('admin') ? 'admin' : 'employee';
-        const fullName = lowerUser.includes('manager') ? 'Neha Gupta' : lowerUser.includes('admin') ? 'Arnim Goyal' : 'Riwitika Sharma';
+        let roleName = 'employee';
+        let fullName = 'Riwitika Gupta';
+
+        if (lowerUser.includes('super')) {
+          roleName = 'super_admin';
+          fullName = 'Arun Goyal';
+        } else if (lowerUser.includes('admin')) {
+          roleName = 'admin';
+          fullName = 'Arnim Goyal';
+        } else if (lowerUser.includes('manager')) {
+          roleName = 'manager';
+          fullName = 'Riwitika Gupta';
+        } else {
+          roleName = 'employee';
+          fullName = 'Riwitika Gupta';
+        }
         
         set({
           user: {
