@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 
 import KPICard from '../components/KPICard';
-import UserTable, { UserRowItem } from '../components/UserTable';
+import UserTable from '../components/UserTable';
+import type { UserRowItem } from '../components/UserTable';
 import UserDrawer from '../components/UserDrawer';
 import BulkToolbar from '../components/BulkToolbar';
 
