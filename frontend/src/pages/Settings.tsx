@@ -5,22 +5,10 @@ import {
   Bell, 
   Shield, 
   Settings as SettingsIcon,
-  HelpCircle,
-  Building2, 
-  Sparkles, 
-  Database, 
-  History, 
   Upload,
-  Globe,
-  Calendar,
-  Sun,
   LayoutGrid,
   Trash2,
-  Lock,
   ArrowRight,
-  ExternalLink,
-  Laptop,
-  Smartphone,
   Info
 } from 'lucide-react';
 
@@ -52,7 +40,7 @@ export default function Settings() {
 
   // Toggle Switches
   const [themeMode, setThemeMode] = useState<'light' | 'system'>('light');
-  const [twoFactor, setTwoFactor] = useState(true);
+
 
   // Horizontal Tab Items
   const tabs = [
