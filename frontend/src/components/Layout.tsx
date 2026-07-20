@@ -35,6 +35,30 @@ export default function Layout() {
 
 
 
+  const getDisplayRole = (role?: string) => {
+    if (!role) return 'Employee';
+    switch (role.toLowerCase()) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'admin':
+        return 'Administrator';
+      case 'manager':
+        return 'Manager';
+      case 'employee':
+        return 'Employee';
+      default:
+        return role.charAt(0).toUpperCase() + role.slice(1);
+    }
+  };
+
+  const getAvatarUrl = (name?: string) => {
+    if (!name) return undefined;
+    if (name.includes('Arnim')) return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+    if (name.includes('Arun')) return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150';
+    if (name.includes('Riwitika')) return 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150';
+    return undefined;
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2);
@@ -242,13 +266,17 @@ export default function Layout() {
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 className="flex items-center gap-3 py-1 px-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all"
               >
-                {/* Riwitika profile picture or mockup fallback */}
-                <div className="h-7.5 w-7.5 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-extrabold text-[10px] overflow-hidden">
-                  {getInitials(user?.full_name)}
+                {/* Dynamic user profile picture or fallback initials */}
+                <div className="h-7.5 w-7.5 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-extrabold text-[10px] overflow-hidden shrink-0">
+                  {getAvatarUrl(user?.full_name) ? (
+                    <img src={getAvatarUrl(user?.full_name)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    getInitials(user?.full_name)
+                  )}
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-xs font-bold text-slate-900 leading-none">{user?.full_name || 'Riwitika Gupta'}</p>
-                  <span className="text-[9px] text-slate-455 font-bold block mt-0.5">Employee</span>
+                  <span className="text-[9px] text-slate-455 font-bold block mt-0.5">{getDisplayRole(user?.role?.name)}</span>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
