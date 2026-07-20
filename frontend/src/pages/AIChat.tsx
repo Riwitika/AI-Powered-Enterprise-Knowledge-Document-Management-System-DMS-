@@ -1,16 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { 
   Send, 
-  Sparkles, 
   FileText, 
   Copy,
   RotateCw,
-  FolderOpen,
-  ArrowRight,
-  ShieldAlert,
-  Save,
-  MessageSquare
+  Save
 } from 'lucide-react';
 
 import AIChatSidebar from '../components/AIChatSidebar';

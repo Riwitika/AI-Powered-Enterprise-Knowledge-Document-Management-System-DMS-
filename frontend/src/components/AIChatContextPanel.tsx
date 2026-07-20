@@ -3,7 +3,6 @@ import {
   Settings, 
   Library, 
   Sparkles,
-  Link,
   ChevronRight
 } from 'lucide-react';
 
