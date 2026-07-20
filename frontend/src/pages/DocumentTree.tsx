@@ -9,6 +9,7 @@ import {
   Info
 } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../components/Breadcrumb';
 import SearchBar from '../components/SearchBar';
 import ActionToolbar from '../components/ActionToolbar';
@@ -18,6 +19,7 @@ import DocumentTable from '../components/DocumentTable';
 import type { DocumentRowItem } from '../components/DocumentTable';
 import RightInformationPanel from '../components/RightInformationPanel';
 export default function DocumentTree() {
+  const navigate = useNavigate();
   
   // Toggle info panel / details sidebar state
   const [showInfoPanel, setShowInfoPanel] = useState(true);
@@ -424,7 +426,7 @@ export default function DocumentTree() {
             <RightInformationPanel
               item={activeDoc}
               onClose={() => setShowInfoPanel(false)}
-              onOpenClick={(item) => alert(`Opening viewer for file: "${item.name}" (UI only)`)}
+              onOpenClick={(item) => navigate(`/documents/${item.id}`)}
               onDownloadClick={(item) => alert(`Initiating download for file: "${item.name}" (UI only)`)}
               onShareClick={(item) => alert(`Opening share menu for file: "${item.name}" (UI only)`)}
             />
