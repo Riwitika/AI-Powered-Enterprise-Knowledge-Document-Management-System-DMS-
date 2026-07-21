@@ -17,53 +17,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   isInitializing: true,
 
   login: async (username, password) => {
-    try {
-      const formData = new FormData();
-      formData.append('username', username);
-      formData.append('password', password);
-      await api.auth.login(formData);
-      const user = await api.auth.me();
-      set({
-        user,
-        isAuthenticated: true,
-      });
-    } catch (e) {
-      // Phase 1 UI/UX: Fallback to mock session if in bypass development mode
-      if (import.meta.env.VITE_DEV_BYPASS_AUTO_LOGIN === 'true') {
-        const lowerUser = username.toLowerCase();
-        let roleName = 'employee';
-        let fullName = 'Riwitika Gupta';
-
-        if (lowerUser.includes('super')) {
-          roleName = 'super_admin';
-          fullName = 'Arun Goyal';
-        } else if (lowerUser.includes('admin')) {
-          roleName = 'admin';
-          fullName = 'Arnim Goyal';
-        } else if (lowerUser.includes('manager')) {
-          roleName = 'manager';
-          fullName = 'Riwitika Gupta';
-        } else {
-          roleName = 'employee';
-          fullName = 'Riwitika Gupta';
-        }
-        
-        set({
-          user: {
-            id: 1,
-            email: username,
-            full_name: fullName,
-            role: {
-              name: roleName,
-              description: `${roleName} permission level`
-            }
-          },
-          isAuthenticated: true
-        });
-      } else {
-        throw e;
-      }
-    }
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', password);
+    const res = await api.auth.login(formData);
+    setAccessToken(res.access_token);
+    const user = await api.auth.me();
+    set({
+      user,
+      isAuthenticated: true,
+    });
   },
 
   register: async (payload) => {
@@ -84,25 +47,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
-    // Phase 1 UI/UX Development: Bypass silent auto-login check if env variable is set to true
-    if (import.meta.env.VITE_DEV_BYPASS_AUTO_LOGIN === 'true') {
-      set({
-        user: null,
-        isAuthenticated: false,
-        isInitializing: false,
-      });
-      return;
-    }
-
     set({ isInitializing: true });
     try {
-      // Silent refresh
       const res = await api.auth.refresh();
       if (res && res.access_token) {
+        setAccessToken(res.access_token);
         const user = await api.auth.me();
         set({
           user,
           isAuthenticated: true,
+        });
+      } else {
+        setAccessToken(null);
+        set({
+          user: null,
+          isAuthenticated: false,
         });
       }
     } catch (e) {

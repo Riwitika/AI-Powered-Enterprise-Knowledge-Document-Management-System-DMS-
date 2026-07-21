@@ -15,14 +15,14 @@ export default function SearchBar({
 }: SearchBarProps) {
   return (
     <div className="flex items-center gap-2 select-none">
-      <div className="relative flex-1 max-w-[280px]">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+      <div className="relative w-80 flex items-center">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full bg-[#f8fafc] border border-slate-200 rounded-lg pl-9.5 pr-4 py-1.5 text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-600 transition-all placeholder-slate-400 font-medium"
+          className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-all placeholder-slate-400 font-medium"
         />
       </div>
       
@@ -30,10 +30,10 @@ export default function SearchBar({
         <button
           type="button"
           onClick={onFilterClick}
-          className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+          className="p-1.8 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-850 hover:bg-slate-50 transition-colors flex items-center justify-center shadow-sm"
           title="Filters"
         >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <SlidersHorizontal className="w-3.5 h-3.5 text-slate-450" />
         </button>
       )}
     </div>

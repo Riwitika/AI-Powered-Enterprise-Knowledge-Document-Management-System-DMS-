@@ -47,6 +47,7 @@ export default function UserTable({
       case 'admin':
         return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-rose-50 text-rose-700 border-rose-150">Admin</span>;
       case 'manager':
+      case 'department_manager':
         return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-indigo-50 text-indigo-700 border-indigo-150">Manager</span>;
       case 'employee':
         return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-blue-50 text-blue-700 border-blue-150">Employee</span>;

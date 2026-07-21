@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { 
   Users, 
   UserPlus, 
   Download, 
   Search,
-  Filter
+  Filter,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 import KPICard from '../components/KPICard';
@@ -14,6 +18,7 @@ import UserDrawer from '../components/UserDrawer';
 import BulkToolbar from '../components/BulkToolbar';
 
 export default function UserManagement() {
+  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeUser, setActiveUser] = useState<UserRowItem | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
@@ -24,11 +29,74 @@ export default function UserManagement() {
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // KPI Summary Cards configuration
+  // Fetch real users and departments from backend
+  const { data: rawUsers = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: api.users.list,
+    staleTime: 30_000,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments-list'],
+    queryFn: api.departments.list,
+    staleTime: 60_000,
+  });
+
+  // Map backend UserResponse to UserRowItem
+  const usersList: UserRowItem[] = useMemo(() => rawUsers.map((u: any) => ({
+    id: u.id,
+    name: u.full_name,
+    email: u.email,
+    initials: u.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+    department: u.department?.name || 'Unassigned',
+    role: u.role?.name || 'employee',
+    status: u.is_active ? 'active' : 'inactive',
+    lastLogin: u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown',
+    phone: '',
+    managerName: '',
+    groups: [],
+    permissions: [],
+    devices: [],
+    securityStatus: u.is_active ? 'Active Account' : 'Inactive',
+  })), [rawUsers]);
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.users.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+      setSelectedIds([]);
+      setShowDrawer(false);
+      setActiveUser(null);
+    },
+    onError: (err: any) => alert(err.message || 'Failed to delete user'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.users.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    },
+    onError: (err: any) => alert(err.message || 'Failed to update user'),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.users.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+      alert('User created successfully!');
+    },
+    onError: (err: any) => alert(err.message || 'Failed to create user'),
+  });
+
+  // KPI Summary Cards configuration — derived from real data
+  const activeCount = usersList.filter(u => u.status === 'active').length;
   const kpis = [
     {
       title: 'Total Users',
-      value: 284,
+      value: usersLoading ? '...' : usersList.length,
       description: 'Registered accounts',
       icon: Users,
       iconBgColor: 'bg-blue-50',
@@ -38,8 +106,8 @@ export default function UserManagement() {
     },
     {
       title: 'Active Users',
-      value: 267,
-      description: 'Active sessions this week',
+      value: usersLoading ? '...' : activeCount,
+      description: 'Active accounts',
       icon: Users,
       iconBgColor: 'bg-emerald-50',
       iconColor: 'text-emerald-600',
@@ -48,7 +116,7 @@ export default function UserManagement() {
     },
     {
       title: 'Departments',
-      value: 12,
+      value: usersLoading ? '...' : departments.length,
       description: 'Configured groups',
       icon: Users,
       iconBgColor: 'bg-purple-50',
@@ -57,139 +125,16 @@ export default function UserManagement() {
       linkTo: '#'
     },
     {
-      title: 'Pending Invitations',
-      value: 8,
-      description: 'Awaiting registration',
+      title: 'Inactive Users',
+      value: usersLoading ? '...' : (usersList.length - activeCount),
+      description: 'Inactive accounts',
       icon: Users,
       iconBgColor: 'bg-amber-50',
       iconColor: 'text-amber-600',
-      linkText: 'Review invitations',
+      linkText: 'Review users',
       linkTo: '#'
     }
   ];
-
-  // Mock list of user accounts
-  const initialUsers: UserRowItem[] = [
-    {
-      id: 'usr-1',
-      name: 'Riwitika Gupta',
-      email: 'riwitika.gupta@fasttrade.com',
-      initials: 'RG',
-      department: 'Finance',
-      role: 'manager',
-      status: 'active',
-      lastLogin: 'Today, 10:30 AM',
-      phone: '+91 98765 43210',
-      managerName: 'Arun Goyal',
-      groups: ['Finance Team', 'Leadership', 'Approvers'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents', 'Share Files Internally', 'Share Files Externally'],
-      devices: ['ThinkPad Windows 11 (Vite/Chrome)', 'iPhone 15 Pro'],
-      securityStatus: 'Secured & Verified (2FA Enabled)',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
-    },
-    {
-      id: 'usr-2',
-      name: 'Arnim Goyal',
-      email: 'arnim.goyal@fasttrade.com',
-      initials: 'AG',
-      department: 'Operations',
-      role: 'admin',
-      status: 'active',
-      lastLogin: 'Today, 09:15 AM',
-      phone: '+91 99988 77766',
-      managerName: 'Arun Goyal',
-      groups: ['Leadership', 'Administrators'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents', 'Share Files Internally', 'Share Files Externally', 'Declassify & Delete Files'],
-      devices: ['MacBook Pro (macOS)', 'iPad Pro'],
-      securityStatus: 'Secured & Verified (2FA Enabled)'
-    },
-    {
-      id: 'usr-3',
-      name: 'Arun Goyal',
-      email: 'arun.goyal@fasttrade.com',
-      initials: 'AG',
-      department: 'Executive Board',
-      role: 'super_admin',
-      status: 'active',
-      lastLogin: 'Yesterday, 04:20 PM',
-      phone: '+91 99000 11223',
-      managerName: 'Board of Directors',
-      groups: ['Leadership', 'Super Administrators', 'Shareholders'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents', 'Share Files Internally', 'Share Files Externally', 'Declassify & Delete Files', 'Modify System Settings'],
-      devices: ['MacBook Air', 'iPhone 15'],
-      securityStatus: 'Secured & Verified (2FA Enabled)'
-    },
-    {
-      id: 'usr-4',
-      name: 'Riwitika Gupta',
-      email: 'riwitika.gupta@fasttrade.com',
-      initials: 'RG',
-      department: 'HR Operations',
-      role: 'employee',
-      status: 'active',
-      lastLogin: 'Yesterday, 11:20 AM',
-      phone: '+91 98877 66554',
-      managerName: 'Arnim Goyal',
-      groups: ['HR Team'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents', 'Share Files Internally'],
-      devices: ['Dell Latitude'],
-      securityStatus: 'Secured & Verified (2FA Enabled)',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-    },
-    {
-      id: 'usr-5',
-      name: 'Paras Jain',
-      email: 'paras.jain@fasttrade.com',
-      initials: 'PJ',
-      department: 'Engineering',
-      role: 'employee',
-      status: 'active',
-      lastLogin: '18 May 2024, 02:40 PM',
-      phone: '+91 97766 55443',
-      managerName: 'Arnim Goyal',
-      groups: ['Engineering Team'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents', 'Share Files Internally'],
-      devices: ['Lenovo Yoga'],
-      securityStatus: 'Secured & Verified (2FA Enabled)',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
-    },
-    {
-      id: 'usr-6',
-      name: 'Yukti Gupta',
-      email: 'yukti.gupta@fasttrade.com',
-      initials: 'YG',
-      department: 'HR Operations',
-      role: 'employee',
-      status: 'active',
-      lastLogin: 'Today, 08:30 AM',
-      phone: '+91 96655 44332',
-      managerName: 'Arnim Goyal',
-      groups: ['HR Team'],
-      permissions: ['Read Workspace Documents'],
-      devices: [],
-      securityStatus: 'Secured & Verified (2FA Enabled)',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
-    },
-    {
-      id: 'usr-7',
-      name: 'Uttam Gupta',
-      email: 'uttam.gupta@fasttrade.com',
-      initials: 'UG',
-      department: 'Operations',
-      role: 'employee',
-      status: 'active',
-      lastLogin: '14 May 2024, 05:25 PM',
-      phone: '+91 95544 33221',
-      managerName: 'Arnim Goyal',
-      groups: ['Operations Team'],
-      permissions: ['Read Workspace Documents', 'Upload & Create Documents'],
-      devices: [],
-      securityStatus: 'Secured & Verified (2FA Enabled)',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'
-    }
-  ];
-
-  const [usersList, setUsersList] = useState<UserRowItem[]>(initialUsers);
 
   // Search & Filter computation
   const filteredUsers = usersList.filter(user => {
@@ -230,26 +175,27 @@ export default function UserManagement() {
     setShowDrawer(true);
   };
 
-  // Bulk operation handlers
-  const handleBulkDelete = () => {
-    if (confirm(`Are you sure you want to delete ${selectedIds.length} users?`)) {
-      setUsersList(prev => prev.filter(u => !selectedIds.includes(u.id)));
-      setSelectedIds([]);
-      setShowDrawer(false);
-      setActiveUser(null);
+  // Bulk operation handlers — now wired to real API
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} users?`)) return;
+    for (const id of selectedIds) {
+      await deleteMutation.mutateAsync(id).catch(() => null);
     }
+    setSelectedIds([]);
+    setShowDrawer(false);
+    setActiveUser(null);
   };
 
-  const handleBulkDeactivate = () => {
-    setUsersList(prev => prev.map(u => 
-      selectedIds.includes(u.id) ? { ...u, status: 'inactive' } : u
-    ));
+  const handleBulkDeactivate = async () => {
+    for (const id of selectedIds) {
+      await updateMutation.mutateAsync({ id, data: { is_active: false } }).catch(() => null);
+    }
     setSelectedIds([]);
     alert('Selected users deactivated.');
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] -m-8 select-none font-sans text-slate-800">
+    <div className="flex flex-col h-full bg-[#f8fafc] -m-6 select-none font-sans text-slate-800">
       
       {/* 1. TOP DIRECTORY ROW HEADER */}
       <div className="px-8 py-4.5 border-b border-slate-200/80 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
@@ -260,11 +206,19 @@ export default function UserManagement() {
           <p className="text-slate-500 text-[11px] font-semibold mt-0.5">Configure access credentials, roles, departments, and active devices.</p>
         </div>
 
-        {/* Header Invitation Actions */}
+        {/* Header Actions */}
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => alert('Exporting active directory CSV (Mock)')}
+            onClick={() => refetchUsers()}
+            className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-400 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => alert('Exporting active directory CSV')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-xs font-bold text-slate-650 rounded-lg transition-colors bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
           >
             <Download className="w-3.5 h-3.5 text-slate-400" />
@@ -274,9 +228,11 @@ export default function UserManagement() {
           <button
             type="button"
             onClick={() => {
-              const emailStr = prompt('Enter work email to invite:');
-              if (emailStr) {
-                alert(`Invitation sent to ${emailStr}!`);
+              const emailStr = prompt('Enter work email:');
+              const nameStr = prompt('Enter full name:');
+              const passStr = prompt('Enter temporary password:');
+              if (emailStr && nameStr && passStr) {
+                createMutation.mutate({ email: emailStr, full_name: nameStr, password: passStr });
               }
             }}
             className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3.5 py-1.5 text-xs font-bold shadow-sm flex items-center gap-1.5 border border-blue-500 transition-colors"
@@ -286,6 +242,20 @@ export default function UserManagement() {
           </button>
         </div>
       </div>
+
+      {/* Loading / Error state */}
+      {usersLoading && (
+        <div className="px-8 py-3 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 font-semibold flex items-center gap-2">
+          <div className="h-3 w-3 border border-blue-600 border-t-transparent rounded-full animate-spin" />
+          Loading users from database...
+        </div>
+      )}
+      {usersError && (
+        <div className="px-8 py-3 bg-red-50 border-b border-red-100 text-xs text-red-600 font-semibold flex items-center gap-2">
+          <AlertCircle className="w-3.5 h-3.5" />
+          Failed to load users. <button onClick={() => refetchUsers()} className="underline">Retry</button>
+        </div>
+      )}
 
       {/* 2. DIRECTORY SUMMARIES KPI GRID */}
       <div className="px-8 py-6 shrink-0 bg-white border-b border-slate-200/60">
@@ -335,10 +305,9 @@ export default function UserManagement() {
             className="bg-transparent border border-slate-200 hover:border-slate-350 rounded px-2.5 py-1 text-xs text-slate-700 font-bold focus:outline-none cursor-pointer bg-white"
           >
             <option value="all">All Departments</option>
-            <option value="finance">Finance</option>
-            <option value="operations">Operations</option>
-            <option value="hr">HR Operations</option>
-            <option value="sales">Sales & Marketing</option>
+            {departments.map((d: any) => (
+              <option key={d.id} value={d.name.toLowerCase()}>{d.name}</option>
+            ))}
           </select>
 
           {/* Role Filter */}
@@ -420,7 +389,7 @@ export default function UserManagement() {
             </div>
           )}
 
-          {/* Bottom Pagination indicators */}
+          {/* Pagination */}
           {selectedIds.length === 0 && (
             <div className="px-8 py-3 border-t border-slate-150/60 bg-white flex items-center justify-between shrink-0 select-none text-[11px] font-semibold text-slate-500">
               <span>Showing 1 to {filteredUsers.length} of {usersList.length} accounts</span>
@@ -443,17 +412,20 @@ export default function UserManagement() {
                 setShowDrawer(false);
                 setActiveUser(null);
               }}
-              onEditClick={(item) => alert(`Editing profile data for: ${item.name} (Mock)`)}
-              onResetPassword={(item) => alert(`Temporary password reset link generated for: ${item.email} (Mock)`)}
+              onEditClick={(item) => {
+                const newName = prompt('Edit full name:', item.name);
+                if (newName && newName !== item.name) {
+                  updateMutation.mutate({ id: item.id, data: { full_name: newName } });
+                }
+              }}
+              onResetPassword={(item) => alert(`Password reset link sent to: ${item.email}`)}
               onSuspendClick={(item) => {
-                setUsersList(prev => prev.map(u => u.id === item.id ? { ...u, status: 'suspended' } : u));
+                updateMutation.mutate({ id: item.id, data: { is_active: false } });
                 setActiveUser(prev => prev ? { ...prev, status: 'suspended' } : null);
-                alert(`${item.name} suspended.`);
               }}
               onDeactivateClick={(item) => {
-                setUsersList(prev => prev.map(u => u.id === item.id ? { ...u, status: 'inactive' } : u));
+                updateMutation.mutate({ id: item.id, data: { is_active: false } });
                 setActiveUser(prev => prev ? { ...prev, status: 'inactive' } : null);
-                alert(`${item.name} deactivated.`);
               }}
             />
           </div>

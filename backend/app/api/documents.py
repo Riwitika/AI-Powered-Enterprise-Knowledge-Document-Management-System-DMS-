@@ -222,6 +222,32 @@ def archive_document(
     return doc
 
 
+@router.post("/{document_id}/restore", response_model=DocumentResponse)
+def restore_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    doc = verify_document_access(document_id, current_user, db, required_access="edit")
+    doc.status = "active"
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+@router.post("/{document_id}/favorite", response_model=DocumentResponse)
+def toggle_favorite(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    doc = verify_document_access(document_id, current_user, db, required_access="view")
+    doc.is_favorite = not doc.is_favorite
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
 from sqlalchemy.exc import IntegrityError
 
 @router.delete("/{document_id}")

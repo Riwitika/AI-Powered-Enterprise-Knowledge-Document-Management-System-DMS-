@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
+
 import { 
   Eye, 
   Info,
@@ -226,7 +229,19 @@ export default function DocumentViewer() {
   const [conversionState, setConversionState] = useState<'idle' | 'converting' | 'success'>('idle');
   const [conversionProgress, setConversionProgress] = useState(0);
 
-  // Load documents database from localStorage if present
+  // Detect if the ID is a real UUID (backend) or a mock/temp ID
+  const isRealUUID = !!id && !id.startsWith('doc-') && !id.startsWith('temp-') && id.length > 20;
+
+  // Fetch real document from backend if it's a UUID
+  const { data: apiDoc } = useQuery({
+    queryKey: ['document', id],
+    queryFn: () => api.documents.get(id!),
+    enabled: isRealUUID,
+    staleTime: 30_000,
+    retry: 1,
+  });
+
+  // Load documents database from localStorage if present (for mock IDs)
   let localDocs: any[] = [];
   try {
     const saved = localStorage.getItem('kms-documents-db');
@@ -240,7 +255,23 @@ export default function DocumentViewer() {
   const mockDocMatch = id ? mockDocsList[id] : undefined;
   
   let activeDoc: MockDoc;
-  if (localDocMatch) {
+  if (apiDoc && isRealUUID) {
+    // Backend document — map to MockDoc shape
+    activeDoc = {
+      id: apiDoc.id,
+      name: apiDoc.name,
+      fileType: detectFileType(apiDoc.name, apiDoc.file_type).toUpperCase(),
+      version: `v${apiDoc.current_version}`,
+      lastModified: new Date(apiDoc.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      ownerName: apiDoc.owner?.full_name || 'Unknown',
+      locationPath: apiDoc.folder_id ? `/Folder ${apiDoc.folder_id}` : '/Workspace',
+      tags: apiDoc.ai_keywords || [apiDoc.category || 'Document'],
+      description: apiDoc.description || apiDoc.ai_summary || `Document: ${apiDoc.name}`,
+      whoCanAccess: apiDoc.access_level === 'organization' ? 'All Employees' : apiDoc.access_level === 'department' ? `${apiDoc.owner?.department?.name || 'Department'} Team` : 'Permitted Users',
+      accessType: 'Can view, edit',
+      aiSummaryText: apiDoc.ai_summary || `AI summary for "${apiDoc.name}" is being generated. The AI Document Assistant is ready to answer questions about this document.`
+    };
+  } else if (localDocMatch) {
     // Resolve format dynamically based on file name first, falling back to mock or db
     const resolvedFileType = detectFileType(localDocMatch.name, localDocMatch.fileType || mockDocMatch?.fileType).toUpperCase();
     activeDoc = {
@@ -405,8 +436,12 @@ export default function DocumentViewer() {
     }
   };
 
+  if (activeFormat.toUpperCase() === 'DOCX') {
+    return <DocxEditor activeDoc={activeDoc} />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] -m-8 select-none font-sans">
+    <div className="flex flex-col h-full bg-[#f8fafc] -m-6 select-none font-sans">
            {/* 1. Header (Standard metadata header) */}
       <DocHeader
         name={activeDoc.name}
@@ -520,6 +555,7 @@ export default function DocumentViewer() {
               whoCanAccess={activeDoc.whoCanAccess}
               accessType={activeDoc.accessType}
               aiSummaryText={activeDoc.aiSummaryText}
+              documentId={id}
             />
           </div>
         )}

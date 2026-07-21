@@ -39,6 +39,38 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+// Guard helper to protect administrator-only routes
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isInitializing } = useAuthStore();
+
+  if (isInitializing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm font-semibold text-slate-500">Initializing session...</div>
+      </div>
+    );
+  }
+
+  const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'super_admin';
+  return isAuthenticated && isAdmin ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+// Guard helper to protect manager/admin approval dashboard route
+function ManagerOrAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isInitializing } = useAuthStore();
+
+  if (isInitializing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm font-semibold text-slate-500">Initializing session...</div>
+      </div>
+    );
+  }
+
+  const isAllowed = ['super_admin', 'admin', 'manager', 'department_manager'].includes(user?.role?.name);
+  return isAuthenticated && isAllowed ? <>{children}</> : <Navigate to="/" replace />;
+}
+
 // Guard helper to prevent authenticated users from going to login
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitializing } = useAuthStore();
@@ -90,9 +122,37 @@ export default function App() {
             <Route path="documents/:id" element={<DocumentViewer />} />
             <Route path="chat" element={<AIChat />} />
             <Route path="search" element={<Search />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="approval" element={<ApprovalDashboard />} />
-            <Route path="permissions" element={<Permissions />} />
+            
+            {/* Admin only route */}
+            <Route 
+              path="users" 
+              element={
+                <AdminRoute>
+                  <UserManagement />
+                </AdminRoute>
+              } 
+            />
+            
+            {/* Manager and Admin approval route */}
+            <Route 
+              path="approval" 
+              element={
+                <ManagerOrAdminRoute>
+                  <ApprovalDashboard />
+                </ManagerOrAdminRoute>
+              } 
+            />
+            
+            {/* Admin only route */}
+            <Route 
+              path="permissions" 
+              element={
+                <AdminRoute>
+                  <Permissions />
+                </AdminRoute>
+              } 
+            />
+            
             <Route path="settings" element={<Settings />} />
           </Route>
 

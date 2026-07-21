@@ -21,13 +21,13 @@ import {
   FolderOpen,
   CheckCircle,
   Folder,
-  UserCheck,
   Download,
   Eye,
   Share2
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import Breadcrumb from '../components/Breadcrumb';
 import SearchBar from '../components/SearchBar';
 import ActionToolbar from '../components/ActionToolbar';
@@ -36,8 +36,13 @@ import type { FolderNode } from '../components/FolderTree';
 import DocumentTable from '../components/DocumentTable';
 import type { DocumentRowItem } from '../components/DocumentTable';
 import RightInformationPanel from '../components/RightInformationPanel';
+
 export default function DocumentTree() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const activeRoleName = user?.role?.name || 'admin';
+  const role: 'employee' | 'manager' | 'admin' = 
+    (activeRoleName === 'super_admin' ? 'admin' : (activeRoleName === 'department_manager' ? 'manager' : activeRoleName)) as any;
   
   // Toggle info panel / details sidebar state
   const [showInfoPanel, setShowInfoPanel] = useState(true);
@@ -73,8 +78,12 @@ export default function DocumentTree() {
     permissions?: string;
   }
 
-  // Role selection state
-  const [role, setRole] = useState<'employee' | 'manager' | 'admin'>('admin');
+  // Reactively notify active role change
+  useEffect(() => {
+    if (activeRoleName) {
+      showToast(`Switched active authorization to: ${activeRoleName.toUpperCase().replace('_', ' ')}`);
+    }
+  }, [activeRoleName]);
 
   // Recycle bin storage
   const [recycleBinItems, setRecycleBinItems] = useState<DMSItem[]>([]);
@@ -1220,13 +1229,23 @@ export default function DocumentTree() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white select-none font-sans text-slate-800 -m-8">
+    <div className="flex flex-col h-full bg-white select-none font-sans text-slate-800 -m-6">
       
-      {/* 1. TOP DOCUMENT TITLE & TOOLBAR ROW */}
-      <div className="px-8 py-3 border-b border-slate-200/80 flex items-center justify-between shrink-0 select-none bg-white">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Documents</h1>
+      {/* 1. SINGLE UNIFIED HEADER ROW */}
+      <div className="px-6 py-2.5 border-b border-slate-200 flex items-center justify-between shrink-0 select-none bg-white">
+        <div className="flex items-center gap-3.5 flex-1 min-w-0">
+          <h1 className="text-base font-extrabold text-slate-900 tracking-tight shrink-0">Documents</h1>
+          <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
           
+          {/* Breadcrumb inline */}
+          <div className="shrink-0 max-w-[280px] overflow-hidden truncate">
+            <Breadcrumb
+              segments={pathSegments}
+              onSegmentClick={handleBreadcrumbClick}
+            />
+          </div>
+          <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
+
           {/* Header Search & Filter */}
           <SearchBar
             value={searchVal}
@@ -1236,90 +1255,66 @@ export default function DocumentTree() {
           />
         </div>
 
-        {/* Role Selector and Templates Button */}
-        <div className="flex items-center gap-3 select-none">
-          <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1">
-            <UserCheck className="w-3.5 h-3.5 text-slate-500" />
-            <select
-              value={role}
-              onChange={(e) => {
-                const nextRole = e.target.value as any;
-                setRole(nextRole);
-                showToast(`Switched active role authorization to: ${nextRole.toUpperCase()}`);
-              }}
-              className="bg-transparent border-none text-[10px] font-extrabold uppercase text-slate-650 focus:ring-0 cursor-pointer p-0"
-            >
-              <option value="employee">Employee (View Only)</option>
-              <option value="manager">Manager (Read/Write)</option>
-              <option value="admin">Admin (Full Control)</option>
-            </select>
-          </div>
-
+        {/* Right Action buttons and view controls */}
+        <div className="flex items-center gap-3 select-none shrink-0 ml-4">
           <button
             type="button"
             onClick={() => {
               window.dispatchEvent(new CustomEvent('kms-close-layout-dropdowns'));
               setShowTemplatesModal(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 border border-slate-200 hover:border-slate-355 hover:bg-slate-50 text-xs font-bold text-slate-655 bg-white rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-xs font-bold text-slate-600 bg-white rounded-lg transition-colors shadow-sm"
           >
             <Layout className="w-3.5 h-3.5 text-slate-400" />
             <span>Templates</span>
           </button>
-        </div>
-      </div>
 
-      {/* 2. SUB-HEADER BREADCRUMB & PANEL VIEWS TOGGLES */}
-      <div className="px-8 py-2.5 border-b border-slate-200/60 flex items-center justify-between shrink-0 bg-white">
-        <Breadcrumb
-          segments={pathSegments}
-          onSegmentClick={handleBreadcrumbClick}
-        />
-        
-        {/* Panel layouts controllers */}
-        <div className="flex items-center gap-2">
+          <div className="h-4 w-[1px] bg-slate-200" />
+
           {/* List/Grid View mode */}
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-lg border transition-all ${
-              viewMode === 'list' 
-                ? 'bg-slate-100 border-slate-200 text-slate-800 font-bold' 
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-            title="List View"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-lg border transition-all ${
-              viewMode === 'grid' 
-                ? 'bg-slate-100 border-slate-200 text-slate-800 font-bold' 
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-            title="Grid View"
-          >
-            <Grid className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                viewMode === 'list' 
+                  ? 'bg-slate-105 border-slate-200 text-slate-800 font-bold' 
+                  : 'border-transparent text-slate-400 hover:text-slate-650'
+              }`}
+              title="List View"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                viewMode === 'grid' 
+                  ? 'bg-slate-105 border-slate-200 text-slate-800 font-bold' 
+                  : 'border-transparent text-slate-400 hover:text-slate-650'
+              }`}
+              title="Grid View"
+            >
+              <Grid className="w-3.5 h-3.5" />
+            </button>
 
-          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+            <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
-          {/* Details toggle */}
-          <button
-            type="button"
-            onClick={() => setShowInfoPanel(!showInfoPanel)}
-            className={`p-1.5 rounded-lg border transition-all ${
-              showInfoPanel 
-                ? 'bg-slate-100 border-slate-200 text-blue-600' 
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-            title="Info Panel"
-          >
-            <Info className="w-4 h-4" />
-          </button>
+            {/* Details toggle */}
+            <button
+              type="button"
+              onClick={() => setShowInfoPanel(!showInfoPanel)}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                showInfoPanel 
+                  ? 'bg-slate-105 border-slate-200 text-blue-600' 
+                  : 'border-transparent text-slate-400 hover:text-slate-650'
+              }`}
+              title="Info Panel"
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1972,7 +1967,7 @@ export default function DocumentTree() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="e.g. Finance, HR, manager, paras@fasttrade.com"
+                    placeholder="e.g. Finance, HR, manager, employee@efasttrade.com"
                     value={shareSettings.userOrDept}
                     onChange={(e) => setShareSettings(prev => ({ ...prev, userOrDept: e.target.value }))}
                     className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.8 text-xs font-semibold outline-none focus:border-blue-500 shadow-sm"

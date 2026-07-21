@@ -1,13 +1,14 @@
 import type React from 'react';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import { Link } from 'react-router-dom';
+import { api } from '../api/client';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   FileText, 
   Users, 
   Cloud, 
   Sparkles,
-  RefreshCw,
   FolderClosed,
   Calendar,
   ClipboardList,
@@ -15,7 +16,8 @@ import {
   Square,
   ArrowRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import KPICard from '../components/KPICard';
 import SectionHeader from '../components/SectionHeader';
@@ -27,11 +29,44 @@ import DepartmentProgressList from '../components/DepartmentProgressList';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
-  const isManager = user?.role?.name === 'manager';
+  const navigate = useNavigate();
+  const isManager = user?.role?.name === 'manager' || user?.role?.name === 'department_manager';
   const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'super_admin';
   
-  // Use \"Riwitika Gupta\" as requested for Employee and Manager roles, and Arnim/Arun for admins
-  const userName = user?.full_name || (isAdmin ? 'Arnim Goyal' : 'Riwitika Gupta');
+  const userName = user?.full_name || 'User';
+
+  // Fetch real metrics from backend
+  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery({
+    queryKey: ['dashboard-metrics'],
+    queryFn: api.dashboard.metrics,
+    staleTime: 30_000, // 30s cache
+    retry: 2,
+  });
+
+  // Helper: format a backend timestamp to a human-readable relative time
+  const formatRelativeTime = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffHrs < 1) return 'Just now';
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
+
+  // Map backend DocumentResponse to DataRow for DataTable
+  const docsToRows = (docs: any[]): DataRow[] => docs.map((doc) => ({
+    id: doc.id,
+    name: doc.name,
+    category: doc.category || doc.file_type?.toUpperCase() || 'Document',
+    timestamp: formatRelativeTime(doc.updated_at || doc.created_at),
+    fileType: doc.file_type,
+    badgeText: doc.file_type?.toUpperCase() || 'FILE',
+    badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
+    ownerName: doc.owner?.full_name || 'System',
+  }));
 
   // Helper icons mapping
   const getFileTypeIcon = (type?: string) => {
@@ -75,11 +110,15 @@ export default function Dashboard() {
 
   // 1. ADMINISTRATOR DASHBOARD VIEW
   if (isAdmin) {
+    const totalDocs = metrics?.total_documents ?? '—';
+    const totalUsers = metrics?.total_users_count ?? '—';
+    const pendingApprovals = metrics?.pending_approvals_count ?? '—';
+
     const adminKpis = [
       {
         title: 'Total Users',
-        value: '342',
-        description: '+18 this week',
+        value: metricsLoading ? '...' : totalUsers,
+        description: 'Registered accounts',
         icon: Users,
         iconBgColor: 'bg-blue-50',
         iconColor: 'text-blue-600',
@@ -88,8 +127,8 @@ export default function Dashboard() {
       },
       {
         title: 'Total Documents',
-        value: '18,632',
-        description: '+1,248 this week',
+        value: metricsLoading ? '...' : totalDocs,
+        description: `${metrics?.recent_uploads_count ?? 0} uploaded recently`,
         icon: FileText,
         iconBgColor: 'bg-emerald-50',
         iconColor: 'text-emerald-650',
@@ -97,83 +136,30 @@ export default function Dashboard() {
         linkTo: '/documents'
       },
       {
-        title: 'Storage Used',
-        value: '245.6 GB',
-        description: '49% of 500 GB',
+        title: 'Active Users',
+        value: metricsLoading ? '...' : (metrics?.active_users_count ?? '—'),
+        description: 'Active this week',
         icon: Cloud,
         iconBgColor: 'bg-purple-50',
         iconColor: 'text-purple-650',
-        linkText: 'View storage',
-        linkTo: '/settings'
+        linkText: 'View users',
+        linkTo: '/users'
       },
       {
         title: 'Pending Approvals',
-        value: 12,
+        value: metricsLoading ? '...' : pendingApprovals,
         description: 'Requires your attention',
         icon: CheckSquare,
         iconBgColor: 'bg-amber-50',
         iconColor: 'text-amber-600',
         linkText: 'Review approvals',
-        linkTo: '/settings'
+        linkTo: '/approvals'
       }
     ];
 
-    const adminRecentDocs: DataRow[] = [
-      {
-        id: 'ad-1',
-        name: 'Client Onboarding Process.docx',
-        category: 'Sales & Marketing',
-        timestamp: 'Today, 10:30 AM',
-        fileType: 'docx',
-        badgeText: '2.4 MB',
-        badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Yukti Gupta',
-        ownerAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
-      },
-      {
-        id: 'ad-2',
-        name: 'Sales Report - April.xlsx',
-        category: 'Sales & Marketing',
-        timestamp: 'Today, 09:15 AM',
-        fileType: 'xlsx',
-        badgeText: '1.1 MB',
-        badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Paras Jain',
-        ownerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-      },
-      {
-        id: 'ad-3',
-        name: 'Vendor Agreement.pdf',
-        category: 'Procurement',
-        timestamp: 'Yesterday, 04:20 PM',
-        fileType: 'pdf',
-        badgeText: '890 KB',
-        badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Riwitika Gupta',
-        ownerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
-      },
-      {
-        id: 'ad-4',
-        name: 'Product Roadmap.pptx',
-        category: 'Product',
-        timestamp: 'Yesterday, 11:00 AM',
-        fileType: 'pptx',
-        badgeText: '5.6 MB',
-        badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Uttam Gupta',
-        ownerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'
-      },
-      {
-        id: 'ad-5',
-        name: 'Company Policy Manual.docx',
-        category: 'Human Resources',
-        timestamp: '17 May 2024',
-        fileType: 'docx',
-        badgeText: '3.2 MB',
-        badgeStyle: 'bg-slate-50 text-slate-600 border-slate-200',
-        ownerName: 'Arnim Goyal'
-      }
-    ];
+    const adminRecentDocs: DataRow[] = metrics?.recent_uploads
+      ? docsToRows(metrics.recent_uploads)
+      : [];
 
     return (
       <div className="space-y-7 max-w-7xl mx-auto font-sans text-slate-800 pb-12 select-none">
@@ -187,9 +173,19 @@ export default function Dashboard() {
             <p className="text-slate-500 text-xs font-semibold">Here's an overview of your organization.</p>
           </div>
           
-          <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-xs font-bold text-slate-650 shrink-0">
-            <Calendar className="w-4 h-4 text-slate-455" />
-            <span>{formattedDate}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => refetchMetrics()}
+              title="Refresh dashboard"
+              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-400 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-xs font-bold text-slate-650 shrink-0">
+              <Calendar className="w-4 h-4 text-slate-455" />
+              <span>{formattedDate}</span>
+            </div>
           </div>
         </div>
 
@@ -251,8 +247,10 @@ export default function Dashboard() {
                   <circle cx="50" cy="50" r="38" fill="transparent" stroke="#94a3b8" strokeWidth="11" strokeDasharray="10 90" strokeDashoffset="-90" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-[17px] font-extrabold text-slate-900 tracking-tight leading-none">18,632</span>
-                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Documents</span>
+                  <span className="text-[17px] font-extrabold text-slate-900 tracking-tight leading-none">
+                  {metricsLoading ? '...' : (metrics?.total_documents ?? '—')}
+                </span>
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Documents</span>
                 </div>
               </div>
 
@@ -293,29 +291,47 @@ export default function Dashboard() {
             />
             
             <div className="space-y-4">
-              {[
-                { label: 'New user added:', user: 'Yukti Gupta', detail: 'by Arnim Goyal', time: '2h ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' },
-                { label: 'Document uploaded:', user: 'Competitor Analysis.xlsx', detail: 'by Paras Jain', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
-                { label: 'Approval completed:', user: 'Q2 Budget Report.pdf', detail: 'by Riwitika Gupta', time: '5h ago', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150' },
-                { label: 'Role updated:', user: 'Project Manager', detail: 'by Arnim Goyal', time: '1d ago' },
-                { label: 'Permission updated:', user: 'Sales Team', detail: 'by Arnim Goyal', time: '1d ago' }
-              ].map((act, idx) => (
-                <div key={idx} className="flex items-center gap-3 text-xs p-0.5">
-                  {act.avatar ? (
-                    <img src={act.avatar} alt="" className="w-8 h-8 rounded-full border border-slate-200 object-cover shrink-0" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-extrabold text-slate-700 shrink-0">
-                      AG
+              {metrics?.recent_activity && metrics.recent_activity.length > 0 ? (
+                metrics.recent_activity.slice(0, 5).map((act: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-3 text-xs p-0.5">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 border border-slate-200 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0">
+                      {act.user_name?.slice(0, 2).toUpperCase() || 'SY'}
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-slate-655 leading-normal text-[11px] font-semibold">
-                      <strong className="text-slate-800 font-extrabold">{act.label}</strong> {act.user} <span className="text-slate-400 font-medium">{act.detail}</span>
-                    </p>
-                    <span className="text-[9.5px] text-slate-400 font-bold block mt-0.5">{act.time}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-slate-655 leading-normal text-[11px] font-semibold">
+                        <strong className="text-slate-800 font-extrabold">
+                          {act.type === 'upload' ? 'Uploaded:' : act.type === 'edit' ? 'Edited:' : 'Approved:'}
+                        </strong>{' '}
+                        {act.document_name}{' '}
+                        <span className="text-slate-400 font-medium">by {act.user_name}</span>
+                      </p>
+                      <span className="text-[9.5px] text-slate-400 font-bold block mt-0.5">{formatRelativeTime(act.timestamp)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                [
+                  { label: 'New user added:', user: 'Yukti Gupta', detail: 'by Arnim Goyal', time: '2h ago', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' },
+                  { label: 'Document uploaded:', user: 'Competitor Analysis.xlsx', detail: 'by Paras Jain', time: '3h ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+                  { label: 'Approval completed:', user: 'Q2 Budget Report.pdf', detail: 'by Riwitika Gupta', time: '5h ago', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150' },
+                  { label: 'Role updated:', user: 'Project Manager', detail: 'by Arnim Goyal', time: '1d ago' },
+                  { label: 'Permission updated:', user: 'Sales Team', detail: 'by Arnim Goyal', time: '1d ago' }
+                ].map((act, idx) => (
+                  <div key={idx} className="flex items-center gap-3 text-xs p-0.5">
+                    {act.avatar ? (
+                      <img src={act.avatar} alt="" className="w-8 h-8 rounded-full border border-slate-200 object-cover shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-extrabold text-slate-700 shrink-0">AG</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-slate-655 leading-normal text-[11px] font-semibold">
+                        <strong className="text-slate-800 font-extrabold">{act.label}</strong> {act.user} <span className="text-slate-400 font-medium">{act.detail}</span>
+                      </p>
+                      <span className="text-[9.5px] text-slate-400 font-bold block mt-0.5">{act.time}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -404,7 +420,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-slate-700 leading-normal text-[11px]">
-                    <strong>5 documents</strong> are awaiting approvals.
+                    <strong>{metrics?.pending_approvals_count ?? 0} document{(metrics?.pending_approvals_count ?? 0) !== 1 ? 's' : ''}</strong> {(metrics?.pending_approvals_count ?? 0) === 0 ? '— all documents are approved.' : 'are awaiting approvals.'}
                   </p>
                   <button type="button" onClick={() => alert('Approvals dashboard opened')} className="text-[9.5px] text-blue-600 hover:text-blue-800 font-extrabold mt-1.5 flex items-center gap-0.5">
                     View approvals &rarr;
@@ -426,8 +442,8 @@ export default function Dashboard() {
     const managerKpis = [
       {
         title: 'Total Documents',
-        value: '1,248',
-        description: 'In your department',
+        value: metricsLoading ? '...' : (metrics?.total_documents ?? '—'),
+        description: `${metrics?.recent_uploads_count ?? 0} uploaded recently`,
         icon: FileText,
         iconBgColor: 'bg-blue-50',
         iconColor: 'text-blue-600',
@@ -436,7 +452,7 @@ export default function Dashboard() {
       },
       {
         title: 'Team Members',
-        value: 18,
+        value: metricsLoading ? '...' : (metrics?.active_users_count ?? '—'),
         description: 'Active users',
         icon: Users,
         iconBgColor: 'bg-emerald-50',
@@ -446,18 +462,18 @@ export default function Dashboard() {
       },
       {
         title: 'Pending Approvals',
-        value: 8,
+        value: metricsLoading ? '...' : (metrics?.pending_approvals_count ?? '—'),
         description: 'Awaiting your approval',
         icon: CheckSquare,
         iconBgColor: 'bg-amber-50',
         iconColor: 'text-amber-600',
         linkText: 'Review approvals',
-        linkTo: '/settings'
+        linkTo: '/approvals'
       },
       {
-        title: 'New Uploads',
-        value: 42,
-        description: 'This week',
+        title: 'Recent Uploads',
+        value: metricsLoading ? '...' : (metrics?.recent_uploads_count ?? '—'),
+        description: 'Recent activity',
         icon: Cloud,
         iconBgColor: 'bg-blue-50',
         iconColor: 'text-blue-600',
@@ -466,59 +482,10 @@ export default function Dashboard() {
       }
     ];
 
-    // Mock recent documents for Manager
-    const managerRecentDocs: DataRow[] = [
-      {
-        id: 'mr-1',
-        name: 'Client Onboarding Process.docx',
-        category: '/Sales & Marketing/Onboarding',
-        timestamp: 'Today, 10:30 AM',
-        fileType: 'docx',
-        badgeText: 'Word',
-        badgeStyle: 'bg-blue-50 text-blue-600 border-blue-150',
-        ownerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
-      },
-      {
-        id: 'mr-2',
-        name: 'Sales Report - April.xlsx',
-        category: '/Sales & Marketing/Reports',
-        timestamp: 'Today, 09:15 AM',
-        fileType: 'xlsx',
-        badgeText: 'Excel',
-        badgeStyle: 'bg-emerald-50 text-emerald-600 border-emerald-150',
-        ownerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-      },
-      {
-        id: 'mr-3',
-        name: 'Marketing Strategy.pdf',
-        category: '/Sales & Marketing/Strategy',
-        timestamp: 'Yesterday, 04:20 PM',
-        fileType: 'pdf',
-        badgeText: 'PDF',
-        badgeStyle: 'bg-red-50 text-red-600 border-red-150',
-        ownerAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
-      },
-      {
-        id: 'mr-4',
-        name: 'Product Roadmap.pptx',
-        category: '/Sales & Marketing/Presentations',
-        timestamp: 'Yesterday, 11:00 AM',
-        fileType: 'pptx',
-        badgeText: 'PPT',
-        badgeStyle: 'bg-orange-50 text-orange-600 border-orange-150',
-        ownerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'
-      },
-      {
-        id: 'mr-5',
-        name: 'Competitor Analysis.docx',
-        category: '/Sales & Marketing/Research',
-        timestamp: '17 May 2024',
-        fileType: 'docx',
-        badgeText: 'Word',
-        badgeStyle: 'bg-blue-50 text-blue-600 border-blue-150',
-        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150'
-      }
-    ];
+    // Recent documents for Manager from real API
+    const managerRecentDocs: DataRow[] = metrics?.recent_uploads
+      ? docsToRows(metrics.recent_uploads)
+      : [];
 
 
 

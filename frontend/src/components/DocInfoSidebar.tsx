@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { 
   Calendar, 
   Tag, 
   Plus, 
   Sparkles,
   Shield,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
 
 interface DocInfoSidebarProps {
@@ -18,6 +21,7 @@ interface DocInfoSidebarProps {
   whoCanAccess?: string;
   accessType?: string;
   aiSummaryText?: string;
+  documentId?: string; // real document UUID for API calls
 }
 
 export default function DocInfoSidebar({
@@ -29,23 +33,51 @@ export default function DocInfoSidebar({
   description = 'Quarter 2 budget report including departmental allocations, variances and forecasts.',
   whoCanAccess = 'Finance Team, Managers',
   accessType = 'Can view, download',
-  aiSummaryText = 'This budget document outlines expenditure plans for the second quarter. Total projections show a 24% allocation to engineering operations, with compliance and legal audits remaining unchanged.'
+  aiSummaryText = 'This budget document outlines expenditure plans for the second quarter. Total projections show a 24% allocation to engineering operations, with compliance and legal audits remaining unchanged.',
+  documentId
 }: DocInfoSidebarProps) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'properties' | 'activity' | 'comments'>('properties');
-  const [comments, setComments] = useState([
-    { author: 'Paras Jain', initials: 'PJ', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
-    { author: 'Yukti Gupta', initials: 'YG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
-  ]);
   const [newComment, setNewComment] = useState('');
+
+  // Check if documentId is a valid UUID (not a temp- or doc-N style mock ID)
+  const isRealDoc = !!documentId && !documentId.startsWith('temp-') && !documentId.startsWith('doc-') && documentId.length > 10;
+
+  // Fetch real comments from backend
+  const { data: commentsData = [], isLoading: commentsLoading } = useQuery({
+    queryKey: ['comments', documentId],
+    queryFn: () => api.comments.list(documentId!),
+    enabled: isRealDoc && activeTab === 'comments',
+    staleTime: 15_000,
+  });
+
+  // Fetch real version history
+  const { data: versionsData = [] } = useQuery({
+    queryKey: ['versions', documentId],
+    queryFn: () => api.documents.versions(documentId!),
+    enabled: isRealDoc && activeTab === 'activity',
+    staleTime: 30_000,
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: (content: string) => api.comments.create(documentId!, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', documentId] });
+      setNewComment('');
+    },
+    onError: (err: any) => alert(err.message || 'Failed to post comment'),
+  });
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-    setComments(prev => [
-      ...prev,
-      { author: 'Arnim Goyal', initials: 'AG', comment: newComment.trim(), time: 'Just now' }
-    ]);
-    setNewComment('');
+    if (isRealDoc) {
+      createCommentMutation.mutate(newComment.trim());
+    } else {
+      // Fallback for mock docs
+      setNewComment('');
+      alert('Comment submitted (demo mode — no real document ID)');
+    }
   };
 
   return (
@@ -56,7 +88,7 @@ export default function DocInfoSidebar({
         {[
           { id: 'properties', label: 'Properties' },
           { id: 'activity', label: 'Activity' },
-          { id: 'comments', label: `Comments (${comments.length})` }
+          { id: 'comments', label: `Comments (${commentsData.length})` }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -160,40 +192,62 @@ export default function DocInfoSidebar({
 
         {activeTab === 'activity' && (
           <div className="relative pl-4 border-l border-slate-200 space-y-5 py-2">
-            {[
-              { text: 'Paras Jain modified version to v2.1', time: '19 May 2024, 10:30 AM' },
-              { text: 'Yukti Gupta viewed document', time: '18 May 2024, 05:25 PM' },
-              { text: 'Riwitika Gupta shared with finance team', time: '17 May 2024, 02:40 PM' },
-              { text: 'Paras Jain created document', time: '14 May 2024, 11:00 AM' }
-            ].map((act, idx) => (
-              <div key={idx} className="relative text-xs font-semibold">
-                <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            {isRealDoc && versionsData.length > 0 ? (
+              versionsData.map((ver: any) => (
+                <div key={ver.id} className="relative text-xs font-semibold">
+                  <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  </div>
+                  <p className="text-slate-750 font-extrabold leading-normal">Version v{ver.version_number} uploaded</p>
+                  <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">{new Date(ver.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <p className="text-slate-750 font-extrabold leading-normal">{act.text}</p>
-                <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">{act.time}</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              [
+                { text: `${ownerName} modified document`, time: lastModified },
+                { text: `${ownerName} created document`, time: createdOn }
+              ].map((act, idx) => (
+                <div key={idx} className="relative text-xs font-semibold">
+                  <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  </div>
+                  <p className="text-slate-750 font-extrabold leading-normal">{act.text}</p>
+                  <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">{act.time}</span>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {activeTab === 'comments' && (
           <div className="space-y-4 h-full flex flex-col justify-between">
             <div className="space-y-3.5 flex-1 overflow-y-auto">
-              {comments.map((c, idx) => (
-                <div key={idx} className="flex gap-2.5 text-xs p-2.5 border border-slate-100 rounded-xl bg-slate-50/50">
-                  <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 font-extrabold text-[10px] text-slate-700">
-                    {c.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-extrabold text-slate-800">{c.author}</span>
-                      <span className="text-[9px] text-slate-400 font-medium">{c.time}</span>
-                    </div>
-                    <p className="text-slate-650 leading-relaxed font-medium mt-1 text-[11px]">{c.comment}</p>
-                  </div>
+              {commentsLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                 </div>
-              ))}
+              ) : commentsData.length > 0 ? (
+                commentsData.map((c: any) => (
+                  <div key={c.id} className="flex gap-2.5 text-xs p-2.5 border border-slate-100 rounded-xl bg-slate-50/50">
+                    <div className="w-7 h-7 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0 font-extrabold text-[10px] text-blue-700">
+                      {c.user_name?.slice(0, 2).toUpperCase() || 'U'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-extrabold text-slate-800">{c.user_name}</span>
+                        <span className="text-[9px] text-slate-400 font-medium">{new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      </div>
+                      <p className="text-slate-650 leading-relaxed font-medium mt-1 text-[11px]">{c.content}</p>
+                      {c.resolved && <span className="text-[9px] text-emerald-600 font-bold">✓ Resolved</span>}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <MessageSquare className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                  <p className="text-[11px] text-slate-400 font-semibold">No comments yet.</p>
+                </div>
+              )}
             </div>
 
             {/* Comment adding box */}
@@ -207,10 +261,10 @@ export default function DocInfoSidebar({
               />
               <button
                 type="submit"
-                disabled={!newComment.trim()}
+                disabled={!newComment.trim() || createCommentMutation.isPending}
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-1.5 shadow-sm transition-all disabled:opacity-50 flex items-center justify-center"
               >
-                <MessageSquare className="w-3.5 h-3.5" />
+                {createCommentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageSquare className="w-3.5 h-3.5" />}
               </button>
             </form>
           </div>

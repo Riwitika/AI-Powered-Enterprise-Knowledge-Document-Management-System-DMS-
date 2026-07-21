@@ -35,13 +35,14 @@ export default function UserDrawer({
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'super_admin':
-        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-fuchsia-50 text-fuchsia-750 border-fuchsia-150">Super Admin</span>;
+        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-fuchsia-50 text-fuchsia-755 border-fuchsia-150">Super Admin</span>;
       case 'admin':
-        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-rose-50 text-rose-750 border-rose-150">Admin</span>;
+        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-rose-50 text-rose-755 border-rose-150">Admin</span>;
       case 'manager':
-        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-indigo-50 text-indigo-750 border-indigo-150">Manager</span>;
+      case 'department_manager':
+        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-indigo-50 text-indigo-755 border-indigo-150">Manager</span>;
       case 'employee':
-        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-blue-50 text-blue-750 border-blue-150">Employee</span>;
+        return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-blue-50 text-blue-755 border-blue-150">Employee</span>;
       case 'viewer':
         return <span className="px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 border-slate-200">Viewer</span>;
       default:

@@ -5,11 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import engine, Base, SessionLocal
 from app.db.init_db import init_db
-from app.api import auth, users, departments, folders, documents, permissions, search, ai, dashboard
+from app.api import auth, users, departments, folders, documents, permissions, search, ai, dashboard, comments, notifications
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 # Run database creation & seed on startup
 # This acts as a robust fallback to ensure the DB works immediately.
 try:
@@ -51,6 +50,8 @@ app.include_router(permissions.router, prefix=f"{settings.API_V1_STR}/permission
 app.include_router(search.router, prefix=f"{settings.API_V1_STR}/search", tags=["search"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
+app.include_router(comments.router, prefix=f"{settings.API_V1_STR}/comments", tags=["comments"])
+app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 
 @app.get("/")
 def read_root():

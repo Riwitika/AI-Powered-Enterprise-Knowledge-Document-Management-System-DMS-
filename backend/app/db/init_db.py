@@ -39,27 +39,82 @@ def init_db(db: Session) -> None:
         db_depts.append(dept)
     db.commit()
 
-    # Get super_admin role
+    # Get roles and departments
     super_admin_role = db.query(Role).filter(Role.name == "super_admin").first()
-    corp_dept = db.query(Department).filter(Department.name == "Corporate").first()
+    admin_role = db.query(Role).filter(Role.name == "admin").first()
+    manager_role = db.query(Role).filter(Role.name == "department_manager").first()
+    employee_role = db.query(Role).filter(Role.name == "employee").first()
 
-    # 3. Seed Super Admin User
-    admin_email = "admin@enterprise.com"
-    admin_user = db.query(User).filter(User.email == admin_email).first()
-    if not admin_user:
-        admin_user = User(
-            full_name="System Administrator",
-            email=admin_email,
-            password_hash=get_password_hash("adminpassword"),
-            role_id=super_admin_role.id if super_admin_role else None,
-            department_id=corp_dept.id if corp_dept else None,
-            is_active=True
-        )
-        db.add(admin_user)
-        db.commit()
-        logger.info(f"Seeding super_admin user: {admin_email}")
-    else:
-        logger.info(f"Super_admin user {admin_email} already exists.")
+    corp_dept = db.query(Department).filter(Department.name == "Corporate").first()
+    ops_dept = db.query(Department).filter(Department.name == "Operations").first()
+    hr_dept = db.query(Department).filter(Department.name == "Human Resources").first()
+    fin_dept = db.query(Department).filter(Department.name == "Finance").first()
+
+    # 3. Seed Standard Demo Users
+    demo_users_data = [
+        {
+            "full_name": "Arun Goyal",
+            "email": "superadmin@efasttrade.com",
+            "password": "SuperAdmin@123",
+            "role_id": super_admin_role.id if super_admin_role else None,
+            "department_id": corp_dept.id if corp_dept else None
+        },
+        {
+            "full_name": "Arnim Goyal",
+            "email": "admin@efasttrade.com",
+            "password": "Admin@123",
+            "role_id": admin_role.id if admin_role else None,
+            "department_id": ops_dept.id if ops_dept else None
+        },
+        {
+            "full_name": "Riwitika Gupta",
+            "email": "manager@efasttrade.com",
+            "password": "Manager@123",
+            "role_id": manager_role.id if manager_role else None,
+            "department_id": fin_dept.id if fin_dept else None
+        },
+        {
+            "full_name": "Paras Jain",
+            "email": "employee@efasttrade.com",
+            "password": "Employee@123",
+            "role_id": employee_role.id if employee_role else None,
+            "department_id": hr_dept.id if hr_dept else None
+        },
+        {
+            "full_name": "Yukti Gupta",
+            "email": "yukti@efasttrade.com",
+            "password": "Employee@123",
+            "role_id": employee_role.id if employee_role else None,
+            "department_id": hr_dept.id if hr_dept else None
+        },
+        {
+            "full_name": "Uttam Gupta",
+            "email": "uttam@efasttrade.com",
+            "password": "Employee@123",
+            "role_id": employee_role.id if employee_role else None,
+            "department_id": ops_dept.id if ops_dept else None
+        }
+    ]
+
+    admin_user = None
+    for u_data in demo_users_data:
+        user_record = db.query(User).filter(User.email == u_data["email"]).first()
+        if not user_record:
+            user_record = User(
+                full_name=u_data["full_name"],
+                email=u_data["email"],
+                password_hash=get_password_hash(u_data["password"]),
+                role_id=u_data["role_id"],
+                department_id=u_data["department_id"],
+                is_active=True
+            )
+            db.add(user_record)
+            db.commit()
+            db.refresh(user_record)
+            logger.info(f"Seeded user: {u_data['email']}")
+        
+        if u_data["email"] == "superadmin@efasttrade.com":
+            admin_user = user_record
 
     # 4. Seed Folders (Company Knowledge -> HR, Finance, Legal, Products -> ERP Lens)
     from app.models.models import Folder, Document

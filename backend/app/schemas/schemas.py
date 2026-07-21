@@ -93,6 +93,7 @@ class DocumentBase(BaseModel):
     content: Optional[str] = None
     rejection_remarks: Optional[str] = None
     is_template: bool = False
+    is_favorite: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class DocumentCreate(DocumentBase):
@@ -108,6 +109,7 @@ class DocumentUpdate(BaseModel):
     content: Optional[str] = None
     rejection_remarks: Optional[str] = None
     is_template: Optional[bool] = None
+    is_favorite: Optional[bool] = None
 
 class DocumentResponse(DocumentBase):
     id: UUID

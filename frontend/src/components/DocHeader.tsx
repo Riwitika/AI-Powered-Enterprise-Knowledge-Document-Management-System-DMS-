@@ -322,7 +322,7 @@ export default function DocHeader({
             label: 'Help',
             items: [
               { label: 'Keyboard Shortcuts', action: () => alert('Shortcuts list: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Z') },
-              { label: 'Support Helpdesk', action: () => alert('Support contact: support@fasttrade.com') },
+              { label: 'Support Helpdesk', action: () => alert('Support contact: support@efasttrade.com') },
               { label: 'ℹ️ About KMS Editor', action: () => alert('v2.4.21 - Google Docs style Editor') }
             ]
           }

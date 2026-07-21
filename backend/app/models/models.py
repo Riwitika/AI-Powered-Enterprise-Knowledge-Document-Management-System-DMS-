@@ -10,7 +10,7 @@ from sqlalchemy import (
     func,
 )
 import os
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 db_url = os.getenv("DATABASE_URL", "sqlite:///./kms.db")
 is_sqlite = db_url.startswith("sqlite")
@@ -183,6 +183,7 @@ class Document(Base):
     status = Column(String(20), default="active")
     rejection_remarks = Column(Text, nullable=True)
     is_template = Column(Boolean, default=False)
+    is_favorite = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -257,3 +258,30 @@ class AIConversation(Base):
 
     user = relationship("User", back_populates="conversations")
     document = relationship("Document", back_populates="conversations")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    user_name = Column(String(150), nullable=False)
+    content = Column(Text, nullable=False)
+    parent_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    resolved = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    replies = relationship("Comment", backref=backref("parent", remote_side=[id]), cascade="all, delete-orphan")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(150), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), nullable=True)
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+

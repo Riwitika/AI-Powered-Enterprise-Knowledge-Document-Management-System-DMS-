@@ -561,9 +561,13 @@ export default function Login() {
               </div>
 
               {/* Seeding Box - Hidden in clean UI but available on hover / tiny details */}
-              <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1 text-[10px] text-slate-450 font-medium">
-                <div className="flex justify-between font-mono">
-                  <span>Demo: arun.goyal@fasttrade.com (Super Admin) / arnim.goyal@fasttrade.com (Admin) / riwitika.gupta@fasttrade.com (Manager/Employee)</span>
+              <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1.5 text-[10px] text-slate-500 font-medium">
+                <div className="font-mono text-center leading-relaxed">
+                  <p className="font-bold text-slate-700">Demo Accounts Available:</p>
+                  <p>Super Admin: <span className="text-blue-600 font-bold">superadmin@efasttrade.com</span> / SuperAdmin@123</p>
+                  <p>Admin: <span className="text-blue-600 font-bold">admin@efasttrade.com</span> / Admin@123</p>
+                  <p>Manager: <span className="text-blue-600 font-bold">manager@efasttrade.com</span> / Manager@123</p>
+                  <p>Employees: <span className="text-blue-600 font-bold">employee@efasttrade.com</span>, <span className="text-blue-600 font-bold">yukti@efasttrade.com</span>, <span className="text-blue-600 font-bold">uttam@efasttrade.com</span> / Employee@123</p>
                 </div>
               </div>
             </div>

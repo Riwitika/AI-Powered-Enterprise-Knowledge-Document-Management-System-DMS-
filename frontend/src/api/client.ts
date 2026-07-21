@@ -176,6 +176,8 @@ export const api = {
     download: async (id: string): Promise<Blob> => apiRequest(`/documents/${id}/download`),
     delete: async (id: string) => apiRequest(`/documents/${id}`, { method: "DELETE" }),
     archive: async (id: string) => apiRequest(`/documents/${id}/archive`, { method: "POST" }),
+    restore: async (id: string) => apiRequest(`/documents/${id}/restore`, { method: "POST" }),
+    favorite: async (id: string) => apiRequest(`/documents/${id}/favorite`, { method: "POST" }),
     update: async (id: string, doc: any) => apiRequest(`/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -237,5 +239,27 @@ export const api = {
   },
   dashboard: {
     metrics: async () => apiRequest("/dashboard"),
+  },
+  comments: {
+    list: async (docId: string) => apiRequest(`/comments/${docId}`),
+    create: async (docId: string, payload: { content: string; parent_id?: number }) => apiRequest(`/comments/${docId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+    resolve: async (commentId: number) => apiRequest(`/comments/resolve/${commentId}`, { method: "POST" }),
+    delete: async (commentId: number) => apiRequest(`/comments/item/${commentId}`, { method: "DELETE" }),
+  },
+  notifications: {
+    list: async () => apiRequest("/notifications"),
+    create: async (payload: { user_email: string; title: string; message: string; type?: string }) => apiRequest("/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+    read: async (notifId: number) => apiRequest(`/notifications/read/${notifId}`, { method: "POST" }),
+    readAll: async () => apiRequest("/notifications/read-all", { method: "POST" }),
+    clearAll: async () => apiRequest("/notifications/clear-all", { method: "POST" }),
+    delete: async (notifId: number) => apiRequest(`/notifications/${notifId}`, { method: "DELETE" }),
   },
 };
