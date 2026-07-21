@@ -366,17 +366,17 @@ export default function UserManagement() {
                 onAssignRole={() => {
                   const r = prompt('Enter new role (super_admin/admin/manager/employee/viewer):');
                   if (r) {
-                    setUsersList(prev => prev.map(u => selectedIds.includes(u.id) ? { ...u, role: r as any } : u));
+                    alert("Bulk role assignment will be available after backend integration.");
+                    queryClient.invalidateQueries({ queryKey: ['users-list'] });
                     setSelectedIds([]);
-                    alert('Roles assigned.');
                   }
                 }}
                 onMoveDept={() => {
                   const d = prompt('Enter new department name:');
                   if (d) {
-                    setUsersList(prev => prev.map(u => selectedIds.includes(u.id) ? { ...u, department: d } : u));
+                    alert("Bulk department change will be available after backend integration.");
+                    queryClient.invalidateQueries({ queryKey: ['users-list'] });
                     setSelectedIds([]);
-                    alert('Departments moved.');
                   }
                 }}
                 onDeactivate={handleBulkDeactivate}

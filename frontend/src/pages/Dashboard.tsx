@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../api/client';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   FileText, 
   Users, 
@@ -29,7 +29,6 @@ import DepartmentProgressList from '../components/DepartmentProgressList';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const isManager = user?.role?.name === 'manager' || user?.role?.name === 'department_manager';
   const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'super_admin';
   
