@@ -7,7 +7,8 @@ from sqlalchemy.orm import sessionmaker
 
 # Set environment variable to make sure tests run correctly
 os.environ["SECRET_KEY"] = "testsecretkeyforrunningtests"
-os.environ["DATABASE_URL"] = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/kms")
+os.environ["DATABASE_URL"] = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+os.environ["ENV"] = "development"
 
 from app.main import app
 from app.core.deps import get_db
@@ -18,7 +19,9 @@ from app.core.security import get_password_hash
 client = TestClient(app)
 
 # Create a test database session
-engine = create_engine(os.environ["DATABASE_URL"])
+is_sqlite = os.environ["DATABASE_URL"].startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+engine = create_engine(os.environ["DATABASE_URL"], connect_args=connect_args)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="module")
