@@ -19,7 +19,6 @@ import {
   Unlock,
   History,
   FolderOpen,
-  CheckCircle,
   Folder,
   Download,
   Eye,
@@ -27,6 +26,8 @@ import {
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import Breadcrumb from '../components/Breadcrumb';
 import SearchBar from '../components/SearchBar';
@@ -85,9 +86,6 @@ export default function DocumentTree() {
     }
   }, [activeRoleName]);
 
-  // Recycle bin storage
-  const [recycleBinItems, setRecycleBinItems] = useState<DMSItem[]>([]);
-
   // Toast Notification Message
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -128,13 +126,6 @@ export default function DocumentTree() {
   const [previewDoc, setPreviewDoc] = useState<DMSItem | null>(null);
   const [previewImageZoom, setPreviewImageZoom] = useState(1);
 
-  // Upload dialog modal states
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFilesQueue, setUploadFilesQueue] = useState<{name: string, size: string, progress: number, status: 'idle'|'uploading'|'success'|'error'}[]>([]);
-  const [uploadModalProgress, setUploadModalProgress] = useState(0);
-  const [uploadModalStatus, setUploadModalStatus] = useState<'idle' | 'uploading' | 'success'>('idle');
-  const [uploadIntervalId, setUploadIntervalId] = useState<any>(null);
-
   // Share Dialog modal states
   const [shareDoc, setShareDoc] = useState<DMSItem | null>(null);
   const [shareSettings, setShareSettings] = useState({
@@ -150,9 +141,6 @@ export default function DocumentTree() {
 
   // Upload Experience overlays
   const [isDragOverWindow, setIsDragOverWindow] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   interface TemplateItem {
     id: string;
@@ -500,8 +488,7 @@ export default function DocumentTree() {
   };
 
   // Active folder / breadcrumb state
-  const [activeFolder, setActiveFolder] = useState<FolderNode>({ id: 'reports', name: 'Reports' });
-  const [pathSegments, setPathSegments] = useState<string[]>(['Corporate Knowledge', 'Finance', 'Reports']);
+  const [activeFolder, setActiveFolder] = useState<FolderNode>({ id: 0, name: 'Workspace Root' });
 
   // Search input state
   const [searchVal, setSearchVal] = useState('');
@@ -509,179 +496,114 @@ export default function DocumentTree() {
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Folder tree data configuration
-  const [folderTreeNodes, setFolderTreeNodes] = useState<FolderNode[]>([
-    {
-      id: 'root',
-      name: 'Corporate Knowledge',
-      subFolders: [
-        { id: 'company_info', name: '00_Company Information' },
-        { id: 'hr', name: '01_Human Resources' },
-        {
-          id: 'finance',
-          name: '02_Finance',
-          subFolders: [
-            { id: 'policies', name: 'Policies' },
-            { id: 'budgets', name: 'Budgets' },
-            { id: 'reports', name: 'Reports' },
-            { id: 'audit', name: 'Audit' }
-          ]
-        },
-        { id: 'sales_marketing', name: '03_Sales & Marketing' },
-        { id: 'operations', name: '04_Operations' },
-        { id: 'legal', name: '05_Legal' },
-        { id: 'projects', name: '06_Projects' }
-      ]
-    }
-  ]);
+  // Fetch tree and flat documents list via React Query
+  const queryClient = useQueryClient();
 
-  // Document rows data configuration (matching mockup exactly)
-  const defaultDocuments: DMSItem[] = [
-    {
-      id: 'doc-1',
-      name: 'Q2 Budget Report.docx',
-      version: 'v2.1',
-      fileType: 'DOCX',
-      modifiedAt: '19 May 2026, 10:30 AM',
-      ownerName: 'Paras Jain',
-      ownerInitials: 'PJ',
-      size: '2.4 MB',
-      isFolder: false,
-      folderId: 'reports',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-2',
-      name: 'Sales Report - April.xlsx',
-      version: 'v1.3',
-      fileType: 'XLSX',
-      modifiedAt: '19 May 2026, 09:15 AM',
-      ownerName: 'Uttam Gupta',
-      ownerInitials: 'UG',
-      size: '1.1 MB',
-      isFolder: false,
-      folderId: 'reports',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-3',
-      name: 'Vendor Agreement.pdf',
-      fileType: 'PDF',
-      modifiedAt: '18 May 2026, 04:20 PM',
-      ownerName: 'Riwitika Gupta',
-      ownerInitials: 'RG',
-      size: '890 KB',
-      isFolder: false,
-      folderId: 'legal',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-4',
-      name: 'Product Roadmap.pptx',
-      version: 'v3.0',
-      fileType: 'PPTX',
-      modifiedAt: '18 May 2026, 11:00 AM',
-      ownerName: 'Uttam Gupta',
-      ownerInitials: 'UG',
-      size: '5.6 MB',
-      isFolder: false,
-      folderId: 'sales_marketing',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-5',
-      name: 'Financial Policy.docx',
-      fileType: 'DOCX',
-      modifiedAt: '17 May 2026, 03:45 PM',
-      ownerName: 'Yukti Gupta',
-      ownerInitials: 'YG',
-      size: '1.2 MB',
-      isFolder: false,
-      folderId: 'policies',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-6',
-      name: 'Expense Analysis.xlsx',
-      fileType: 'XLSX',
-      modifiedAt: '17 May 2026, 02:10 PM',
-      ownerName: 'Paras Jain',
-      ownerInitials: 'PJ',
-      size: '980 KB',
-      isFolder: false,
-      folderId: 'budgets',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-7',
-      name: 'Annual Financial Summary.pdf',
-      fileType: 'PDF',
-      modifiedAt: '16 May 2026, 05:30 PM',
-      ownerName: 'Riwitika Gupta',
-      ownerInitials: 'RG',
-      size: '3.8 MB',
-      isFolder: false,
-      folderId: 'budgets',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-8',
-      name: 'Budget Presentation Q2.pptx',
-      fileType: 'PPTX',
-      modifiedAt: '16 May 2026, 11:20 AM',
-      ownerName: 'Yukti Gupta',
-      ownerInitials: 'YG',
-      size: '12.4 MB',
-      isFolder: false,
-      folderId: 'budgets',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-9',
-      name: 'Cash Flow Statement.xlsx',
-      fileType: 'XLSX',
-      modifiedAt: '15 May 2026, 10:05 AM',
-      ownerName: 'Paras Jain',
-      ownerInitials: 'PJ',
-      size: '750 KB',
-      isFolder: false,
-      folderId: 'finance',
-      isFavorite: false,
-      isLocked: false
-    },
-    {
-      id: 'doc-10',
-      name: 'Tax Compliance Guide.pdf',
-      fileType: 'PDF',
-      modifiedAt: '15 May 2026, 09:50 AM',
-      ownerName: 'Uttam Gupta',
-      ownerInitials: 'UG',
-      size: '1.6 MB',
-      isFolder: false,
-      folderId: 'finance',
-      isFavorite: false,
-      isLocked: false
-    }
-  ];
-
-  const [documents, setDocuments] = useState<DMSItem[]>(() => {
-    const saved = localStorage.getItem('kms-documents-db');
-    return saved ? JSON.parse(saved) : defaultDocuments;
+  const { data: rawTreeData, isLoading: isTreeLoading } = useQuery({
+    queryKey: ['folders-tree'],
+    queryFn: api.folders.tree
   });
 
-  useEffect(() => {
-    localStorage.setItem('kms-documents-db', JSON.stringify(documents));
-  }, [documents]);
+  const { data: allDocs, isLoading: isDocsLoading } = useQuery({
+    queryKey: ['documents-list-workspace'],
+    queryFn: api.documents.list
+  });
 
-  // Active / Selected single document state (pre-opened details as shown in mockup)
+  const isLoading = isTreeLoading || isDocsLoading;
+
+  // Recursive tree mapper to ensure both sub_folders and subFolders exist
+  const mapTreeNodes = (nodes: any[]): FolderNode[] => {
+    return nodes.map(node => ({
+      id: node.id,
+      name: node.name,
+      sub_folders: node.sub_folders,
+      subFolders: node.sub_folders ? mapTreeNodes(node.sub_folders) : undefined,
+      documents: node.documents
+    }));
+  };
+
+  const folderTreeNodes = rawTreeData ? mapTreeNodes(rawTreeData) : [];
+
+  const mapFolderToDMSItem = (folder: any): DMSItem => ({
+    id: String(folder.id),
+    name: folder.name,
+    isFolder: true,
+    fileType: 'Folder',
+    modifiedAt: folder.created_at ? new Date(folder.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A',
+    ownerName: 'System',
+    ownerInitials: 'SYS',
+    size: '--',
+    folderId: String(folder.parent_id || 0),
+    isFavorite: false,
+    isLocked: false
+  });
+
+  const mapDocToDMSItem = (doc: any): DMSItem => {
+    const ownerName = doc.owner?.full_name || 'Unknown';
+    const ownerInitials = ownerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
+    return {
+      id: doc.id,
+      name: doc.name,
+      version: `v${doc.current_version}`,
+      fileType: (doc.file_type || 'pdf').toUpperCase(),
+      modifiedAt: new Date(doc.updated_at || doc.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      ownerName,
+      ownerInitials,
+      size: '1.2 MB',
+      isFolder: false,
+      folderId: String(doc.folder_id || 0),
+      isFavorite: doc.is_favorite,
+      isLocked: doc.status === 'locked',
+      status: doc.status === 'active' ? 'Approved' : doc.status === 'pending_approval' ? 'Pending' : doc.status === 'rejected' ? 'Rejected' : 'Draft',
+      department: doc.department?.name || 'Operations',
+      description: doc.description || ''
+    };
+  };
+
+  const findFolderNode = (nodes: FolderNode[], folderId: string | number): FolderNode | null => {
+    for (const node of nodes) {
+      if (String(node.id) === String(folderId)) return node;
+      const children = node.sub_folders || node.subFolders;
+      if (children) {
+        const found = findFolderNode(children, folderId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const getActiveViewItems = (): DMSItem[] => {
+    if (isLoading) return [];
+
+    if (activeFolder.id === 'recycle_bin') {
+      const archivedDocs = allDocs?.filter((d: any) => d.status === 'archived') || [];
+      return archivedDocs.map(mapDocToDMSItem);
+    }
+
+    if (activeFolder.id === 'favorites') {
+      const favDocs = allDocs?.filter((d: any) => d.is_favorite) || [];
+      return favDocs.map(mapDocToDMSItem);
+    }
+
+    const activeNode = findFolderNode(folderTreeNodes, activeFolder.id);
+    if (!activeNode) return [];
+
+    const subs = (activeNode.sub_folders || []).map(mapFolderToDMSItem);
+    const files = ((activeNode as any).documents || []).map(mapDocToDMSItem);
+
+    let list = [...subs, ...files];
+
+    if (searchVal.trim()) {
+      const q = searchVal.toLowerCase();
+      list = list.filter(item => item.name.toLowerCase().includes(q));
+    }
+
+    return list;
+  };
+
+  const activeItems = getActiveViewItems();
+
+  // Active / Selected single document state
   const [activeDoc, setActiveDoc] = useState<DocumentRowItem | null>(null);
 
   // Close context menu on outside click
@@ -691,7 +613,34 @@ export default function DocumentTree() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  // Listen to window drop files for simulated upload overlay
+  // Real Upload logic
+  const uploadDocMutation = useMutation({
+    mutationFn: api.documents.upload,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast(`Uploaded file "${data.name}" successfully`);
+    },
+    onError: (err: any) => alert(`Upload failed: ${err.message}`)
+  });
+
+  const handleRealUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', file.name.split('.')[0]);
+      const parentId = activeFolder.id === 0 || activeFolder.id === 'root' ? '' : String(activeFolder.id);
+      formData.append('folder_id', parentId);
+      formData.append('access_level', 'organization');
+      uploadDocMutation.mutate(formData);
+    }
+  };
+
+  // Drag & drop file upload
   useEffect(() => {
     const handleDragEnter = (e: DragEvent) => {
       e.preventDefault();
@@ -710,7 +659,17 @@ export default function DocumentTree() {
       e.preventDefault();
       setIsDragOverWindow(false);
       if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        triggerSimulatedUpload();
+        const files = e.dataTransfer.files;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('name', file.name.split('.')[0]);
+          const parentId = activeFolder.id === 0 || activeFolder.id === 'root' ? '' : String(activeFolder.id);
+          formData.append('folder_id', parentId);
+          formData.append('access_level', 'organization');
+          uploadDocMutation.mutate(formData);
+        }
       }
     };
 
@@ -725,249 +684,40 @@ export default function DocumentTree() {
       window.removeEventListener('dragleave', handleDragLeave);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [activeFolder]);
-
-  // Simulate file upload progress
-  const triggerSimulatedUpload = () => {
-    setIsUploading(true);
-    setUploadProgress(0);
-    setUploadSuccess(false);
-
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 20;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        setUploadSuccess(true);
-        setTimeout(() => {
-          setIsUploading(false);
-          const newDoc: DMSItem = {
-            id: `uploaded-${Math.random().toString(36).substr(2, 9)}`,
-            name: 'Uploaded_Document_Receipt.pdf',
-            fileType: 'PDF',
-            modifiedAt: new Date().toLocaleString(),
-            ownerName: 'Paras Jain',
-            ownerInitials: 'PJ',
-            size: '1.4 MB',
-            isFolder: false,
-            folderId: activeFolder.id.toString(),
-            isFavorite: false,
-            isLocked: false
-          };
-          setDocuments(prev => [newDoc, ...prev]);
-          showToast('Uploaded document successfully');
-        }, 1000);
-      }
-    }, 300);
-  };
-
-  // Helper to simulate dialog upload progress queue
-  const handleUploadModalStart = (filesList: string[], _isFolderUpload: boolean = false) => {
-    if (filesList.length === 0) return;
-    
-    // Build simulated queue
-    const queue = filesList.map(name => ({
-      name,
-      size: `${(Math.random() * 2 + 0.1).toFixed(1)} MB`,
-      progress: 0,
-      status: 'idle' as const
-    }));
-    
-    setUploadFilesQueue(queue);
-    setUploadModalStatus('uploading');
-    setUploadModalProgress(0);
-    setShowUploadModal(true);
-
-    if (uploadIntervalId) clearInterval(uploadIntervalId);
-
-    let overallProgress = 0;
-    const interval = setInterval(() => {
-      overallProgress += 10;
-      setUploadModalProgress(overallProgress);
-
-      setUploadFilesQueue(prev => prev.map((item, idx) => {
-        // distribute progress sequentially
-        const itemTargetProgress = Math.min(100, Math.max(0, overallProgress * filesList.length - idx * 100));
-        return {
-          ...item,
-          progress: itemTargetProgress,
-          status: itemTargetProgress >= 100 ? 'success' : 'uploading'
-        };
-      }));
-
-      if (overallProgress >= 100) {
-        clearInterval(interval);
-        setUploadModalStatus('success');
-        
-        // Add new files to catalog database
-        const uploadedDocs: DMSItem[] = filesList.map((name, idx) => {
-          const ext = name.split('.').pop()?.toUpperCase() || 'PDF';
-          return {
-            id: `uploaded-${Date.now()}-${idx}`,
-            name,
-            version: 'v1.0',
-            fileType: ext,
-            modifiedAt: new Date().toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
-            ownerName: 'Paras',
-            ownerInitials: 'P',
-            size: `${(Math.random() * 2 + 0.1).toFixed(1)} MB`,
-            isFolder: false,
-            folderId: activeFolder.id.toString(),
-            isFavorite: false,
-            isLocked: false,
-            department: 'Operations',
-            status: 'Approved'
-          };
-        });
-        
-        setDocuments(prev => [...uploadedDocs, ...prev]);
-        showToast(`Uploaded ${filesList.length} ${filesList.length === 1 ? 'file' : 'files'} successfully`);
-      }
-    }, 200);
-
-    setUploadIntervalId(interval);
-  };
-
-  const handleUploadModalCancel = () => {
-    if (uploadIntervalId) clearInterval(uploadIntervalId);
-    setUploadModalStatus('idle');
-    setUploadModalProgress(0);
-    setUploadFilesQueue([]);
-    setShowUploadModal(false);
-    showToast('Upload cancelled');
-  };
-
-  const handleUploadModalRetry = () => {
-    const fileNames = uploadFilesQueue.map(f => f.name);
-    handleUploadModalStart(fileNames);
-  };
-
-  // Helper to create blank templates
-  const handleCreateBlankFile = (format: string) => {
-    const ext = format.toLowerCase();
-    const id = `doc-${Date.now()}`;
-    const name = `Untitled Outline.${ext}`;
-    
-    const newDoc: DMSItem = {
-      id,
-      name,
-      version: 'v1.0',
-      fileType: format.toUpperCase(),
-      modifiedAt: new Date().toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
-      ownerName: 'Paras',
-      ownerInitials: 'P',
-      size: '0 KB',
-      isFolder: false,
-      folderId: activeFolder.id.toString(),
-      isFavorite: false,
-      isLocked: false,
-      department: 'Operations',
-      status: 'Draft'
-    };
-
-    setDocuments(prev => [newDoc, ...prev]);
-    showToast(`Created blank ${format} file: "${name}"`);
-    navigate(`/documents/${id}`);
-  };
-
-  // Helper to duplicate files
-  const handleDuplicateItem = (item: DMSItem) => {
-    const extIdx = item.name.lastIndexOf('.');
-    const base = extIdx !== -1 ? item.name.substring(0, extIdx) : item.name;
-    const ext = extIdx !== -1 ? item.name.substring(extIdx) : '';
-    const newDoc: DMSItem = {
-      ...item,
-      id: `doc-${Date.now()}`,
-      name: `${base}_copy${ext}`,
-      modifiedAt: new Date().toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
-      status: 'Draft'
-    };
-    setDocuments(prev => [newDoc, ...prev]);
-    showToast(`Duplicated "${item.name}"`);
-  };
-
-  // Helper to resolve subfolders of active folder node
-  const getSubfoldersOf = (folderId: string): DMSItem[] => {
-    const findSubfolders = (nodes: FolderNode[]): FolderNode[] => {
-      for (const node of nodes) {
-        if (node.id === folderId) return node.subFolders || [];
-        if (node.subFolders) {
-          const found = findSubfolders(node.subFolders);
-          if (found.length > 0) return found;
-        }
-      }
-      return [];
-    };
-
-    const subNodes = findSubfolders(folderTreeNodes);
-    return subNodes.map(sn => ({
-      id: sn.id.toString(),
-      name: sn.name,
-      isFolder: true,
-      fileType: 'Folder',
-      modifiedAt: '20 May 2026, 11:00 AM',
-      ownerName: 'System',
-      ownerInitials: 'SYS',
-      size: '--',
-      folderId: folderId
-    }));
-  };
-
-  // Dynamically resolve items shown in table
-  const getActiveViewItems = (): DMSItem[] => {
-    let list: DMSItem[] = [];
-
-    if (activeFolder.id === 'recycle_bin') {
-      list = recycleBinItems;
-    } else if (activeFolder.id === 'favorites') {
-      const favDocs = documents.filter(d => d.isFavorite);
-      list = [...favDocs];
-    } else {
-      const subs = getSubfoldersOf(activeFolder.id.toString());
-      const files = documents.filter(doc => doc.folderId === activeFolder.id.toString());
-      list = [...subs, ...files];
-    }
-
-    if (searchVal.trim()) {
-      const q = searchVal.toLowerCase();
-      list = list.filter(item => item.name.toLowerCase().includes(q));
-    }
-
-    return list;
-  };
-
-  const activeItems = getActiveViewItems();
+  }, [activeFolder, allDocs]);
 
   // Folder selection navigation
   const handleFolderSelect = (node: FolderNode) => {
-    setActiveFolder(node);
-    if (node.id === 'reports' || node.id === 'policies' || node.id === 'budgets' || node.id === 'audit') {
-      setPathSegments(['Corporate Knowledge', '02_Finance', node.name]);
-    } else if (node.id === 'finance') {
-      setPathSegments(['Corporate Knowledge', '02_Finance']);
-    } else if (node.id === 'root') {
-      setPathSegments(['Corporate Knowledge']);
-    } else {
-      setPathSegments(['Corporate Knowledge', node.name]);
-    }
+    setActiveFolder({ id: node.id, name: node.name });
     setSelectedIds([]);
   };
 
+  const getPathToNode = (nodes: FolderNode[], targetId: string | number, currentPath: FolderNode[] = []): FolderNode[] | null => {
+    for (const node of nodes) {
+      const path = [...currentPath, node];
+      if (String(node.id) === String(targetId)) return path;
+      const children = node.sub_folders || node.subFolders;
+      if (children) {
+        const found = getPathToNode(children, targetId, path);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const pathNodes = getPathToNode(folderTreeNodes, activeFolder.id) || [];
+  const pathSegments = activeFolder.id === 'favorites'
+    ? ['Starred Favorites']
+    : activeFolder.id === 'recycle_bin'
+      ? ['Recycle Bin']
+      : pathNodes.map(n => n.name);
+
   // Breadcrumb segment click logic
   const handleBreadcrumbClick = (index: number) => {
-    const targetSegment = pathSegments[index];
-    let folderId = 'root';
-    if (targetSegment.includes('Finance')) folderId = 'finance';
-    else if (targetSegment.toLowerCase().includes('report')) folderId = 'reports';
-    else if (targetSegment.toLowerCase().includes('policy')) folderId = 'policies';
-    else if (targetSegment.toLowerCase().includes('budget')) folderId = 'budgets';
-    else if (targetSegment.toLowerCase().includes('audit')) folderId = 'audit';
-    else if (targetSegment !== 'Corporate Knowledge') {
-      folderId = targetSegment.toLowerCase().replace(' ', '_');
+    const targetNode = pathNodes[index];
+    if (targetNode) {
+      handleFolderSelect(targetNode);
     }
-    
-    handleFolderSelect({ id: folderId, name: targetSegment });
   };
 
   // Checkbox row selection logic
@@ -985,24 +735,9 @@ export default function DocumentTree() {
     }
   };
 
-  // Table row click selects active file for details panel
   const handleItemClick = (item: DocumentRowItem) => {
     const dmsItem = activeItems.find(x => x.id === item.id) || null;
     setActiveDoc(dmsItem);
-    
-    // Auto broadcast to active context for AI
-    if (dmsItem && !dmsItem.isFolder) {
-      window.dispatchEvent(new CustomEvent('kms-active-document-change', {
-        detail: {
-          title: dmsItem.name,
-          fileType: dmsItem.fileType,
-          version: dmsItem.version || 'v1.0',
-          owner: dmsItem.ownerName,
-          selectedText: '',
-          fullContent: 'Document metadata preview is active. The AI Document Assistant is listening.'
-        }
-      }));
-    }
   };
 
   const handleItemDoubleClick = (item: DocumentRowItem) => {
@@ -1014,7 +749,6 @@ export default function DocumentTree() {
     }
   };
 
-  // Row context menu trigger
   const handleContextMenuAction = (item: DocumentRowItem, e: React.MouseEvent) => {
     const dmsItem = activeItems.find(x => x.id === item.id);
     if (dmsItem) {
@@ -1026,70 +760,59 @@ export default function DocumentTree() {
     }
   };
 
-  // Star Favorite Toggle
-  const handleToggleFavorite = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setDocuments(prev => prev.map(doc => {
-      if (doc.id === id) {
-        const nextFav = !doc.isFavorite;
-        showToast(nextFav ? 'Added file to Favorites' : 'Removed file from Favorites');
-        return { ...doc, isFavorite: nextFav };
-      }
-      return doc;
-    }));
-  };
+  // CRUD Mutations
+  const createFolderMutation = useMutation({
+    mutationFn: api.folders.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      showToast('Folder created successfully');
+      setShowNewFolderModal(false);
+    },
+    onError: (err: any) => alert(`Failed to create folder: ${err.message}`)
+  });
 
-  // Create New Folder
   const triggerCreateFolder = (e: React.FormEvent) => {
     e.preventDefault();
-    const parentId = activeFolder.id.toString();
+    const parentId = activeFolder.id === 0 || activeFolder.id === 'root' ? null : Number(activeFolder.id);
 
-    // Check duplicate name
-    const foldersOfActive = getSubfoldersOf(parentId);
-    if (foldersOfActive.some(f => f.name.toLowerCase() === newFolderVal.name.toLowerCase().trim())) {
+    const currentActiveNode = findFolderNode(folderTreeNodes, activeFolder.id);
+    const existingNames = (currentActiveNode?.sub_folders || []).map((f: any) => f.name.toLowerCase());
+    if (existingNames.includes(newFolderVal.name.trim().toLowerCase())) {
       alert('Error: A folder with this name already exists.');
       return;
     }
 
-    const newFolderNode: FolderNode = {
-      id: `folder-${Math.random().toString(36).substr(2, 9)}`,
+    createFolderMutation.mutate({
       name: newFolderVal.name.trim(),
-      subFolders: []
-    };
-
-    // Insert into Folder Tree
-    const addSubfolderNode = (nodes: FolderNode[]): FolderNode[] => {
-      return nodes.map(node => {
-        if (node.id === parentId) {
-          return {
-            ...node,
-            subFolders: [...(node.subFolders || []), newFolderNode]
-          };
-        }
-        if (node.subFolders) {
-          return {
-            ...node,
-            subFolders: addSubfolderNode(node.subFolders)
-          };
-        }
-        return node;
-      });
-    };
-
-    setFolderTreeNodes(prev => addSubfolderNode(prev));
-    setShowNewFolderModal(false);
-    setNewFolderVal({
-      name: '',
-      description: '',
-      color: '#3b82f6',
-      department: 'Finance',
-      owner: 'Paras Jain',
-      permissions: 'Editor'
+      parent_id: parentId
     });
-    showToast('Folder created successfully');
   };
 
-  // Rename action trigger
+  const renameFolderMutation = useMutation({
+    mutationFn: ({ id, name, parent_id }: { id: number; name: string; parent_id: number | null }) =>
+      api.folders.update(id, { name, parent_id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      showToast('Folder renamed successfully');
+      setShowRenameModal(false);
+      setRenameTarget(null);
+    },
+    onError: (err: any) => alert(`Failed to rename folder: ${err.message}`)
+  });
+
+  const renameDocumentMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) =>
+      api.documents.update(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast('Document renamed successfully');
+      setShowRenameModal(false);
+      setRenameTarget(null);
+    },
+    onError: (err: any) => alert(`Failed to rename document: ${err.message}`)
+  });
+
   const triggerRenameAction = (e: React.FormEvent) => {
     e.preventDefault();
     if (!renameTarget) return;
@@ -1097,139 +820,197 @@ export default function DocumentTree() {
     const trimmed = renameNewName.trim();
     if (!trimmed) return;
 
-    // Check duplicate naming checks in same directory
     if (activeItems.some(i => i.id !== renameTarget.id && i.name.toLowerCase() === trimmed.toLowerCase())) {
       alert('Error: An item with this name already exists in this folder.');
       return;
     }
 
     if (renameTarget.isFolder) {
-      const renameFolderNode = (nodes: FolderNode[]): FolderNode[] => {
-        return nodes.map(node => {
-          if (node.id === renameTarget.id) {
-            return { ...node, name: trimmed };
-          }
-          if (node.subFolders) {
-            return { ...node, subFolders: renameFolderNode(node.subFolders) };
-          }
-          return node;
-        });
-      };
-      setFolderTreeNodes(prev => renameFolderNode(prev));
+      renameFolderMutation.mutate({
+        id: Number(renameTarget.id),
+        name: trimmed,
+        parent_id: renameTarget.folderId === '0' || renameTarget.folderId === 'root' ? null : Number(renameTarget.folderId)
+      });
     } else {
-      setDocuments(prev => prev.map(d => d.id === renameTarget.id ? { ...d, name: trimmed } : d));
+      renameDocumentMutation.mutate({
+        id: renameTarget.id,
+        payload: { name: trimmed }
+      });
     }
-
-    setShowRenameModal(false);
-    setRenameTarget(null);
-    showToast('Item renamed successfully');
   };
 
-  // Move/Copy Action execution
-  const triggerMoveCopyAction = () => {
-    if (pickerTargetItems.length === 0) return;
+  const deleteFolderMutation = useMutation({
+    mutationFn: api.folders.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      showToast('Folder deleted successfully');
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+      setSelectedIds([]);
+    },
+    onError: (err: any) => alert(`Failed to delete folder: ${err.message}`)
+  });
 
-    const targetIds = pickerTargetItems.map(t => t.id);
+  const archiveDocumentMutation = useMutation({
+    mutationFn: api.documents.archive,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast('Item moved to Recycle Bin (Archived)');
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+      setSelectedIds([]);
+    },
+    onError: (err: any) => alert(`Failed to archive document: ${err.message}`)
+  });
 
-    if (pickerAction === 'move') {
-      setDocuments(prev => prev.map(doc => {
-        if (targetIds.includes(doc.id)) {
-          return { ...doc, folderId: pickerSelectedFolderId };
-        }
-        return doc;
-      }));
-      showToast(`Moved ${pickerTargetItems.length} items successfully`);
-    } else {
-      const copies: DMSItem[] = pickerTargetItems.map(t => ({
-        ...t,
-        id: `copy-${Math.random().toString(36).substr(2, 9)}`,
-        name: `Copy of ${t.name}`,
-        folderId: pickerSelectedFolderId,
-        isLocked: false
-      }));
-      setDocuments(prev => [...copies, ...prev]);
-      showToast(`Copied ${pickerTargetItems.length} items successfully`);
-    }
-
-    setShowTreePicker(false);
-    setPickerTargetItems([]);
-  };
-
-  // Delete Action trigger (Confirmation warnings)
   const triggerDeleteConfirm = () => {
     if (!deleteTarget) return;
 
-    setDocuments(prev => prev.filter(doc => doc.id !== deleteTarget.id));
-    setRecycleBinItems(prev => [deleteTarget, ...prev]);
-
-    setShowDeleteConfirm(false);
-    setDeleteTarget(null);
-    setSelectedIds([]);
-    showToast('Item moved to Recycle Bin');
+    if (deleteTarget.isFolder) {
+      deleteFolderMutation.mutate(Number(deleteTarget.id));
+    } else {
+      archiveDocumentMutation.mutate(deleteTarget.id);
+    }
   };
 
-  // Recycle Bin managers
-  const handleEmptyRecycleBin = () => {
-    setRecycleBinItems([]);
-    showToast('Recycle Bin emptied permanently');
-  };
+  const restoreDocumentMutation = useMutation({
+    mutationFn: api.documents.restore,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast('Document restored successfully');
+    },
+    onError: (err: any) => alert(`Failed to restore document: ${err.message}`)
+  });
 
   const handleRestoreItem = (item: DMSItem) => {
-    setRecycleBinItems(prev => prev.filter(x => x.id !== item.id));
-    setDocuments(prev => [item, ...prev]);
-    showToast(`Restored "${item.name}"`);
+    restoreDocumentMutation.mutate(item.id);
   };
+
+  const purgeDocumentMutation = useMutation({
+    mutationFn: api.documents.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast('Document permanently deleted');
+    },
+    onError: (err: any) => alert(`Failed to permanently delete document: ${err.message}`)
+  });
 
   const handleDeleteItemPermanently = (item: DMSItem) => {
-    setRecycleBinItems(prev => prev.filter(x => x.id !== item.id));
-    showToast(`Permanently deleted "${item.name}"`);
+    purgeDocumentMutation.mutate(item.id);
   };
 
-  // Lock document toggler
+  const handleEmptyRecycleBin = () => {
+    const archivedDocs = allDocs?.filter((d: any) => d.status === 'archived') || [];
+    if (archivedDocs.length === 0) return;
+    archivedDocs.forEach((d: any) => {
+      purgeDocumentMutation.mutate(d.id);
+    });
+  };
+
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: api.documents.favorite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+    },
+    onError: (err: any) => alert(`Failed to toggle favorite: ${err.message}`)
+  });
+
+  const handleToggleFavorite = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    toggleFavoriteMutation.mutate(id);
+  };
+
+  const moveDocumentMutation = useMutation({
+    mutationFn: ({ id, folderId }: { id: string; folderId: number | null }) =>
+      api.documents.update(id, { folder_id: folderId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      showToast('Moved items successfully');
+      setShowTreePicker(false);
+      setPickerTargetItems([]);
+    },
+    onError: (err: any) => alert(`Failed to move document: ${err.message}`)
+  });
+
+  const triggerMoveCopyAction = () => {
+    if (pickerTargetItems.length === 0) return;
+
+    const targetFolderId = pickerSelectedFolderId === 'root' || pickerSelectedFolderId === '0' ? null : Number(pickerSelectedFolderId);
+
+    if (pickerAction === 'move') {
+      pickerTargetItems.forEach(item => {
+        if (!item.isFolder) {
+          moveDocumentMutation.mutate({ id: item.id, folderId: targetFolderId });
+        }
+      });
+      setShowTreePicker(false);
+      setPickerTargetItems([]);
+    } else {
+      showToast('Copying is not supported on the server database.');
+      setShowTreePicker(false);
+      setPickerTargetItems([]);
+    }
+  };
+
   const handleToggleLock = (item: DMSItem) => {
-    setDocuments(prev => prev.map(doc => {
-      if (doc.id === item.id) {
-        const nextLocked = !doc.isLocked;
-        showToast(nextLocked ? 'Document locked for editing' : 'Document unlocked successfully');
-        return {
-          ...doc,
-          isLocked: nextLocked,
-          lockedBy: nextLocked ? 'Paras Jain' : undefined
-        };
-      }
-      return doc;
-    }));
+    showToast(`Editing locks for "${item.name}" are handled automatically by document status.`);
   };
 
-  // Drag and Drop handlers
-  const handleDragStart = (e: React.DragEvent, item: DMSItem) => {
+  const handleCreateBlankFile = (format: string) => {
+    const ext = format.toLowerCase();
+    const name = `Untitled Outline.${ext}`;
+    const blob = new Blob([format === 'txt' ? 'Start editing...' : ''], { type: 'application/octet-stream' });
+    const fileObj = new File([blob], name, { type: 'application/octet-stream' });
+    
+    const formData = new FormData();
+    formData.append('file', fileObj);
+    formData.append('name', name.split('.')[0]);
+    const parentId = activeFolder.id === 0 || activeFolder.id === 'root' ? '' : String(activeFolder.id);
+    formData.append('folder_id', parentId);
+    formData.append('access_level', 'organization');
+    formData.append('description', `Blank ${format.toUpperCase()} Document`);
+    
+    uploadDocMutation.mutate(formData, {
+      onSuccess: (data) => {
+        navigate(`/documents/${data.id}`);
+      }
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent, item: DocumentRowItem) => {
     e.dataTransfer.setData('text/plain', item.id);
     setDraggedItemId(item.id);
   };
 
-  const handleDragOverItem = (e: React.DragEvent, item: DMSItem) => {
+  const handleDragOverItem = (e: React.DragEvent, item: DocumentRowItem) => {
     if (item.isFolder && item.id !== draggedItemId) {
       e.preventDefault();
     }
   };
 
-  const handleDropOnItem = (e: React.DragEvent, targetItem: DMSItem) => {
+  const handleDropOnItem = (e: React.DragEvent, targetItem: DocumentRowItem) => {
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain');
-    
     if (sourceId && targetItem.isFolder && sourceId !== targetItem.id) {
-      setDocuments(prev => prev.map(doc => {
-        if (doc.id === sourceId) {
-          return { ...doc, folderId: targetItem.id };
-        }
-        return doc;
-      }));
+      moveDocumentMutation.mutate({ id: sourceId, folderId: Number(targetItem.id) });
       showToast(`Moved item successfully into "${targetItem.name}"`);
     }
   };
 
   return (
     <div className="flex flex-col h-full bg-white select-none font-sans text-slate-800 -m-6">
+      <input
+        type="file"
+        id="kms-file-upload-input"
+        multiple
+        onChange={handleRealUpload}
+        style={{ display: 'none' }}
+      />
       
       {/* 1. SINGLE UNIFIED HEADER ROW */}
       <div className="px-6 py-2.5 border-b border-slate-200 flex items-center justify-between shrink-0 select-none bg-white">
@@ -1396,13 +1177,10 @@ export default function DocumentTree() {
               onNewPptxClick={() => handleCreateBlankFile('pptx')}
               onNewTxtClick={() => handleCreateBlankFile('txt')}
               onUploadFilesClick={() => {
-                const names = ['Annual_Audit_Report.pdf', 'Sales_Q2_Summary.xlsx', 'Operations_Checklist.docx'];
-                const randNames = names.slice(0, Math.floor(Math.random() * 3) + 1);
-                handleUploadModalStart(randNames);
+                document.getElementById('kms-file-upload-input')?.click();
               }}
               onUploadFolderClick={() => {
-                const names = ['HR_Policy_Handbook.docx', 'SOP_Employee_Onboarding.pdf'];
-                handleUploadModalStart(names, true);
+                document.getElementById('kms-file-upload-input')?.click();
               }}
               onAiGenerateClick={() => {
                 setShowTemplatesModal(true);
@@ -1429,28 +1207,13 @@ export default function DocumentTree() {
               }}
               onFavoriteClick={() => {
                 if (selectedIds.length > 0) {
-                  const targets = activeItems.filter(x => selectedIds.includes(x.id));
-                  const anyNotFav = targets.some(x => !x.isFavorite);
-                  setDocuments(prev => prev.map(d => {
-                    if (selectedIds.includes(d.id)) {
-                      return { ...d, isFavorite: anyNotFav };
-                    }
-                    return d;
-                  }));
-                  showToast(anyNotFav ? 'Added items to Starred Favorites' : 'Removed items from Favorites');
+                  selectedIds.forEach(id => toggleFavoriteMutation.mutate(id));
+                  showToast('Toggled favorites');
                 }
               }}
               onLockClick={() => {
                 if (selectedIds.length > 0) {
-                  const targets = activeItems.filter(x => selectedIds.includes(x.id));
-                  const anyUnlocked = targets.some(x => !x.isLocked);
-                  setDocuments(prev => prev.map(d => {
-                    if (selectedIds.includes(d.id)) {
-                      return { ...d, isLocked: anyUnlocked, lockedBy: anyUnlocked ? 'Paras' : undefined };
-                    }
-                    return d;
-                  }));
-                  showToast(anyUnlocked ? 'Selected documents locked' : 'Selected documents unlocked');
+                  showToast('Editing locks are handled automatically by document status.');
                 }
               }}
               onVersionHistoryClick={() => {
@@ -1565,8 +1328,7 @@ export default function DocumentTree() {
                   setShowNewFolderModal(true);
                 }}
                 onUploadClick={() => {
-                  const names = ['Annual_Quarterly_Brief.pdf'];
-                  handleUploadModalStart(names);
+                  document.getElementById('kms-file-upload-input')?.click();
                 }}
                 onAiGenerateClick={() => setShowTemplatesModal(true)}
               />
@@ -1823,121 +1585,7 @@ export default function DocumentTree() {
         </div>
       )}
 
-      {/* PROFESSIONAL UPLOAD DIALOG MODAL */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[500px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-150 bg-slate-50/50 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-blue-600" />
-                  <span>KMS Upload Desk</span>
-                </h3>
-              </div>
-              <button
-                onClick={handleUploadModalCancel}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-150 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Content Area */}
-            <div className="p-6 space-y-4">
-              {/* Drag drop zone helper */}
-              {uploadFilesQueue.length === 0 ? (
-                <div 
-                  onClick={() => handleUploadModalStart(['Quarterly_Corporate_Audit.pdf', 'HR_Internal_Onboarding.docx'])}
-                  className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-8 text-center bg-slate-50/30 hover:bg-blue-50/5 cursor-pointer transition-all flex flex-col items-center justify-center"
-                >
-                  <Upload className="w-10 h-10 text-slate-400 mb-3 animate-bounce" />
-                  <span className="text-xs font-extrabold text-slate-750">Drag & drop files or folders here</span>
-                  <span className="text-[10px] text-slate-450 mt-1 font-semibold">Or click to browse simulator files</span>
-                  <div className="flex gap-2 mt-4">
-                    <button type="button" className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-extrabold text-slate-700 shadow-sm">Browse Files</button>
-                    <button type="button" className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-extrabold text-slate-700 shadow-sm">Browse Folder</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Queue status ({uploadFilesQueue.length} items)</div>
-                  <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-150 rounded-xl p-3 bg-slate-50/20 custom-scrollbar">
-                    {uploadFilesQueue.map((file, fIdx) => (
-                      <div key={fIdx} className="text-xs flex items-center justify-between bg-white border border-slate-100 rounded-lg p-2.5">
-                        <div className="truncate max-w-[220px]">
-                          <div className="font-extrabold text-slate-800 truncate">{file.name}</div>
-                          <div className="text-[9px] text-slate-455 font-bold mt-0.5">{file.size}</div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {file.status === 'success' ? (
-                            <span className="text-emerald-600 font-extrabold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Success</span>
-                          ) : file.status === 'error' ? (
-                            <span className="text-red-655 font-extrabold text-[10px] bg-red-50 px-2 py-0.5 rounded-md border border-red-100">Error</span>
-                          ) : (
-                            <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-blue-600 h-full transition-all duration-150" style={{ width: `${file.progress}%` }} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Overall progression */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-extrabold text-slate-655">
-                      <span>Overall Progress</span>
-                      <span>{uploadModalProgress}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full transition-all duration-200" style={{ width: `${uploadModalProgress}%` }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 py-4 border-t border-slate-150 bg-slate-50/50 flex items-center justify-between">
-              <div>
-                {uploadModalStatus === 'success' && (
-                  <span className="text-xs text-emerald-600 font-extrabold flex items-center gap-1">
-                    <span>✓</span> All uploads active in context
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleUploadModalCancel}
-                  className="px-3.5 py-1.8 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold shadow-sm transition-all"
-                >
-                  {uploadModalStatus === 'success' ? 'Close' : 'Cancel'}
-                </button>
-                {uploadModalStatus === 'uploading' && (
-                  <button
-                    type="button"
-                    onClick={handleUploadModalCancel}
-                    className="px-3.5 py-1.8 bg-red-50 hover:bg-red-100 text-red-650 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Abort
-                  </button>
-                )}
-                {uploadModalStatus === 'success' && (
-                  <button
-                    type="button"
-                    onClick={handleUploadModalRetry}
-                    className="glow-btn px-3.5 py-1.8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold border border-blue-500 shadow-md transition-all animate-pulse"
-                  >
-                    Upload More
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ENTERPRISE SHARE DIALOG MODAL */}
       {shareDoc && (
@@ -2513,28 +2161,16 @@ export default function DocumentTree() {
       )}
 
       {/* 1. UPLOAD PROGRESS BACKDROP */}
-      {isUploading && (
+      {uploadDocMutation.isPending && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-[99999] flex items-center justify-center p-4 select-none">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl flex flex-col items-center text-center">
-            {uploadSuccess ? (
-              <CheckCircle className="w-12 h-12 text-green-500 mb-4 animate-bounce" />
-            ) : (
-              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-            )}
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
             <h4 className="text-sm font-extrabold text-slate-800">
-              {uploadSuccess ? 'Upload Complete' : 'Uploading Record to KMS'}
+              Uploading Record to KMS
             </h4>
             <p className="text-[10px] text-slate-455 font-bold mt-1">
-              {uploadSuccess ? 'Document cataloged and context active.' : 'Parsing document content and permissions structure...'}
+              Parsing document content and permissions structure...
             </p>
-            {!uploadSuccess && (
-              <div className="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden border border-slate-200/50">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -2915,8 +2551,7 @@ export default function DocumentTree() {
               <button
                 onClick={() => {
                   handleFolderSelect({ id: contextMenu.item.id, name: contextMenu.item.name });
-                  const names = ['Department_Budget_Draft.xlsx', 'Q2_Operations_Brief.docx'];
-                  handleUploadModalStart(names);
+                  document.getElementById('kms-file-upload-input')?.click();
                   setContextMenu(null);
                 }}
                 className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 flex items-center gap-2"
@@ -3010,7 +2645,7 @@ export default function DocumentTree() {
               </button>
               <button
                 onClick={() => {
-                  handleDuplicateItem(contextMenu.item);
+                  showToast('Duplicate is not supported on the server database.');
                   setContextMenu(null);
                 }}
                 className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 flex items-center gap-2"

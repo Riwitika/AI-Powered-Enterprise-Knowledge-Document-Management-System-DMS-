@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { 
   Send, 
   Sparkles, 
@@ -11,11 +13,12 @@ import {
   PieChart,
   MessageSquare,
   MoreVertical,
-  HelpCircle
+  HelpCircle,
+  RefreshCw
 } from 'lucide-react';
 
 export default function AIChat() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<any[]>([
     {
       id: 'm-1',
       role: 'user',
@@ -33,10 +36,33 @@ export default function AIChat() {
 
   const [inputVal, setInputVal] = useState('');
   const [typingState, setTypingState] = useState(false);
+  const [recentChats, setRecentChats] = useState<{ title: string; time: string }[]>([
+    { title: 'Q2 Budget highlights', time: '10:32 AM' },
+    { title: 'Team performance overview', time: 'Yesterday' },
+    { title: 'Pending vendor contracts', time: 'Yesterday' },
+    { title: 'HR policies summary', time: '2 days ago' },
+    { title: 'Project status update', time: '3 days ago' }
+  ]);
 
-  const handleSend = (textToSend?: string) => {
+  // Load real conversations from backend
+  const { data: dbConversations } = useQuery({
+    queryKey: ['ai-conversations'],
+    queryFn: () => api.ai.conversations(),
+  });
+
+  useEffect(() => {
+    if (dbConversations && dbConversations.length > 0) {
+      const mapped = dbConversations.map((c: any) => ({
+        title: c.question.length > 25 ? c.question.slice(0, 25) + '...' : c.question,
+        time: new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      }));
+      setRecentChats(mapped);
+    }
+  }, [dbConversations]);
+
+  const handleSend = async (textToSend?: string) => {
     const text = textToSend || inputVal;
-    if (!text.trim()) return;
+    if (!text.trim() || typingState) return;
 
     // Add user message
     const userMsg = {
@@ -50,17 +76,30 @@ export default function AIChat() {
     setInputVal('');
     setTypingState(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const res = await api.ai.ask(text);
       setTypingState(false);
       const aiMsg = {
         id: Math.random().toString(),
         role: 'assistant',
-        content: `I analyzed your knowledge base for "${text}". Let me know if you would like me to compile a summary report or cross-reference matching documents.`,
-        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        content: res.answer,
+        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        sourceDocuments: res.source_documents
       };
       setMessages(prev => [...prev, aiMsg]);
-    }, 1200);
+    } catch (err) {
+      console.error('Global AI Ask failed:', err);
+      setTypingState(false);
+      const errMsg = {
+        id: Math.random().toString(),
+        role: 'assistant',
+        content: "AI service is temporarily unavailable.",
+        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        isError: true,
+        failedQuestion: text
+      };
+      setMessages(prev => [...prev, errMsg]);
+    }
   };
 
   const suggestedQuestions = [
@@ -69,14 +108,6 @@ export default function AIChat() {
     'Show documents uploaded by Paras Jain',
     'Compare Q2 and Q1 revenue',
     'List HR policies and documents'
-  ];
-
-  const recentChats = [
-    { title: 'Q2 Budget highlights', time: '10:32 AM' },
-    { title: 'Team performance overview', time: 'Yesterday' },
-    { title: 'Pending vendor contracts', time: 'Yesterday' },
-    { title: 'HR policies summary', time: '2 days ago' },
-    { title: 'Project status update', time: '3 days ago' }
   ];
 
   const capabilities = [
@@ -158,7 +189,21 @@ export default function AIChat() {
                       </div>
 
                       <div className="flex-1 space-y-3.5 min-w-0">
-                        <p className="text-xs font-bold text-slate-800 leading-normal select-text">{msg.content}</p>
+                        {msg.isError ? (
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl rounded-tl-none text-red-800 text-xs font-bold leading-relaxed shadow-[0_1px_2px_rgba(0,0,0,0.01)] select-text max-w-[80%] space-y-2.5 animate-in fade-in duration-200">
+                            <p>{msg.content}</p>
+                            <button
+                              type="button"
+                              onClick={() => handleSend(msg.failedQuestion)}
+                              className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 border border-red-200 hover:border-red-300 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 transition-colors shadow-sm"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Retry</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-xs font-bold text-slate-800 leading-normal select-text">{msg.content}</p>
+                        )}
 
                         {/* Structured details card wrapper */}
                         {msg.showStructuredCard && (
@@ -261,6 +306,40 @@ export default function AIChat() {
                               </div>
                             </div>
 
+                          </div>
+                        )}
+
+                        {msg.sourceDocuments && msg.sourceDocuments.length > 0 && (
+                          <div className="space-y-3 mt-3 animate-in fade-in duration-200">
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block border-b border-slate-100 pb-1.5">
+                              Top Relevant Documents
+                            </h4>
+                            
+                            <div className="border border-slate-200/80 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.01)] bg-white text-xs font-semibold text-slate-750 divide-y divide-slate-100">
+                              {msg.sourceDocuments.map((doc: any, sIdx: number) => (
+                                <div key={sIdx} className="flex items-center justify-between gap-4 p-3 hover:bg-slate-50/50 transition-colors">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-bold text-[9px] border border-blue-100 shrink-0">
+                                      {doc.file_type || 'DOCX'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="font-extrabold text-slate-900 block truncate leading-tight">{doc.name}</span>
+                                      <span className="text-[9.5px] text-slate-400 block mt-0.5 truncate leading-none">
+                                        {doc.file_path} &bull; Modified {new Date(doc.updated_at).toLocaleDateString('en-IN')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <button 
+                                    type="button"
+                                    onClick={() => window.open(`/documents/${doc.id}`, '_blank')}
+                                    className="px-3.5 py-1 text-[10.5px] font-extrabold text-blue-600 hover:text-blue-800 bg-white border border-blue-200 hover:border-blue-350 rounded-lg transition-colors shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
+                                  >
+                                    Open
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                         
@@ -378,7 +457,7 @@ export default function AIChat() {
             {recentChats.map((chat, idx) => (
               <div 
                 key={idx} 
-                onClick={() => handleSend(`Open past logs: "${chat.title}"`)}
+                onClick={() => handleSend(chat.title)}
                 className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold p-0.5 hover:bg-slate-50 rounded"
               >
                 <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />

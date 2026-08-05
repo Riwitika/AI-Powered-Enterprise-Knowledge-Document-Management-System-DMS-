@@ -32,6 +32,7 @@ interface MockDoc {
   whoCanAccess: string;
   accessType: string;
   aiSummaryText: string;
+  content?: string;
 }
 
 const detectFileType = (fileName: string, metadataType?: string): string => {
@@ -269,7 +270,8 @@ export default function DocumentViewer() {
       description: apiDoc.description || apiDoc.ai_summary || `Document: ${apiDoc.name}`,
       whoCanAccess: apiDoc.access_level === 'organization' ? 'All Employees' : apiDoc.access_level === 'department' ? `${apiDoc.owner?.department?.name || 'Department'} Team` : 'Permitted Users',
       accessType: 'Can view, edit',
-      aiSummaryText: apiDoc.ai_summary || `AI summary for "${apiDoc.name}" is being generated. The AI Document Assistant is ready to answer questions about this document.`
+      aiSummaryText: apiDoc.ai_summary || `AI summary for "${apiDoc.name}" is being generated. The AI Document Assistant is ready to answer questions about this document.`,
+      content: apiDoc.content || ''
     };
   } else if (localDocMatch) {
     // Resolve format dynamically based on file name first, falling back to mock or db
@@ -336,6 +338,7 @@ export default function DocumentViewer() {
   useEffect(() => {
     const title = activeDoc?.name || 'Untitled Document';
     const contextDetail = {
+      id,
       title,
       fileType: activeFormat,
       department: activeDoc?.locationPath?.split('/')[1] || 'Operations',

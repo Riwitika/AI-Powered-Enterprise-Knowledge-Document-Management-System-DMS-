@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Check, X, FileText, User, Calendar, ShieldCheck, AlertCircle, Eye } from 'lucide-react';
+import { sanitizeHtml } from '../utils/sanitize';
 
 export default function ApprovalDashboard() {
   const queryClient = useQueryClient();
@@ -172,7 +173,7 @@ export default function ApprovalDashboard() {
                   <span className="text-[9px] font-bold text-slate-450 uppercase tracking-widest">Document Review Canvas</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-12 custom-scrollbar select-text leading-relaxed text-[#202124] text-[14px]">
-                  <div dangerouslySetInnerHTML={{ __html: selectedDoc.content || `<p className="italic text-slate-400">This document has no content to review.</p>` }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedDoc.content || `<p class="italic text-slate-400">This document has no content to review.</p>`) }} />
                 </div>
               </div>
 

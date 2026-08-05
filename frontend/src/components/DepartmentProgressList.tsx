@@ -1,19 +1,41 @@
-interface DeptHeadcount {
-  name: string;
-  count: number;
-}
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 
 export default function DepartmentProgressList() {
-  const depts: DeptHeadcount[] = [
-    { name: 'Sales & Marketing', count: 96 },
-    { name: 'Human Resources', count: 54 },
-    { name: 'Finance', count: 48 },
-    { name: 'Product', count: 39 },
-    { name: 'Procurement', count: 31 },
-    { name: 'IT', count: 24 }
-  ];
+  const { data: rawUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: api.users.list,
+    staleTime: 30_000,
+  });
 
-  const maxCount = 100; // max reference value
+  const { data: departments = [], isLoading: deptsLoading } = useQuery({
+    queryKey: ['departments-list'],
+    queryFn: api.departments.list,
+    staleTime: 60_000,
+  });
+
+  if (usersLoading || deptsLoading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Calculate user counts by department
+  const depts = departments.map((d: any) => {
+    const count = rawUsers.filter((u: any) => u.department_id === d.id).length;
+    return { name: d.name, count };
+  });
+
+  // Sort departments by headcount descending
+  depts.sort((a, b) => b.count - a.count);
+
+  const maxCount = Math.max(...depts.map(d => d.count), 1) || 1;
+
+  if (depts.length === 0) {
+    return <div className="text-center py-4 text-xs text-slate-400">No departments configured.</div>;
+  }
 
   return (
     <div className="space-y-4 select-none py-1.5">

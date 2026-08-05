@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, get_current_active_user, verify_document_access
 from app.models.models import Permission, Document, User, Department
 from app.schemas.schemas import PermissionResponse, PermissionGrantRequest
+from app.services.audit import log_audit
 
 router = APIRouter()
 
@@ -79,6 +80,9 @@ def grant_permission(
         existing.access_type = payload.access_type
         db.commit()
         db.refresh(existing)
+        
+        log_audit("permission_grant", current_user.email, f"Granted/updated {payload.access_type} permission for document {document_id} to user {payload.user_id} / department {payload.department_id}")
+        
         return existing
 
     new_perm = Permission(
@@ -90,6 +94,9 @@ def grant_permission(
     db.add(new_perm)
     db.commit()
     db.refresh(new_perm)
+    
+    log_audit("permission_grant", current_user.email, f"Granted {payload.access_type} permission for document {document_id} to user {payload.user_id} / department {payload.department_id}")
+    
     return new_perm
 
 
@@ -138,4 +145,7 @@ def revoke_permission(
         
     db.delete(perm)
     db.commit()
+    
+    log_audit("permission_revoke", current_user.email, f"Revoked permission for document {document_id} from user {user_id} / department {department_id}")
+    
     return {"message": "Permission revoked successfully"}

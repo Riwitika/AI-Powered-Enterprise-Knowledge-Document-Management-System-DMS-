@@ -11,6 +11,7 @@ from app.models.models import Document, DocumentVersion, User, Folder
 from app.schemas.schemas import DocumentResponse, DocumentUpdate, DocumentVersionResponse
 from app.services.storage import storage
 from app.services.document_processing import run_background_processing
+from app.services.audit import log_audit
 
 router = APIRouter()
 
@@ -43,10 +44,43 @@ def upload_document(
     contents = file.file.read()
     file.file.seek(0)
     
-    file_path = storage.save_file(contents, file.filename)
+    if not contents or len(contents) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
+        
+    from app.core.config import settings
+    max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(contents) > max_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_MB}MB."
+        )
+        
     file_ext = os.path.splitext(file.filename)[1].replace(".", "").lower()
-    
+    allowed_extensions = {"pdf", "docx", "xlsx", "pptx", "txt"}
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file extension '.{file_ext}'. Allowed types: pdf, docx, xlsx, pptx, txt."
+        )
+        
     doc_name = name or os.path.splitext(file.filename)[0]
+    
+    # Check duplicate document name in same folder context
+    existing_doc = db.query(Document).filter(
+        Document.folder_id == target_folder_id,
+        Document.name == doc_name,
+        Document.status != "archived"
+    ).first()
+    if existing_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A document named '{doc_name}' already exists in this folder."
+        )
+        
+    file_path = storage.save_file(contents, file.filename)
 
     # Create document entry
     new_doc = Document(
@@ -276,6 +310,7 @@ def delete_document(
     try:
         db.delete(doc)
         db.commit()
+        log_audit("document_deletion", current_user.email, f"User deleted document: {doc.name} (ID: {doc.id})")
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(
@@ -312,6 +347,28 @@ def upload_new_version(
     contents = file.file.read()
     file.file.seek(0)
     
+    if not contents or len(contents) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
+        
+    from app.core.config import settings
+    max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(contents) > max_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_MB}MB."
+        )
+        
+    file_ext = os.path.splitext(file.filename)[1].replace(".", "").lower()
+    allowed_extensions = {"pdf", "docx", "xlsx", "pptx", "txt"}
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file extension '.{file_ext}'. Allowed types: pdf, docx, xlsx, pptx, txt."
+        )
+        
     file_path = storage.save_file(contents, file.filename)
     new_version_num = doc.current_version + 1
     
@@ -408,6 +465,9 @@ def approve_document(
     doc.rejection_remarks = None
     db.commit()
     db.refresh(doc)
+    
+    log_audit("document_approval", current_user.email, f"Manager approved document: {doc.name} (ID: {doc.id})")
+    
     return doc
 
 @router.post("/{document_id}/reject", response_model=DocumentResponse)
@@ -426,6 +486,9 @@ def reject_document(
     doc.rejection_remarks = payload.rejection_remarks
     db.commit()
     db.refresh(doc)
+    
+    log_audit("document_rejection", current_user.email, f"Manager rejected document: {doc.name} (ID: {doc.id}) with remarks: {payload.rejection_remarks}")
+    
     return doc
 
 

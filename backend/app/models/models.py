@@ -11,9 +11,9 @@ from sqlalchemy import (
 )
 import os
 from sqlalchemy.orm import relationship, backref
+from app.core.config import settings
 
-db_url = os.getenv("DATABASE_URL", "sqlite:///./kms.db")
-is_sqlite = db_url.startswith("sqlite")
+is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 if is_sqlite:
     from sqlalchemy.types import TypeDecorator, String as SQLAlchemyString
@@ -124,7 +124,7 @@ class Department(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
-    parent_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    parent_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
 
     parent = relationship("Department", remote_side=[id], backref="sub_departments")
     users = relationship("User", back_populates="department")
@@ -138,8 +138,8 @@ class User(Base):
     full_name = Column(String(150), nullable=False)
     email = Column(String(150), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -155,8 +155,8 @@ class Folder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(150), nullable=False)
-    parent_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    parent_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     parent = relationship("Folder", remote_side=[id], backref="sub_folders")
@@ -167,14 +167,14 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
+    folder_id = Column(Integer, ForeignKey("folders.id", ondelete="SET NULL"), nullable=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     file_path = Column(String(500), nullable=False)
     file_type = Column(String(20), nullable=False)
     category = Column(String(100), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     access_level = Column(String(30), nullable=False, default="private")
     current_version = Column(Integer, default=1)
     content = Column(Text, nullable=True)
@@ -204,7 +204,7 @@ class DocumentVersion(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     version_number = Column(Integer, nullable=False)
     file_path = Column(String(500), nullable=False)
-    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     uploaded_at = Column(DateTime, server_default=func.now())
 
     document = relationship("Document", back_populates="versions")
@@ -225,8 +225,8 @@ class Permission(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
     access_type = Column(String(30), nullable=False)  # view | edit
 
     document = relationship("Document", back_populates="permissions")
@@ -249,8 +249,8 @@ class AIConversation(Base):
     __tablename__ = "ai_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     source_document_ids = Column(ARRAY(UUID), nullable=True)
@@ -284,4 +284,12 @@ class Notification(Base):
     type = Column(String(50), nullable=True)
     read = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class BlacklistedToken(Base):
+    __tablename__ = "blacklisted_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(500), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
 

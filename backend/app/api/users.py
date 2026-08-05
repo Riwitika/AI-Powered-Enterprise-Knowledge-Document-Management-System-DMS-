@@ -7,6 +7,7 @@ from app.core.deps import get_db, get_current_admin, get_current_active_user
 from app.core.security import get_password_hash
 from app.models.models import User, Role, Department
 from app.schemas.schemas import UserResponse, UserCreate, UserUpdate
+from app.services.audit import log_audit
 
 router = APIRouter()
 
@@ -46,6 +47,9 @@ def create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    log_audit("user_creation", admin.email, f"Admin created user: {new_user.email} (Role ID: {new_user.role_id})")
+    
     return new_user
 
 
@@ -118,6 +122,9 @@ def update_user(
         
     db.commit()
     db.refresh(user)
+    
+    log_audit("user_update", admin.email, f"Admin updated user: {user.email} (Role ID: {user.role_id}, Department ID: {user.department_id}, Active: {user.is_active})")
+    
     return user
 
 
@@ -141,4 +148,7 @@ def delete_user(
         )
     db.delete(user)
     db.commit()
+    
+    log_audit("user_deletion", admin.email, f"Admin deleted user: {user.email}")
+    
     return {"message": "User deleted successfully"}

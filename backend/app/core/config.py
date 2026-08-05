@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    INVITE_CODE: str = "FASTTRADE-SECURE-2026"
     
     # AI LLM Provider Configuration
     OPENAI_API_KEY: str = ""
@@ -37,6 +39,15 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_cors_origins(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            origins = data.get("BACKEND_CORS_ORIGINS")
+            if isinstance(origins, str) and origins:
+                data["BACKEND_CORS_ORIGINS"] = [x.strip() for x in origins.split(",") if x.strip()]
+        return data
 
     @model_validator(mode="after")
     def validate_sensitive_keys(self) -> 'Settings':

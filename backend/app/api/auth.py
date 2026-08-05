@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -12,7 +12,8 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
 )
-from app.models.models import User, Role, Department
+from app.models.models import User, Role, Department, BlacklistedToken
+from app.services.audit import log_audit
 from app.schemas.schemas import RegisterRequest, UserResponse, Token
 
 router = APIRouter()
@@ -30,7 +31,7 @@ def register(
         )
 
     # Invite code validation
-    if payload.invite_code != "FASTTRADE-SECURE-2026":
+    if payload.invite_code != settings.INVITE_CODE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Corporate Invite Code. Please contact your system administrator."
@@ -74,6 +75,9 @@ def register(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    log_audit("user_registration", new_user.email, f"User registered successfully. Assigned Role: {role_name}")
+    
     return new_user
 
 
@@ -85,15 +89,19 @@ def login(
 ):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password_hash):
+        log_audit("login_failed", form_data.username, "Incorrect username or password provided.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
         )
     if not user.is_active:
+        log_audit("login_failed", user.email, "Attempted login for inactive account.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"
         )
+        
+    log_audit("login_success", user.email, "User logged in successfully.")
         
     # Create tokens
     access_token = create_access_token(subject=user.id)
@@ -137,6 +145,14 @@ def refresh(
             detail="Refresh token missing"
         )
         
+    # Check blacklist
+    blacklisted = db.query(BlacklistedToken).filter(BlacklistedToken.token == refresh_token).first()
+    if blacklisted:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been blacklisted"
+        )
+        
     payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
@@ -174,7 +190,34 @@ def refresh(
 
 
 @router.post("/logout")
-def logout(response: Response):
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            refresh_token = auth_header.split(" ")[1]
+
+    if refresh_token:
+        try:
+            payload = decode_token(refresh_token)
+            if payload and payload.get("type") == "refresh":
+                expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+                blacklisted = BlacklistedToken(token=refresh_token, expires_at=expires_at)
+                db.add(blacklisted)
+                db.commit()
+                
+                # Fetch user for audit trail
+                user_id = payload.get("sub")
+                user = db.query(User).filter(User.id == user_id).first()
+                actor = user.email if user else f"User ID: {user_id}"
+                log_audit("logout", actor, "User logged out successfully.")
+        except Exception:
+            db.rollback()
+
     response.delete_cookie(key="refresh_token")
     return {"message": "Successfully logged out"}
 

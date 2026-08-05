@@ -28,6 +28,9 @@ interface Message {
   content: string;
   timestamp: Date;
   isRegenerated?: boolean;
+  sourceDocuments?: any[];
+  isError?: boolean;
+  failedQuestion?: string;
 }
 
 const DOCUMENT_ACTIONS = [
@@ -58,7 +61,7 @@ export default function FloatingAIChat() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
-  const [provider] = useState<AIProvider>('mock');
+  const [provider] = useState<AIProvider>('openai');
   
   // Custom loading status cycle
   const [loadingStatus, setLoadingStatus] = useState('AI Thinking...');
@@ -235,7 +238,8 @@ export default function FloatingAIChat() {
         id: assistantMessageId,
         role: 'assistant',
         content: '',
-        timestamp: new Date()
+        timestamp: new Date(),
+        sourceDocuments: response.sourceDocuments
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -262,8 +266,10 @@ export default function FloatingAIChat() {
       const errorMessage: Message = {
         id: Math.random().toString(),
         role: 'assistant',
-        content: `Error: ${(err as Error).message || 'Failed to generate response'}`,
-        timestamp: new Date()
+        content: 'AI service is temporarily unavailable.',
+        timestamp: new Date(),
+        isError: true,
+        failedQuestion: queryText
       };
       setMessages(prev => [...prev, errorMessage]);
     }
@@ -503,7 +509,9 @@ export default function FloatingAIChat() {
                   <div className={`rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm relative ${
                     isUser 
                       ? 'bg-blue-600 text-white rounded-tr-none' 
-                      : 'bg-white text-slate-855 border border-slate-200/80 rounded-tl-none'
+                      : msg.isError
+                        ? 'bg-red-50 text-red-800 border border-red-200 rounded-tl-none'
+                        : 'bg-white text-slate-855 border border-slate-200/80 rounded-tl-none'
                   }`}>
                     {/* Render Content */}
                     <div className="space-y-2 whitespace-pre-wrap">
@@ -535,7 +543,47 @@ export default function FloatingAIChat() {
                     <span className={`text-[8px] block mt-1.5 select-none font-bold ${isUser ? 'text-blue-200 text-right' : 'text-slate-400 text-left'}`}>
                       {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                    
+                    {!isUser && msg.isError && (
+                      <div className="mt-2 flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleAsk(msg.failedQuestion || '')}
+                          className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-800 border border-red-200 hover:border-red-300 rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-colors shadow-sm"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5 shrink-0" />
+                          <span>Retry</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {!isUser && msg.sourceDocuments && msg.sourceDocuments.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">Sources & Citations:</span>
+                      <div className="flex flex-col gap-1">
+                        {msg.sourceDocuments.map((doc: any, sIdx: number) => (
+                          <div key={sIdx} className="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200/60 rounded-xl">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <div className="w-5 h-5 bg-blue-50 text-blue-600 rounded font-black text-[8px] border border-blue-100 flex items-center justify-center shrink-0">
+                                {doc.file_type || 'DOCX'}
+                              </div>
+                              <span className="text-[10px] font-extrabold text-slate-750 truncate max-w-[200px]" title={doc.name}>
+                                {doc.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => window.open(`/documents/${doc.id}`, '_blank')}
+                              className="px-2 py-0.5 border border-blue-200 text-blue-650 hover:bg-blue-50 text-[9px] font-bold rounded shadow-sm shrink-0"
+                            >
+                              Open
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Actions for Assistant Message */}
                   {!isUser && msg.id !== 'welcome' && (

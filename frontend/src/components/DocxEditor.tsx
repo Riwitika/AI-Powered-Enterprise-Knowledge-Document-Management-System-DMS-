@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { sanitizeHtml } from '../utils/sanitize';
 import { useNavigate } from 'react-router-dom';
 import { 
   Undo2, 
@@ -34,6 +35,8 @@ import {
   Outdent as OutdentIcon
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { api } from '../api/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 interface CommentReply {
@@ -76,6 +79,7 @@ interface DocxEditorProps {
     locationPath: string;
     tags: string[];
     description: string;
+    content?: string;
   };
 }
 
@@ -84,12 +88,15 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   const navigate = useNavigate();
   const docId = activeDoc?.id || 'default-doc';
   
+  const queryClient = useQueryClient();
+  const isRealUUID = !!activeDoc?.id && !activeDoc.id.startsWith('doc-') && !activeDoc.id.startsWith('temp-') && activeDoc.id.length > 20;
+
   // ----------------- STATE DECLARATIONS -----------------
   const [docTitle, setDocTitle] = useState(activeDoc?.name || 'Untitled Document');
   const [fontSizeVal, setFontSizeVal] = useState(11);
   const [fontFamily, setFontFamily] = useState('Arial');
   const [lineSpacing, setLineSpacing] = useState('1.15');
-  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Unsaved changes'>('Saved');
+  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Failed' | 'Unsaved changes'>('Saved');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
@@ -113,6 +120,61 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   const [headings, setHeadings] = useState<{ id: string; text: string; tag: string }[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
+
+  // React Query for comments list
+  const { data: dbComments } = useQuery({
+    queryKey: ['comments', docId],
+    queryFn: () => api.comments.list(docId),
+    enabled: isRealUUID,
+  });
+
+  // React Query for versions list
+  const { data: dbVersions } = useQuery({
+    queryKey: ['versions', docId],
+    queryFn: () => api.documents.versions(docId),
+    enabled: isRealUUID,
+  });
+
+  const formatTime = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return 'Just now';
+    }
+  };
+
+  useEffect(() => {
+    if (dbComments) {
+      const mappedComments = dbComments.map((c: any) => ({
+        id: String(c.id),
+        author: c.user_name,
+        content: c.content,
+        timestamp: formatTime(c.created_at),
+        resolved: c.resolved,
+        replies: (c.replies || []).map((r: any) => ({
+          author: r.user_name,
+          content: r.content,
+          timestamp: formatTime(r.created_at),
+        })),
+      }));
+      setComments(mappedComments);
+    }
+  }, [dbComments]);
+
+  useEffect(() => {
+    if (dbVersions) {
+      const mappedVersions = dbVersions.map((v: any) => ({
+        id: String(v.id),
+        version: `v${v.version_number}.0`,
+        author: v.uploader?.full_name || 'System',
+        timestamp: formatTime(v.uploaded_at),
+        content: '',
+        version_number: v.version_number
+      }));
+      setVersions(mappedVersions);
+    }
+  }, [dbVersions]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [aiMessages, setAiMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
     { sender: 'ai', text: 'Hello! I am your Enterprise AI Assistant. How can I help you draft or refine this document?' }
@@ -162,12 +224,16 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
     if (!docId) return;
 
     // 1. Load document content
-    const savedContent = localStorage.getItem(`kms-doc-content-${docId}`);
     if (editorRef.current) {
-      if (savedContent) {
-        editorRef.current.innerHTML = savedContent;
+      if (isRealUUID) {
+        editorRef.current.innerHTML = sanitizeHtml(activeDoc?.content || getDefaultEditorContent());
       } else {
-        editorRef.current.innerHTML = getDefaultEditorContent();
+        const savedContent = localStorage.getItem(`kms-doc-content-${docId}`);
+        if (savedContent) {
+          editorRef.current.innerHTML = sanitizeHtml(savedContent);
+        } else {
+          editorRef.current.innerHTML = sanitizeHtml(getDefaultEditorContent());
+        }
       }
     }
 
@@ -180,53 +246,7 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
     const lockList = locks ? JSON.parse(locks) : [];
     setIsLocked(lockList.includes(docId));
 
-    // 3. Load comments
-    const savedComments = localStorage.getItem(`kms-doc-comments-${docId}`);
-    if (savedComments) {
-      setComments(JSON.parse(savedComments));
-    } else {
-      const defaultComments: Comment[] = [
-        {
-          id: `comment-1`,
-          author: 'Arnim Goyal',
-          content: 'Verify operational budget estimates in Section 2 before final submission.',
-          timestamp: '2 hours ago',
-          resolved: false,
-          replies: [
-            { author: 'Paras Jain', content: 'On it. Reviewing standard operational figures now.', timestamp: '1 hour ago' }
-          ]
-        }
-      ];
-      setComments(defaultComments);
-      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(defaultComments));
-    }
-
-    // 4. Load version history
-    const savedVersions = localStorage.getItem(`kms-doc-versions-${docId}`);
-    if (savedVersions) {
-      setVersions(JSON.parse(savedVersions));
-    } else {
-      const defaultVersions: Version[] = [
-        {
-          id: 'v-1',
-          version: 'v1.0',
-          author: 'Arun Goyal',
-          timestamp: '2026-07-20 10:15',
-          content: '<h1>Initial Project Scope</h1><p>Starting draft operational guidelines...</p>'
-        },
-        {
-          id: 'v-2',
-          version: 'v1.1',
-          author: 'Riwitika Gupta',
-          timestamp: '2026-07-21 11:20',
-          content: '<h1>Project Scope Outline</h1><p>Refined agenda and updated attendees list...</p>'
-        }
-      ];
-      setVersions(defaultVersions);
-      localStorage.setItem(`kms-doc-versions-${docId}`, JSON.stringify(defaultVersions));
-    }
-
-    // 5. Load Activities Log
+    // 5. Load Activities Log (fallback mock list)
     const savedActivities = localStorage.getItem(`kms-doc-activity-${docId}`);
     if (savedActivities) {
       setActivities(JSON.parse(savedActivities));
@@ -238,12 +258,11 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
         { actor: 'Arun Goyal', action: 'Shared document with Riwitika Gupta', time: 'Today, 1:45 PM' }
       ];
       setActivities(defaultActivities);
-      localStorage.setItem(`kms-doc-activity-${docId}`, JSON.stringify(defaultActivities));
     }
 
     // Initialize outline headings
     setTimeout(extractHeadings, 150);
-  }, [docId]);
+  }, [docId, activeDoc?.content, isRealUUID]);
 
   const getDefaultEditorContent = () => {
     return `
@@ -291,18 +310,30 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
     setSaveStatus('Saving...');
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(async () => {
       if (!editorRef.current) return;
       const htmlContent = editorRef.current.innerHTML;
       
-      // Save content
-      localStorage.setItem(`kms-doc-content-${docId}`, htmlContent);
-      setSaveStatus('Saved');
+      if (isRealUUID) {
+        try {
+          await api.documents.update(docId, { content: htmlContent });
+          setSaveStatus('Saved');
+          queryClient.invalidateQueries({ queryKey: ['document', docId] });
+        } catch (err) {
+          console.error('Autosave failed:', err);
+          setSaveStatus('Failed');
+        }
+      } else {
+        localStorage.setItem(`kms-doc-content-${docId}`, htmlContent);
+        setSaveStatus('Saved');
+      }
+      
       extractHeadings();
 
       // Dispatch change event to sync with rest of layout
       window.dispatchEvent(new CustomEvent('kms-active-document-change', {
         detail: {
+          id: docId,
           title: docTitle,
           fileType: 'DOCX',
           version: versionStr,
@@ -465,121 +496,234 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   };
 
   // ----------------- COMMENTS SYSTEM -----------------
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentVal.trim()) return;
 
-    const commentId = `comment-${Date.now()}`;
-    const newComment: Comment = {
-      id: commentId,
-      author: user?.full_name || 'Riwitika Gupta',
-      content: newCommentVal,
-      timestamp: 'Just now',
-      resolved: false,
-      replies: []
-    };
-
-    if (selectedRange && selectedText.length > 0) {
-      editorRef.current?.focus();
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(selectedRange);
-        
-        const anchorHtml = `<span class="bg-amber-100 border-b-2 border-amber-400 py-0.5 cursor-pointer hover:bg-amber-200 transition-colors comment-anchor" data-comment-id="${commentId}">${selectedText}</span>`;
-        document.execCommand('insertHTML', false, anchorHtml);
-      }
-    }
-
-    const updated = [newComment, ...comments];
-    setComments(updated);
-    localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-    logActivity(user?.full_name || 'Riwitika Gupta', `Created new comment: "${newCommentVal.substring(0, 30)}..."`);
-    setNewCommentVal('');
-    setSelectedRange(null);
-    setSelectedText('');
-    triggerAutosave();
-  };
-
-  const handleReplyComment = (commentId: string, replyText: string) => {
-    if (!replyText.trim()) return;
-    const updated = comments.map(c => {
-      if (c.id === commentId) {
-        return {
-          ...c,
-          replies: [...c.replies, {
-            author: user?.full_name || 'Riwitika Gupta',
-            content: replyText,
-            timestamp: 'Just now'
-          }]
-        };
-      }
-      return c;
-    });
-    setComments(updated);
-    localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-    logActivity(user?.full_name || 'Riwitika Gupta', `Replied to comment thread`);
-    setReplyInputs(prev => ({ ...prev, [commentId]: '' }));
-  };
-
-  const handleResolveComment = (commentId: string) => {
-    const target = comments.find(c => c.id === commentId);
-    const updated = comments.map(c => {
-      if (c.id === commentId) {
-        return { ...c, resolved: !c.resolved };
-      }
-      return c;
-    });
-    setComments(updated);
-    localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-    logActivity(user?.full_name || 'Riwitika Gupta', `${target?.resolved ? 'Reopened' : 'Resolved'} comment thread`);
-  };
-
-  const handleDeleteComment = (commentId: string) => {
-    const updated = comments.filter(c => c.id !== commentId);
-    setComments(updated);
-    localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-    logActivity(user?.full_name || 'Riwitika Gupta', `Deleted comment thread`);
-
-    if (!editorRef.current) return;
-    const anchors = editorRef.current.querySelectorAll(`[data-comment-id="${commentId}"]`);
-    anchors.forEach(anchor => {
-      const parent = anchor.parentNode;
-      if (parent) {
-        while (anchor.firstChild) {
-          parent.insertBefore(anchor.firstChild, anchor);
+    if (isRealUUID) {
+      try {
+        let createdComment: any = null;
+        if (selectedRange && selectedText.length > 0) {
+          editorRef.current?.focus();
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(selectedRange);
+            
+            createdComment = await api.comments.create(docId, { content: newCommentVal });
+            const commentId = String(createdComment.id);
+            
+            const anchorHtml = `<span class="bg-amber-100 border-b-2 border-amber-400 py-0.5 cursor-pointer hover:bg-amber-200 transition-colors comment-anchor" data-comment-id="${commentId}">${selectedText}</span>`;
+            document.execCommand('insertHTML', false, anchorHtml);
+            triggerAutosave();
+          }
+        } else {
+          createdComment = await api.comments.create(docId, { content: newCommentVal });
         }
-        parent.removeChild(anchor);
+
+        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
+        logActivity(user?.full_name || 'System', `Created new comment: "${newCommentVal.substring(0, 30)}..."`);
+        setNewCommentVal('');
+        setSelectedRange(null);
+        setSelectedText('');
+      } catch (err) {
+        console.error('Failed to save comment:', err);
+        alert('Could not save comment to backend.');
       }
-    });
-    triggerAutosave();
+    } else {
+      const commentId = `comment-${Date.now()}`;
+      const newComment: Comment = {
+        id: commentId,
+        author: user?.full_name || 'Riwitika Gupta',
+        content: newCommentVal,
+        timestamp: 'Just now',
+        resolved: false,
+        replies: []
+      };
+
+      if (selectedRange && selectedText.length > 0) {
+        editorRef.current?.focus();
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(selectedRange);
+          
+          const anchorHtml = `<span class="bg-amber-100 border-b-2 border-amber-400 py-0.5 cursor-pointer hover:bg-amber-200 transition-colors comment-anchor" data-comment-id="${commentId}">${selectedText}</span>`;
+          document.execCommand('insertHTML', false, anchorHtml);
+        }
+      }
+
+      const updated = [newComment, ...comments];
+      setComments(updated);
+      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
+      logActivity(user?.full_name || 'Riwitika Gupta', `Created new comment: "${newCommentVal.substring(0, 30)}..."`);
+      setNewCommentVal('');
+      setSelectedRange(null);
+      setSelectedText('');
+      triggerAutosave();
+    }
+  };
+
+  const handleReplyComment = async (commentId: string, replyText: string) => {
+    if (!replyText.trim()) return;
+    if (isRealUUID) {
+      try {
+        await api.comments.create(docId, { content: replyText, parent_id: Number(commentId) });
+        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
+        logActivity(user?.full_name || 'System', `Replied to comment thread`);
+        setReplyInputs(prev => ({ ...prev, [commentId]: '' }));
+      } catch (err) {
+        console.error('Failed to reply comment:', err);
+      }
+    } else {
+      const updated = comments.map(c => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            replies: [...c.replies, {
+              author: user?.full_name || 'Riwitika Gupta',
+              content: replyText,
+              timestamp: 'Just now'
+            }]
+          };
+        }
+        return c;
+      });
+      setComments(updated);
+      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
+      logActivity(user?.full_name || 'Riwitika Gupta', `Replied to comment thread`);
+      setReplyInputs(prev => ({ ...prev, [commentId]: '' }));
+    }
+  };
+
+  const handleResolveComment = async (commentId: string) => {
+    if (isRealUUID) {
+      try {
+        await api.comments.resolve(Number(commentId));
+        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
+        logActivity(user?.full_name || 'System', `Resolved comment thread`);
+      } catch (err) {
+        console.error('Failed to resolve comment:', err);
+      }
+    } else {
+      const target = comments.find(c => c.id === commentId);
+      const updated = comments.map(c => {
+        if (c.id === commentId) {
+          return { ...c, resolved: !c.resolved };
+        }
+        return c;
+      });
+      setComments(updated);
+      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
+      logActivity(user?.full_name || 'Riwitika Gupta', `${target?.resolved ? 'Reopened' : 'Resolved'} comment thread`);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (isRealUUID) {
+      try {
+        await api.comments.delete(Number(commentId));
+        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
+        logActivity(user?.full_name || 'System', `Deleted comment thread`);
+
+        if (editorRef.current) {
+          const anchors = editorRef.current.querySelectorAll(`[data-comment-id="${commentId}"]`);
+          anchors.forEach(anchor => {
+            const parent = anchor.parentNode;
+            if (parent) {
+              while (anchor.firstChild) {
+                parent.insertBefore(anchor.firstChild, anchor);
+              }
+              parent.removeChild(anchor);
+            }
+          });
+          triggerAutosave();
+        }
+      } catch (err) {
+        console.error('Failed to delete comment:', err);
+      }
+    } else {
+      const updated = comments.filter(c => c.id !== commentId);
+      setComments(updated);
+      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
+      logActivity(user?.full_name || 'Riwitika Gupta', `Deleted comment thread`);
+
+      if (!editorRef.current) return;
+      const anchors = editorRef.current.querySelectorAll(`[data-comment-id="${commentId}"]`);
+      anchors.forEach(anchor => {
+        const parent = anchor.parentNode;
+        if (parent) {
+          while (anchor.firstChild) {
+            parent.insertBefore(anchor.firstChild, anchor);
+          }
+          parent.removeChild(anchor);
+        }
+      });
+      triggerAutosave();
+    }
   };
 
   // ----------------- CHECKPOINT REVISIONS -----------------
-  const handleCreateVersionCheckpoint = () => {
+  const handleCreateVersionCheckpoint = async () => {
     if (!editorRef.current) return;
-    const newVersionNum = `v1.${versions.length + 1}`;
-    const newVersion: Version = {
-      id: `v-${Date.now()}`,
-      version: newVersionNum,
-      author: user?.full_name || 'Riwitika Gupta',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      content: editorRef.current.innerHTML
-    };
+    if (isRealUUID) {
+      try {
+        setSaveStatus('Saving...');
+        const currentHtml = editorRef.current.innerHTML;
+        const blob = new Blob([currentHtml], { type: 'text/html' });
+        const formData = new FormData();
+        formData.append('file', blob, `${docTitle}.html`);
+        await api.documents.uploadVersion(docId, formData);
+        
+        queryClient.invalidateQueries({ queryKey: ['versions', docId] });
+        queryClient.invalidateQueries({ queryKey: ['document', docId] });
+        setSaveStatus('Saved');
+        alert(`Successfully registered new revision checkpoint!`);
+      } catch (err) {
+        console.error('Failed to create revision checkpoint:', err);
+        alert('Could not save version checkpoint to server.');
+      }
+    } else {
+      const newVersionNum = `v1.${versions.length + 1}`;
+      const newVersion: Version = {
+        id: `v-${Date.now()}`,
+        version: newVersionNum,
+        author: user?.full_name || 'Riwitika Gupta',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        content: editorRef.current.innerHTML
+      };
 
-    const updated = [newVersion, ...versions];
-    setVersions(updated);
-    localStorage.setItem(`kms-doc-versions-${docId}`, JSON.stringify(updated));
-    logActivity(user?.full_name || 'Riwitika Gupta', `Saved revision checkpoint ${newVersionNum}`);
-    alert(`Successfully registered revision checkpoint: ${newVersionNum}`);
+      const updated = [newVersion, ...versions];
+      setVersions(updated);
+      localStorage.setItem(`kms-doc-versions-${docId}`, JSON.stringify(updated));
+      logActivity(user?.full_name || 'Riwitika Gupta', `Saved revision checkpoint ${newVersionNum}`);
+      alert(`Successfully registered revision checkpoint: ${newVersionNum}`);
+    }
   };
 
-  const handleRestoreVersion = (ver: Version) => {
+  const handleRestoreVersion = async (ver: any) => {
     if (!editorRef.current) return;
-    editorRef.current.innerHTML = ver.content;
-    triggerAutosave();
-    logActivity(user?.full_name || 'Riwitika Gupta', `Restored document contents to version ${ver.version}`);
-    alert(`Restored document to version ${ver.version} successfully!`);
+    if (isRealUUID) {
+      try {
+        const versionDetails = await api.documents.viewVersion(docId, ver.version_number);
+        if (editorRef.current && versionDetails && versionDetails.content) {
+          editorRef.current.innerHTML = sanitizeHtml(versionDetails.content);
+          triggerAutosave();
+          logActivity(user?.full_name || 'System', `Restored document contents to version v${ver.version_number}.0`);
+          alert(`Restored document to version v${ver.version_number}.0 successfully!`);
+        } else {
+          alert('Could not retrieve version content from storage.');
+        }
+      } catch (err) {
+        console.error('Error restoring version:', err);
+        alert('Failed to restore version from server.');
+      }
+    } else {
+      editorRef.current.innerHTML = sanitizeHtml(ver.content);
+      triggerAutosave();
+      logActivity(user?.full_name || 'Riwitika Gupta', `Restored document contents to version ${ver.version}`);
+      alert(`Restored document to version ${ver.version} successfully!`);
+    }
   };
 
   // ----------------- FAVORITES & LOCKS -----------------
@@ -682,8 +826,11 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
                   onClick={() => alert(`Auto-save checkpoint configuration`)}
                   className="flex items-center gap-1 text-[8.5px] text-slate-400 font-bold bg-slate-50 border border-slate-200 rounded px-1.5 py-0.2 ml-1 cursor-pointer hover:bg-slate-100 shrink-0"
                 >
-                  <span className={`h-1 w-1 rounded-full ${saveStatus === 'Saving...' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                  <span>{saveStatus === 'Saving...' ? 'Saving...' : 'Saved'}</span>
+                  <span className={`h-1 w-1 rounded-full ${
+                    saveStatus === 'Saving...' ? 'bg-amber-500 animate-pulse' :
+                    saveStatus === 'Failed' ? 'bg-rose-500' : 'bg-emerald-500'
+                  }`} />
+                  <span>{saveStatus}</span>
                 </div>
               </div>
               

@@ -5,6 +5,7 @@ export interface FolderNode {
   id: string | number;
   name: string;
   subFolders?: FolderNode[];
+  sub_folders?: FolderNode[];
 }
 
 interface FolderTreeProps {
@@ -33,7 +34,8 @@ export default function FolderTree({
 
   const renderTree = (items: FolderNode[], depth = 0) => {
     return items.map((node) => {
-      const hasChildren = !!node.subFolders && node.subFolders.length > 0;
+      const children = node.sub_folders || node.subFolders || [];
+      const hasChildren = children.length > 0;
       const isExpanded = !!expandedNodes[node.id];
       const isActive = activeFolderId === node.id;
 
@@ -46,7 +48,7 @@ export default function FolderTree({
             className={`w-full flex items-center gap-1.5 py-2 px-2.5 rounded-lg transition-all text-left text-xs font-bold border-l-2 cursor-pointer ${
               isActive 
                 ? 'bg-blue-50 text-blue-600 border-blue-600' 
-                : 'text-slate-650 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent'
+                : 'text-slate-655 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent'
             }`}
           >
             {/* Toggle arrow */}
@@ -78,7 +80,7 @@ export default function FolderTree({
           {/* Children rendering */}
           {hasChildren && isExpanded && (
             <div className="space-y-0.5">
-              {renderTree(node.subFolders!, depth + 1)}
+              {renderTree(children, depth + 1)}
             </div>
           )}
         </div>

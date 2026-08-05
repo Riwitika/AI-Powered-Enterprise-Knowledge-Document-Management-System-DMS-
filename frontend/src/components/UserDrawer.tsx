@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sanitizeHtml } from '../utils/sanitize';
 import { 
   X, 
   KeyRound, 
@@ -170,7 +171,7 @@ export default function UserDrawer({
                     </div>
                     <div>
                       <span className="text-[10.5px] font-bold text-slate-800 block leading-tight">{d.name}</span>
-                      <span className="text-[9px] text-slate-400 font-semibold block mt-0.5" dangerouslySetInnerHTML={{ __html: d.desc }} />
+                      <span className="text-[9px] text-slate-400 font-semibold block mt-0.5" dangerouslySetInnerHTML={{ __html: sanitizeHtml(d.desc) }} />
                     </div>
                   </div>
                 ))}
