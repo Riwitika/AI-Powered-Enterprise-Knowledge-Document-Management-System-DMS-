@@ -147,7 +147,7 @@ class User(Base):
     department = relationship("Department", back_populates="users")
     documents_owned = relationship("Document", back_populates="owner")
     uploaded_versions = relationship("DocumentVersion", back_populates="uploader")
-    conversations = relationship("AIConversation", back_populates="user")
+    conversations = relationship("AIConversation", back_populates="user", cascade="all, delete-orphan")
 
 
 class Folder(Base):
