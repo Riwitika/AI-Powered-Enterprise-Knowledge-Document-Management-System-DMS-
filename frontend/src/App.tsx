@@ -1,19 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/authStore';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import DocumentTree from './pages/DocumentTree';
-import DocumentViewer from './pages/DocumentViewer';
-import AIChat from './pages/AIChat';
-import Search from './pages/Search';
-import UserManagement from './pages/UserManagement';
-import ApprovalDashboard from './pages/ApprovalDashboard';
-import PublicDocumentViewer from './pages/PublicDocumentViewer';
-import Permissions from './pages/Permissions';
-import Settings from './pages/Settings';
+
+// Lazy loaded page components
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DocumentTree = lazy(() => import('./pages/DocumentTree'));
+const DocumentViewer = lazy(() => import('./pages/DocumentViewer'));
+const AIChat = lazy(() => import('./pages/AIChat'));
+const Search = lazy(() => import('./pages/Search'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const ApprovalDashboard = lazy(() => import('./pages/ApprovalDashboard'));
+const PublicDocumentViewer = lazy(() => import('./pages/PublicDocumentViewer'));
+const Permissions = lazy(() => import('./pages/Permissions'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,69 +98,78 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } 
-          />
-          <Route path="/public/documents/:id" element={<PublicDocumentViewer />} />
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] font-sans">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <div className="text-xs font-bold text-slate-450 uppercase tracking-widest">Loading corporate module...</div>
+            </div>
+          </div>
+        }>
+          <Routes>
+            {/* Public routes */}
+            <Route 
+              path="/login" 
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              } 
+            />
+            <Route path="/public/documents/:id" element={<PublicDocumentViewer />} />
 
-          {/* Protected routes under Layout */}
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="documents" element={<DocumentTree />} />
-            <Route path="documents/:id" element={<DocumentViewer />} />
-            <Route path="chat" element={<AIChat />} />
-            <Route path="search" element={<Search />} />
-            
-            {/* Admin only route */}
+            {/* Protected routes under Layout */}
             <Route 
-              path="users" 
+              path="/" 
               element={
-                <AdminRoute>
-                  <UserManagement />
-                </AdminRoute>
-              } 
-            />
-            
-            {/* Manager and Admin approval route */}
-            <Route 
-              path="approval" 
-              element={
-                <ManagerOrAdminRoute>
-                  <ApprovalDashboard />
-                </ManagerOrAdminRoute>
-              } 
-            />
-            
-            {/* Admin only route */}
-            <Route 
-              path="permissions" 
-              element={
-                <AdminRoute>
-                  <Permissions />
-                </AdminRoute>
-              } 
-            />
-            
-            <Route path="settings" element={<Settings />} />
-          </Route>
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="documents" element={<DocumentTree />} />
+              <Route path="documents/:id" element={<DocumentViewer />} />
+              <Route path="chat" element={<AIChat />} />
+              <Route path="search" element={<Search />} />
+              
+              {/* Admin only route */}
+              <Route 
+                path="users" 
+                element={
+                  <AdminRoute>
+                    <UserManagement />
+                  </AdminRoute>
+                } 
+              />
+              
+              {/* Manager and Admin approval route */}
+              <Route 
+                path="approval" 
+                element={
+                  <ManagerOrAdminRoute>
+                    <ApprovalDashboard />
+                  </ManagerOrAdminRoute>
+                } 
+              />
+              
+              {/* Admin only route */}
+              <Route 
+                path="permissions" 
+                element={
+                  <AdminRoute>
+                    <Permissions />
+                  </AdminRoute>
+                } 
+              />
+              
+              <Route path="settings" element={<Settings />} />
+            </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   );

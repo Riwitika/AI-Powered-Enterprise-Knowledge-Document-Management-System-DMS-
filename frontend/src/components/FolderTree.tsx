@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Folder, ChevronRight, ChevronDown } from 'lucide-react';
 
 export interface FolderNode {
@@ -15,7 +15,7 @@ interface FolderTreeProps {
   defaultExpandedIds?: Record<string | number, boolean>;
 }
 
-export default function FolderTree({
+function FolderTree({
   nodes,
   activeFolderId,
   onFolderSelect,
@@ -58,28 +58,25 @@ export default function FolderTree({
                   toggleExpand(node.id, e);
                 }
               }}
-              className="w-4 h-4 flex items-center justify-center shrink-0"
+              className="p-0.5 rounded hover:bg-slate-150 text-slate-400 hover:text-slate-600 transition-colors"
             >
-              {hasChildren && (
-                isExpanded ? (
-                  <ChevronDown className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 hover:text-slate-700" />
-                )
+              {hasChildren ? (
+                isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />
+              ) : (
+                <div className="w-3.5 h-3.5" />
               )}
             </div>
 
-            {/* Folder Icon */}
-            <Folder className={`w-4 h-4 shrink-0 ${
-              isActive ? 'text-blue-500 fill-blue-500/10' : 'text-amber-500 fill-amber-500/5'
-            }`} />
-            
-            <span className="truncate flex-1">{node.name}</span>
+            {/* Icon */}
+            <Folder className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-500 fill-blue-50' : 'text-slate-400'}`} />
+
+            {/* Folder Name */}
+            <span className="truncate flex-1 pr-1">{node.name}</span>
           </div>
 
-          {/* Children rendering */}
+          {/* Children subfolders container */}
           {hasChildren && isExpanded && (
-            <div className="space-y-0.5">
+            <div className="mt-0.5">
               {renderTree(children, depth + 1)}
             </div>
           )}
@@ -88,5 +85,11 @@ export default function FolderTree({
     });
   };
 
-  return <div className="space-y-1">{renderTree(nodes)}</div>;
+  return (
+    <div className="space-y-0.5">
+      {renderTree(nodes)}
+    </div>
+  );
 }
+
+export default memo(FolderTree);

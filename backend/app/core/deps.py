@@ -73,51 +73,48 @@ def get_current_admin(
 
 def get_accessible_document_ids(user: User, db: Session) -> List[UUID]:
     """
-    Returns the list of document UUIDs the user is allowed to view.
+    Optimized: Returns the list of document UUIDs the user is allowed to view
+    in a single database query using outer joins.
     """
     if user.role and user.role.name in ["super_admin", "admin"]:
         return [d[0] for d in db.query(Document.id).all()]
 
-    # 1. Base conditions (owned, shared org-wide, view_only, edit, public)
+    # Base access level conditions
     conditions = [
         Document.owner_id == user.id,
         Document.access_level.in_(["organization", "view_only", "edit", "public"])
     ]
     
-    # 2. Department condition
     if user.department_id:
         conditions.append(
             and_(Document.access_level == "department", Document.department_id == user.department_id)
         )
         
-    # 3. Custom permissions
-    custom_perm_queries = [Permission.user_id == user.id]
-    if user.department_id:
-        custom_perm_queries.append(Permission.department_id == user.department_id)
-        
-    custom_perm_doc_ids = db.query(Permission.document_id).filter(
-        or_(*custom_perm_queries)
-    ).all()
-    custom_ids = [r[0] for r in custom_perm_doc_ids]
-
-    # Query matching documents
-    query_conditions = [or_(*conditions)]
-    if custom_ids:
-        query_conditions.append(Document.id.in_(custom_ids))
-        
-    docs = db.query(Document).filter(or_(*query_conditions)).all()
+    # Join with Permission table for custom user/dept sharing grants
+    query = db.query(Document.id).outerjoin(
+        Permission, Permission.document_id == Document.id
+    )
     
-    accessible_ids = []
+    custom_conditions = [Permission.user_id == user.id]
+    if user.department_id:
+        custom_conditions.append(Permission.department_id == user.department_id)
+        
+    conditions.append(
+        and_(Permission.id.is_not(None), or_(*custom_conditions))
+    )
+    
+    # Filter based on document status and user role permissions
     is_manager = user.role and user.role.name == "department_manager"
-    for doc in docs:
-        if doc.status == "active":
-            accessible_ids.append(doc.id)
-        elif doc.owner_id == user.id:
-            accessible_ids.append(doc.id)
-        elif doc.status == "pending_approval" and is_manager:
-            accessible_ids.append(doc.id)
-            
-    return accessible_ids
+    status_conditions = [
+        Document.status == "active",
+        Document.owner_id == user.id
+    ]
+    if is_manager:
+        status_conditions.append(Document.status == "pending_approval")
+        
+    query = query.filter(or_(*conditions)).filter(or_(*status_conditions))
+    
+    return [r[0] for r in query.distinct().all()]
 
 def verify_document_access(
     document_id: UUID,

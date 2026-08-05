@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.core.deps import get_db, get_current_active_user, get_accessible_document_ids
@@ -94,14 +94,21 @@ def get_dashboard_metrics(
         docs_by_dept["Unassigned"] = unassigned_count
 
     # 7. Recent uploads (limit 5)
-    recent_uploads = db.query(Document).filter(
+    recent_uploads = db.query(Document).options(
+        joinedload(Document.owner).joinedload(User.role),
+        joinedload(Document.owner).joinedload(User.department)
+    ).filter(
         Document.status == "active",
         Document.id.in_(allowed_ids)
     ).order_by(Document.created_at.desc()).limit(5).all()
 
     # 8. Most viewed documents (limit 5)
     most_viewed_query = db.query(Document, func.count(AIConversation.id).label("convo_count"))\
-        .join(AIConversation, AIConversation.document_id == Document.id, isouter=True)\
+        .outerjoin(AIConversation, AIConversation.document_id == Document.id)\
+        .options(
+            joinedload(Document.owner).joinedload(User.role),
+            joinedload(Document.owner).joinedload(User.department)
+        )\
         .filter(
             Document.status == "active",
             Document.id.in_(allowed_ids)
@@ -118,7 +125,9 @@ def get_dashboard_metrics(
     recent_activity = []
     
     # A. Recent uploads (up to 5)
-    uploads = db.query(Document).filter(
+    uploads = db.query(Document).options(
+        joinedload(Document.owner)
+    ).filter(
         Document.id.in_(allowed_ids)
     ).order_by(Document.created_at.desc()).limit(5).all()
     for doc in uploads:
@@ -132,7 +141,10 @@ def get_dashboard_metrics(
         })
 
     # B. Recent edits/new versions (up to 5)
-    edits = db.query(DocumentVersion).join(Document).filter(
+    edits = db.query(DocumentVersion).join(Document).options(
+        joinedload(DocumentVersion.uploader),
+        joinedload(DocumentVersion.document)
+    ).filter(
         Document.id.in_(allowed_ids)
     ).order_by(DocumentVersion.uploaded_at.desc()).limit(5).all()
     for version in edits:
@@ -146,7 +158,9 @@ def get_dashboard_metrics(
         })
 
     # C. Recent approvals (up to 5)
-    approvals = db.query(Document).filter(
+    approvals = db.query(Document).options(
+        joinedload(Document.owner)
+    ).filter(
         Document.status == "active",
         Document.id.in_(allowed_ids)
     ).order_by(Document.updated_at.desc()).limit(5).all()

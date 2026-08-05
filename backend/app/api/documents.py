@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from app.core.deps import get_db, get_current_active_user, get_accessible_document_ids, verify_document_access
@@ -135,7 +135,10 @@ def list_documents(
     current_user: User = Depends(get_current_active_user)
 ):
     allowed_ids = get_accessible_document_ids(current_user, db)
-    docs = db.query(Document).filter(
+    docs = db.query(Document).options(
+        joinedload(Document.owner).joinedload(User.role),
+        joinedload(Document.owner).joinedload(User.department)
+    ).filter(
         Document.id.in_(allowed_ids),
         or_(
             Document.status == "active",
@@ -152,7 +155,10 @@ def get_pending_documents(
 ):
     if not current_user.role or current_user.role.name not in ["super_admin", "admin", "department_manager"]:
         raise HTTPException(status_code=403, detail="Permission denied")
-    docs = db.query(Document).filter(Document.status == "pending_approval").all()
+    docs = db.query(Document).options(
+        joinedload(Document.owner).joinedload(User.role),
+        joinedload(Document.owner).joinedload(User.department)
+    ).filter(Document.status == "pending_approval").all()
     return docs
 
 @router.get("/templates", response_model=List[DocumentResponse])

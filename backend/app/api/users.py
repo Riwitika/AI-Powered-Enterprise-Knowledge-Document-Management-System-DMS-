@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.deps import get_db, get_current_admin, get_current_active_user
 from app.core.security import get_password_hash
@@ -16,7 +16,10 @@ def list_users(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
-    return db.query(User).all()
+    return db.query(User).options(
+        joinedload(User.role),
+        joinedload(User.department)
+    ).all()
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
