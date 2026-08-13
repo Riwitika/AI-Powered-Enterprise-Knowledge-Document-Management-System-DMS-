@@ -45,43 +45,32 @@ class AIService {
     const isRealUUID = !!docId && !docId.startsWith('doc-') && !docId.startsWith('temp-') && docId.length > 20;
 
     if (options.mode === 'document' && isRealUUID && docId) {
-      try {
-        const res = await api.ai.askDoc(docId, question);
-        return {
-          answer: res.answer,
-          provider: 'openai',
-          timestamp: new Date(),
-          sourceDocuments: res.source_documents,
-          suggestedNextPrompts: [
-            'Summarize this document',
-            'Extract key action items',
-            'Are there any risks here?'
-          ]
-        };
-      } catch (err) {
-        console.error('Document-scoped ask failed:', err);
-        throw err;
-      }
-    }
-
-    // Default global ask (when no doc open, or fallback if not real UUID)
-    try {
-      const res = await api.ai.ask(question);
+      const res = await api.ai.askDoc(docId, question);
       return {
         answer: res.answer,
-        provider: 'openai',
+        provider: 'gemini',
         timestamp: new Date(),
         sourceDocuments: res.source_documents,
         suggestedNextPrompts: [
-          'What are the budget highlights?',
-          'List company guidelines',
-          'Search latest reports'
-        ]
+          'Summarize this document',
+          'What are the key policies?',
+          'Explain the main purpose of this document',
+        ],
       };
-    } catch (err) {
-      console.error('Backend global ask failed:', err);
-      throw err;
     }
+
+    const res = await api.ai.ask(question);
+    return {
+      answer: res.answer,
+      provider: 'gemini',
+      timestamp: new Date(),
+      sourceDocuments: res.source_documents,
+      suggestedNextPrompts: [
+        'What are the budget highlights?',
+        'List company guidelines',
+        'Search latest reports',
+      ],
+    };
   }
 }
 

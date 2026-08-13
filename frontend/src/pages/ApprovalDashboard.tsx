@@ -10,6 +10,13 @@ export default function ApprovalDashboard() {
   const [remarks, setRemarks] = useState<string>('');
   const [showRejectForm, setShowRejectForm] = useState<boolean>(false);
 
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null);
+
   const { data: pendingDocs, isLoading } = useQuery({
     queryKey: ['pending-documents'],
     queryFn: api.documents.getPending,
@@ -27,7 +34,7 @@ export default function ApprovalDashboard() {
       setShowRejectForm(false);
     },
     onError: (err: any) => {
-      alert(err.message || 'Failed to approve document');
+      showToast(err.message || 'Failed to approve document');
     }
   });
 
@@ -42,20 +49,18 @@ export default function ApprovalDashboard() {
       setShowRejectForm(false);
     },
     onError: (err: any) => {
-      alert(err.message || 'Failed to reject document');
+      showToast(err.message || 'Failed to reject document');
     }
   });
 
   const handleApprove = (id: string) => {
-    if (window.confirm('Are you sure you want to approve this document?')) {
-      approveMutation.mutate(id);
-    }
+    setConfirmApproveId(id);
   };
 
   const handleRejectSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!remarks.trim()) {
-      alert('Please provide rejection remarks');
+      showToast('Please provide rejection remarks');
       return;
     }
     rejectMutation.mutate({ id: selectedDoc.id, remarks });
@@ -219,6 +224,41 @@ export default function ApprovalDashboard() {
           </div>
         )}
       </div>
+
+      {confirmApproveId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">Approve Document</span>
+              <button type="button" onClick={() => setConfirmApproveId(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-slate-650 leading-relaxed font-semibold">Are you sure you want to approve this document? This will finalize the publication status and index it into the corporate workspace.</p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setConfirmApproveId(null)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  approveMutation.mutate(confirmApproveId);
+                  setConfirmApproveId(null);
+                }} 
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm"
+              >
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 left-6 bg-slate-900 text-white rounded-xl py-3 px-4 shadow-2xl z-[99999] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-5 duration-200 text-xs font-bold select-none border border-slate-800">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
     </div>
   );
 }

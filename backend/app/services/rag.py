@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 from app.core.config import settings
 from app.models.models import DocumentChunk, Document
@@ -25,45 +26,46 @@ class LLMProvider(ABC):
         pass
 
 
-class OpenAILLMProvider(LLMProvider):
+class GeminiLLMProvider(LLMProvider):
     def __init__(self):
-        self.api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
-        self.model = settings.OPENAI_MODEL or "gpt-4o-mini"
-        if not self.api_key:
-            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
-            if is_dev:
-                logger.warning("OPENAI_API_KEY is not set. LLM provider will run in MOCK mode.")
-                self.client = None
-            else:
-                raise ValueError("OPENAI_API_KEY is not set. A valid OpenAI API key is required in production.")
-        else:
-            self.client = OpenAI(api_key=self.api_key)
+        self.api_key = None
+        self.model_name = None
+        self._configured = False
+
+    def _ensure_configured(self):
+        if not self._configured:
+            self.api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+            self.model_name = settings.GEMINI_MODEL or os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
+            
+            if not self.api_key:
+                raise ValueError("GEMINI_API_KEY is not set. A valid Gemini API key is required.")
+            self._configured = True
 
     def generate_response(self, system_prompt: str, user_prompt: str) -> str:
-        if not self.client:
-            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
-            if is_dev:
-                return self._mock_response(user_prompt)
-            raise ValueError("LLM provider client is not initialized because OpenAI API key is missing.")
+        self._ensure_configured()
+        print(f"[STAGE 3 - GEMINI] generate_response() reached. Model: {self.model_name}", flush=True)
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
                 temperature=0.3
             )
-            return response.choices[0].message.content or ""
+            print("[STAGE 3 - GEMINI] Instantiating request-scoped genai.Client...", flush=True)
+            with genai.Client(api_key=self.api_key) as client:
+                print("[STAGE 3 - GEMINI] Calling generate_content()...", flush=True)
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_prompt,
+                    config=config
+                )
+            print(f"[STAGE 3 - GEMINI] generate_content() succeeded. Response: '{response.text[:50]}...'", flush=True)
+            return response.text or ""
         except Exception as e:
-            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
-            if is_dev:
-                logger.error(f"OpenAI API call failed: {e}. Falling back to mock response.")
-                return self._mock_response(user_prompt)
-            logger.error(f"OpenAI API call failed: {e}")
+            logger.error(f"Gemini API call failed: {e}")
             raise e
 
     def generate_summary_and_keywords(self, text: str) -> Tuple[str, List[str]]:
+        self._ensure_configured()
+        print(f"[STAGE 3 - GEMINI] generate_summary_and_keywords() reached. Model: {self.model_name}", flush=True)
         # Take the first 3000 words to avoid overloading context
         truncated_text = " ".join(text.split()[:3000])
         
@@ -75,55 +77,32 @@ class OpenAILLMProvider(LLMProvider):
         )
         user_prompt = f"Analyze the following document content:\n\n{truncated_text}"
 
-        if not self.client:
-            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
-            if is_dev:
-                return self._mock_summary(truncated_text)
-            raise ValueError("LLM provider client is not initialized because OpenAI API key is missing.")
-
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.2
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2,
+                response_mime_type="application/json"
             )
+            print("[STAGE 3 - GEMINI] Instantiating request-scoped genai.Client for summary...", flush=True)
+            with genai.Client(api_key=self.api_key) as client:
+                print("[STAGE 3 - GEMINI] Calling generate_content() for summary...", flush=True)
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_prompt,
+                    config=config
+                )
             import json
-            result = json.loads(response.choices[0].message.content or "{}")
+            result = json.loads(response.text or "{}")
             summary = result.get("summary", "No summary generated.")
             keywords = result.get("keywords", ["general"])
+            print(f"[STAGE 3 - GEMINI] generate_summary_and_keywords() succeeded. Summary length: {len(summary)}", flush=True)
             return summary, keywords
         except Exception as e:
-            is_dev = os.getenv("ENV") == "development" or os.getenv("DEBUG", "").lower() in ("true", "1")
-            if is_dev:
-                logger.error(f"OpenAI Summary failed: {e}. Falling back to mock summary.")
-                return self._mock_summary(truncated_text)
-            logger.error(f"OpenAI Summary failed: {e}")
+            logger.error(f"Gemini Summary failed: {e}")
             raise e
 
-    def _mock_response(self, user_prompt: str) -> str:
-        return (
-            f"**[MOCK LLM RESPONSE]**\n"
-            f"This is a response generated in offline mock mode since no OpenAI API key is configured. "
-            f"Regarding your query: '{user_prompt[:50]}...', the retrieved document chunks indicate that "
-            f"the system is correctly parsing and retrieving document context using pgvector. "
-            f"Please check the sources listed below to verify content."
-        )
-
-    def _mock_summary(self, text: str) -> Tuple[str, List[str]]:
-        # Simple extraction for mock
-        words = text.split()
-        summary = f"Mock Summary: A document containing {len(words)} words. It covers general topics related to the upload."
-        keywords = ["mock", "document", "upload", "system"]
-        if len(words) > 3:
-            keywords.extend([w.lower().strip(",.()\"") for w in words[:4] if len(w) > 4])
-        return summary, list(set(keywords))[:6]
-
 # Global provider instance
-llm_provider = OpenAILLMProvider()
+llm_provider = GeminiLLMProvider()
 
 # ----------------- RAG PIPELINE FUNCTIONS -----------------
 def retrieve_relevant_chunks(
@@ -197,18 +176,47 @@ def answer_query(
     2. Retrieve top-k relevant chunks.
     3. Generate answer using LLM.
     """
+    print(f"[STAGE 2 - RAG] answer_query() reached with question: '{question}', scoped document_id: {document_id}", flush=True)
     # If a specific document is requested, narrow search down to that document only
     if document_id:
         if document_id not in accessible_doc_ids:
+            print("[STAGE 2 - RAG] Document ID not accessible.", flush=True)
             return "You do not have permission to access this document.", []
         search_doc_ids = [document_id]
     else:
         search_doc_ids = accessible_doc_ids
 
     # Retrieve chunks
+    print("[STAGE 2 - RAG] Retrieving relevant chunks...", flush=True)
     chunks = retrieve_relevant_chunks(db, question, search_doc_ids, limit=5)
+    print(f"[STAGE 2 - RAG] Retrieved {len(chunks)} relevant chunks.", flush=True)
     
     if not chunks:
+        print("[STAGE 2 - RAG] No relevant chunks found.", flush=True)
+        transform_markers = (
+            "return only the",
+            "following selected text",
+            "following text",
+            "rewrite the following",
+            "improve the grammar",
+            "summarize the following",
+            "explain the following",
+            "make the following text shorter",
+            "expand the following text",
+            "generate document content",
+        )
+        if any(marker in question.lower() for marker in transform_markers):
+            print("[STAGE 2 - RAG] Transform request without chunks — calling LLM directly.", flush=True)
+            system_prompt = (
+                "You are an enterprise document writing assistant. "
+                "Follow the user's instruction exactly and return only the requested output."
+            )
+            try:
+                answer = llm_provider.generate_response(system_prompt, question)
+            except Exception as llm_err:
+                logger.error(f"LLM generation failed for transform request: {llm_err}")
+                answer = "The AI generation service is temporarily unavailable. Please try again shortly."
+            return answer, []
         return "No relevant documents found or you don't have access to them.", []
 
     # Compile context
@@ -223,20 +231,57 @@ def answer_query(
             )
             
     context_text = "\n\n".join(context_blocks)
+    print(f"[STAGE 2 - RAG] Context compiled (length: {len(context_text)}).", flush=True)
     
-    # Build prompts
-    system_prompt = (
-        "You are an enterprise AI Knowledge Assistant. Use the provided document context to answer the user's question. "
-        "Strictly base your answer on the context. If the answer cannot be found in the context, say "
-        "'I cannot find the answer in the provided documents.' Do not make up information. "
-        "Cite the document name when mentioning facts."
+    transform_markers = (
+        "return only the",
+        "following selected text",
+        "following text",
+        "rewrite the following",
+        "improve the grammar",
+        "summarize the following",
+        "explain the following",
+        "make the following text shorter",
+        "expand the following text",
+        "generate document content",
     )
+    question_lower = question.lower()
+    is_transform_request = any(marker in question_lower for marker in transform_markers)
+
+    if is_transform_request:
+        system_prompt = (
+            "You are an enterprise document writing assistant. "
+            "Follow the user's instruction exactly. "
+            "When text is provided inside the instruction, transform that text directly. "
+            "Return only the requested output without extra commentary unless the user asks otherwise."
+        )
+        user_prompt = question
+        if context_text:
+            user_prompt = (
+                f"Reference document context (optional):\n{context_text}\n\n"
+                f"Instruction:\n{question}"
+            )
+    else:
+        # Build prompts
+        system_prompt = (
+            "You are an enterprise AI Knowledge Assistant. Use the provided document context to answer the user's question. "
+            "Strictly base your answer on the context. If the answer cannot be found in the context, say "
+            "'I cannot find the answer in the provided documents.' Do not make up information. "
+            "Cite the document name when mentioning facts."
+        )
+        
+        user_prompt = (
+            f"Context:\n{context_text}\n\n"
+            f"Question: {question}\n\n"
+            f"Answer:"
+        )
     
-    user_prompt = (
-        f"Context:\n{context_text}\n\n"
-        f"Question: {question}\n\n"
-        f"Answer:"
-    )
-    
-    answer = llm_provider.generate_response(system_prompt, user_prompt)
+    print("[STAGE 2 - RAG] Calling llm_provider.generate_response()...", flush=True)
+    try:
+        answer = llm_provider.generate_response(system_prompt, user_prompt)
+    except Exception as llm_err:
+        logger.error(f"LLM generation failed in answer_query: {llm_err}")
+        retrieved_names = ", ".join([doc.name for doc in source_docs_map.values()])
+        answer = f"I retrieved relevant context from: {retrieved_names}. However, the AI generation service is temporarily unavailable. Please try again shortly."
+    print(f"[STAGE 2 - RAG] llm_provider returned: '{answer[:50]}...'", flush=True)
     return answer, list(source_docs_map.values())

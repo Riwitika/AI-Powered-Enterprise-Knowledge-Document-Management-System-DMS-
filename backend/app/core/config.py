@@ -1,7 +1,10 @@
 import os
 from typing import Any
+from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Enterprise KMS"
@@ -18,8 +21,8 @@ class Settings(BaseSettings):
     INVITE_CODE: str = "FASTTRADE-SECURE-2026"
     
     # AI LLM Provider Configuration
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-flash-latest"
     
     # Additional Production configurations
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
@@ -35,7 +38,7 @@ class Settings(BaseSettings):
     ]
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -62,8 +65,6 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be a secure, unique, and long token in production mode.")
             if self.DATABASE_URL.startswith("sqlite"):
                 raise ValueError("SQLite databases are not supported in production environment. Use PostgreSQL instead.")
-            if not self.OPENAI_API_KEY:
-                raise ValueError("OPENAI_API_KEY must be configured in production environment.")
         return self
 
 settings = Settings()

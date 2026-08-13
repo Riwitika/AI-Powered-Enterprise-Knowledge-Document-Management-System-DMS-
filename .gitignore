@@ -26,6 +26,7 @@ htmlcov/
 # Local configuration files
 .env
 .env.*
+!.env.example
 *.local
 alembic.env
 

@@ -19,6 +19,12 @@ export default function PptViewer({ activeDoc }: { activeDoc: any }) {
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [zoom, setZoom] = useState(60);
 
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   const getPptSlides = (): Slide[] => {
     const name = activeDoc?.name || '';
     if (name.toLowerCase().includes('budget') || name.toLowerCase().includes('finance')) {
@@ -194,7 +200,7 @@ export default function PptViewer({ activeDoc }: { activeDoc: any }) {
             <div className="h-4 w-[1px] bg-slate-200" />
             <button 
               type="button" 
-              onClick={() => alert('Starting slide presentation... (Mock)')}
+              onClick={() => showToast('Starting slide presentation... (Mock)')}
               className="flex items-center gap-1 text-[11px] font-bold text-slate-700 hover:text-blue-600 transition-colors"
             >
               <Play className="w-3.5 h-3.5 text-blue-600" />
@@ -257,13 +263,20 @@ export default function PptViewer({ activeDoc }: { activeDoc: any }) {
 
           <div className="flex items-center gap-4">
             <span>English (United States)</span>
-            <button type="button" onClick={() => alert('Fullscreen mode triggered (Mock)')} className="p-1 hover:bg-slate-50 rounded">
+            <button type="button" onClick={() => showToast('Fullscreen mode triggered (Mock)')} className="p-1 hover:bg-slate-50 rounded">
               <Maximize2 className="w-3 h-3 text-slate-500" />
             </button>
           </div>
         </div>
 
       </div>
+
+      {toastMsg && (
+        <div className="fixed bottom-6 left-6 bg-slate-900 text-white rounded-xl py-3 px-4 shadow-2xl z-[99999] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-5 duration-200 text-xs font-bold select-none border border-slate-800">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
 
     </div>
   );

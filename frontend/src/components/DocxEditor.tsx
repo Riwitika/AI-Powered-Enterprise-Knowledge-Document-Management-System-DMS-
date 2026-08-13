@@ -1,71 +1,76 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { sanitizeHtml } from '../utils/sanitize';
 import { useNavigate } from 'react-router-dom';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Underline } from '@tiptap/extension-underline';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Link } from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { Color } from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Highlight from '@tiptap/extension-highlight';
+import { ResizableImage } from './editor/ResizableImageExtension';
+import FontFamily from '@tiptap/extension-font-family';
+import { FontSize } from './editor/FontSizeExtension';
+import { TextFormatting } from './editor/TextFormattingExtension';
+import { LineSpacing } from './editor/LineSpacingExtension';
+import { ParagraphSpacing } from './editor/ParagraphSpacingExtension';
+import { BlockIndent } from './editor/BlockIndentExtension';
+import { Page } from './editor/PageExtension';
+import { PageBreak } from './editor/PageBreakExtension';
+import { PaginatedDocument } from './editor/PaginatedDocument';
+import { AutoPagination } from './editor/AutoPaginationExtension';
+import { PAGE_CONTENT_HEIGHT } from './editor/pageGeometry';
+
+import EditorMenuBar from './editor/EditorMenuBar';
+import EditorToolbar from './editor/EditorToolbar';
+import EditorRuler from './editor/EditorRuler';
+import WordCountModal from './editor/WordCountModal';
+import FindReplaceModal from './editor/FindReplaceModal';
+import ImageToolbar from './editor/ImageToolbar';
+import LinkPopover from './editor/LinkPopover';
+import { uploadDocumentAsset } from './editor/imageUpload';
+import { ACCEPTED_IMAGE_TYPES } from './editor/imageConstants';
+import { aiService } from '../services/aiService';
+import {
+  buildEditorQuestion,
+  formatAiError,
+  getEditorActionLabel,
+  isAiUnavailableAnswer,
+  requiresSelection,
+  type EditorAiAction,
+} from '../services/editorAiPrompts';
+
 import { 
-  Undo2, 
-  Redo2, 
-  Printer, 
-  Bold, 
-  Italic, 
-  Underline, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  AlignJustify, 
-  List, 
-  ListOrdered, 
-  Link2, 
-  Table, 
-  Minus,
-  Sparkles,
-  Image,
-  RemoveFormatting,
-  Highlighter,
-  X,
-  Send,
-  User,
-  Users,
-  Copy,
-  Check,
-  Share2,
-  Star,
-  CornerDownLeft,
+  Sparkles, 
+  X, 
+  Send, 
+  Users, 
+  Copy, 
+  Check, 
+  Star, 
   ArrowLeft,
-  Indent as IndentIcon,
-  Outdent as OutdentIcon
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../api/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-
-// Types
-interface CommentReply {
-  author: string;
-  content: string;
-  timestamp: string;
-}
-
-interface Comment {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: string;
-  resolved: boolean;
-  replies: CommentReply[];
-}
-
-interface Version {
-  id: string;
-  version: string;
-  author: string;
-  timestamp: string;
-  content: string;
-}
+import { useQueryClient } from '@tanstack/react-query';
+import { sanitizeHtml } from '../utils/sanitize';
 
 interface ActivityItem {
   actor: string;
   action: string;
   time: string;
+}
+
+interface AiMessage {
+  sender: 'user' | 'ai';
+  text: string;
+  isError?: boolean;
 }
 
 interface DocxEditorProps {
@@ -89,102 +94,77 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   const docId = activeDoc?.id || 'default-doc';
   
   const queryClient = useQueryClient();
-  const isRealUUID = !!activeDoc?.id && !activeDoc.id.startsWith('doc-') && !activeDoc.id.startsWith('temp-') && activeDoc.id.length > 20;
+  // Real UUID Regex check
+  const isRealUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(docId);
 
   // ----------------- STATE DECLARATIONS -----------------
-  const [docTitle, setDocTitle] = useState(activeDoc?.name || 'Untitled Document');
-  const [fontSizeVal, setFontSizeVal] = useState(11);
-  const [fontFamily, setFontFamily] = useState('Arial');
-  const [lineSpacing, setLineSpacing] = useState('1.15');
-  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Failed' | 'Unsaved changes'>('Saved');
+  const [docTitle, setDocTitle] = useState(activeDoc?.name || 'Untitled document');
+  const [saveStatus, setSaveStatus] = useState<'Saved ✓' | 'Saving...' | 'Save Failed' | 'Unsaved changes'>('Saved ✓');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
-  // Layout Panels State
-  const [showOutline, setShowOutline] = useState(true);
-  const [showRightPanel, setShowRightPanel] = useState(true);
-  const [rightTab, setRightTab] = useState<'properties' | 'activity' | 'comments' | 'history'>('properties');
-  const [activeHeadingId, setActiveHeadingId] = useState<string>('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+  const [previewingVersion, setPreviewingVersion] = useState<any | null>(null);
 
-  // Google Docs Menu Dropdowns State
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  // Google Docs View Options
+  const [showRuler, setShowRuler] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(100);
 
-  // Floating AI Assistant States (Only AI interface)
+  // Modal Dialog States
+  const [showWordCountModal, setShowWordCountModal] = useState(false);
+  const [showFindReplaceModal, setShowFindReplaceModal] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageUploadModeRef = useRef<'insert' | 'replace'>('insert');
+  const aiSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const selectedTextRef = useRef('');
+
+  // Floating AI Assistant States
   const [showFloatingAiPanel, setShowFloatingAiPanel] = useState(false);
   const [selectedText, setSelectedText] = useState('');
-  const [selectedRange, setSelectedRange] = useState<Range | null>(null);
   const [showFloatingAiToolbar, setShowFloatingAiToolbar] = useState(false);
   const [floatingAiToolbarPos, setFloatingAiToolbarPos] = useState({ top: 0, left: 0 });
+  const [showLinkPopover, setShowLinkPopover] = useState(false);
+  const [linkPopoverPos, setLinkPopoverPos] = useState({ top: 0, left: 0 });
+  const [imageToolbarPos, setImageToolbarPos] = useState({ top: 0, left: 0 });
+  const [isImageSelected, setIsImageSelected] = useState(false);
 
-  // Right Sidebars States
-  const [headings, setHeadings] = useState<{ id: string; text: string; tag: string }[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [versions, setVersions] = useState<Version[]>([]);
+  const [modalPrompt, setModalPrompt] = useState<{
+    title: string;
+    placeholder: string;
+    defaultValue: string;
+    onSubmit: (val: string) => void;
+  } | null>(null);
 
-  // React Query for comments list
-  const { data: dbComments } = useQuery({
-    queryKey: ['comments', docId],
-    queryFn: () => api.comments.list(docId),
-    enabled: isRealUUID,
-  });
+  const [modalAlert, setModalAlert] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
 
-  // React Query for versions list
-  const { data: dbVersions } = useQuery({
-    queryKey: ['versions', docId],
-    queryFn: () => api.documents.versions(docId),
-    enabled: isRealUUID,
-  });
+  const [modalTable, setModalTable] = useState<{
+    onSubmit: (rows: number, cols: number) => void;
+  } | null>(null);
 
-  const formatTime = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return 'Just now';
-    }
+  const customPrompt = (title: string, defaultValue: string, onSubmit: (val: string) => void, placeholder: string = "Enter value...") => {
+    setModalPrompt({ title, defaultValue, onSubmit, placeholder });
+  };
+  const customAlert = (title: string, message: string) => {
+    setModalAlert({ title, message });
   };
 
-  useEffect(() => {
-    if (dbComments) {
-      const mappedComments = dbComments.map((c: any) => ({
-        id: String(c.id),
-        author: c.user_name,
-        content: c.content,
-        timestamp: formatTime(c.created_at),
-        resolved: c.resolved,
-        replies: (c.replies || []).map((r: any) => ({
-          author: r.user_name,
-          content: r.content,
-          timestamp: formatTime(r.created_at),
-        })),
-      }));
-      setComments(mappedComments);
-    }
-  }, [dbComments]);
-
-  useEffect(() => {
-    if (dbVersions) {
-      const mappedVersions = dbVersions.map((v: any) => ({
-        id: String(v.id),
-        version: `v${v.version_number}.0`,
-        author: v.uploader?.full_name || 'System',
-        timestamp: formatTime(v.uploaded_at),
-        content: '',
-        version_number: v.version_number
-      }));
-      setVersions(mappedVersions);
-    }
-  }, [dbVersions]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [aiMessages, setAiMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
-    { sender: 'ai', text: 'Hello! I am your Enterprise AI Assistant. How can I help you draft or refine this document?' }
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([
+    {
+      sender: 'ai',
+      text: 'Hello! I am your AI Document Assistant. Ask about this document, select text for rewrite/improve actions, or use the quick actions below.',
+    },
   ]);
   const [aiInput, setAiInput] = useState('');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
-
-  // Comments Actions State
-  const [newCommentVal, setNewCommentVal] = useState('');
-  const [replyInputs, setReplyInputs] = useState<{ [commentId: string]: string }>({});
 
   // Share Modal Overlay State
   const [showShareModal, setShowShareModal] = useState(false);
@@ -194,539 +174,518 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   const [publicLinkEnabled, setPublicLinkEnabled] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
 
-  // Document metadata defaults
-  const ownerName = activeDoc?.ownerName || 'Paras Jain';
-  const lastModifiedDate = activeDoc?.lastModified || new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  const versionStr = activeDoc?.version || 'v1.2';
-  const locationPath = activeDoc?.locationPath || '/Operations/Guidelines.docx';
-  const tagsList = activeDoc?.tags || ['Policy', 'Operations', 'KMS'];
-  const docDescription = activeDoc?.description || 'Standard corporate operational policy guidelines and rules.';
-
-  // Refs
-  const editorRef = useRef<HTMLDivElement>(null);
-  const floatingToolbarAiRef = useRef<HTMLDivElement>(null);
-  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const versionStr = activeDoc?.version || 'v1.0';
   const saveTimeoutRef = useRef<any | null>(null);
+  const isProgrammaticUpdateRef = useRef(false);
+  const isHydratingRef = useRef(true);
+  const docIdRef = useRef(docId);
+  const saveGenerationRef = useRef(0);
+  const docTitleRef = useRef(docTitle);
 
-  // Close menus on outside click
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
-        setActiveMenu(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    docIdRef.current = docId;
+  }, [docId]);
 
-  // ----------------- LIFECYCLE SEEDING & LOAD -----------------
   useEffect(() => {
-    if (!docId) return;
+    docTitleRef.current = docTitle;
+  }, [docTitle]);
 
-    // 1. Load document content
-    if (editorRef.current) {
-      if (isRealUUID) {
-        editorRef.current.innerHTML = sanitizeHtml(activeDoc?.content || getDefaultEditorContent());
-      } else {
-        const savedContent = localStorage.getItem(`kms-doc-content-${docId}`);
-        if (savedContent) {
-          editorRef.current.innerHTML = sanitizeHtml(savedContent);
-        } else {
-          editorRef.current.innerHTML = sanitizeHtml(getDefaultEditorContent());
-        }
-      }
+  useEffect(() => {
+    saveGenerationRef.current += 1;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
     }
+  }, [docId]);
 
-    // 2. Load favorite / lock states
-    const favorites = localStorage.getItem('kms-doc-favorites');
-    const favList = favorites ? JSON.parse(favorites) : [];
-    setIsFavorite(favList.includes(docId));
+  const EMPTY_EDITOR_CONTENT = '<div data-type="page" class="tiptap-page-sheet"><p></p></div>';
 
-    const locks = localStorage.getItem('kms-doc-locks');
-    const lockList = locks ? JSON.parse(locks) : [];
-    setIsLocked(lockList.includes(docId));
-
-    // 5. Load Activities Log (fallback mock list)
-    const savedActivities = localStorage.getItem(`kms-doc-activity-${docId}`);
-    if (savedActivities) {
-      setActivities(JSON.parse(savedActivities));
-    } else {
-      const defaultActivities: ActivityItem[] = [
-        { actor: 'Paras Jain', action: 'Created initial draft', time: 'Yesterday, 4:12 PM' },
-        { actor: 'Riwitika Gupta', action: 'Left comment on budget estimates', time: 'Yesterday, 5:30 PM' },
-        { actor: 'Arnim Goyal', action: 'Committed revision checkpoint v1.1', time: 'Today, 11:20 AM' },
-        { actor: 'Arun Goyal', action: 'Shared document with Riwitika Gupta', time: 'Today, 1:45 PM' }
-      ];
-      setActivities(defaultActivities);
+  const resolveEditorContent = (content?: string | null) => {
+    if (content && content.trim()) {
+      return sanitizeHtml(content);
     }
-
-    // Initialize outline headings
-    setTimeout(extractHeadings, 150);
-  }, [docId, activeDoc?.content, isRealUUID]);
-
-  const getDefaultEditorContent = () => {
-    return `
-      <h1 id="heading-ref-0" class="text-xl font-black text-slate-900 border-b border-slate-150 pb-1.5 tracking-tight">
-        Enterprise Policy and Operational Guidelines
-      </h1>
-      <p class="text-slate-700 leading-relaxed font-sans mt-2">
-        This document outlines the standard operational protocols for the Knowledge Management System (KMS). Ensure compliance with corporate security rules and review revision checkpoints before archiving.
-      </p>
-      
-      <h2 id="heading-ref-1" class="text-sm font-extrabold text-slate-800 tracking-tight pt-3">
-        1. Purpose and Scope
-      </h2>
-      <p class="text-slate-700 leading-relaxed mt-1">
-        Our core platform coordinates secure asset synchronization, multi-format previews, and role authorization pipelines. Team contributors can highlight sections to launch contextual AI processing or leave comments for collaborative resolution.
-      </p>
-      
-      <h2 id="heading-ref-2" class="text-sm font-extrabold text-slate-800 tracking-tight pt-3">
-        2. Operational Best Practices
-      </h2>
-      <p class="text-slate-700 leading-relaxed mt-1">
-        Always lock documents when editing sensitive details to prevent overlapping file adjustments. Restored revisions will replace active canvases instantly and notify all contributors reactively.
-      </p>
-    `;
+    return EMPTY_EDITOR_CONTENT;
   };
 
-  const extractHeadings = () => {
-    if (!editorRef.current) return;
-    const headingElements = editorRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    const items: any[] = [];
-    headingElements.forEach((el, index) => {
-      if (!el.id) {
-        el.id = `heading-ref-${index}`;
+  // ----------------- TIPTAP EDITOR INITIALIZATION -----------------
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        document: false,
+        heading: { levels: [1, 2, 3, 4] },
+      }),
+      PaginatedDocument,
+      Underline,
+      TextAlign.configure({
+        types: ['heading', 'paragraph', 'blockquote'],
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-blue-600 underline cursor-pointer',
+        },
+      }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      TextStyle,
+      Color,
+      FontFamily,
+      FontSize,
+      TextFormatting,
+      LineSpacing,
+      ParagraphSpacing,
+      BlockIndent,
+      Page,
+      PageBreak,
+      AutoPagination.configure({
+        pageHeight: PAGE_CONTENT_HEIGHT,
+      }),
+      Highlight.configure({ multicolor: true }),
+      ResizableImage,
+    ],
+    content: resolveEditorContent(activeDoc?.content),
+    editable: !isLocked,
+    onUpdate: ({ editor }) => {
+      if (isHydratingRef.current || isProgrammaticUpdateRef.current) return;
+      setSaveStatus('Unsaved changes');
+      triggerAutosave(editor.getHTML());
+    },
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+
+      if (editor.isActive('image')) {
+        setIsImageSelected(true);
+        setShowFloatingAiToolbar(false);
+        setShowLinkPopover(false);
+        const coords = editor.view.coordsAtPos(from);
+        setImageToolbarPos({ top: coords.top - 48, left: coords.left });
+        return;
       }
-      items.push({
-        id: el.id,
-        text: el.textContent || '',
-        tag: el.tagName.toLowerCase()
-      });
-    });
-    setHeadings(items);
-  };
 
-  const triggerAutosave = () => {
-    setSaveStatus('Saving...');
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      setIsImageSelected(false);
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (!editorRef.current) return;
-      const htmlContent = editorRef.current.innerHTML;
-      
-      if (isRealUUID) {
-        try {
-          await api.documents.update(docId, { content: htmlContent });
-          setSaveStatus('Saved');
-          queryClient.invalidateQueries({ queryKey: ['document', docId] });
-        } catch (err) {
-          console.error('Autosave failed:', err);
-          setSaveStatus('Failed');
-        }
-      } else {
-        localStorage.setItem(`kms-doc-content-${docId}`, htmlContent);
-        setSaveStatus('Saved');
-      }
-      
-      extractHeadings();
-
-      // Dispatch change event to sync with rest of layout
-      window.dispatchEvent(new CustomEvent('kms-active-document-change', {
-        detail: {
-          id: docId,
-          title: docTitle,
-          fileType: 'DOCX',
-          version: versionStr,
-          fullContent: editorRef.current.innerText
-        }
-      }));
-    }, 1200);
-  };
-
-  const handleEditorInput = () => {
-    triggerAutosave();
-  };
-
-  const updateGlobalDocMeta = (newTitle: string) => {
-    try {
-      const savedDocs = localStorage.getItem('kms-documents-db');
-      if (savedDocs) {
-        const docs = JSON.parse(savedDocs);
-        const updated = docs.map((d: any) => {
-          if (d.id === docId) {
-            return { ...d, name: newTitle, lastModified: new Date().toLocaleDateString('en-IN') };
-          }
-          return d;
-        });
-        localStorage.setItem('kms-documents-db', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('kms-documents-updated'));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const executeCommand = (command: string, value: string = '') => {
-    document.execCommand(command, false, value);
-    triggerAutosave();
-  };
-
-  // ----------------- TEXT SELECTION AI ACTIONS -----------------
-  const handleSelectionChange = () => {
-    setTimeout(() => {
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const text = selection.toString().trim();
-        if (text.length > 0 && editorRef.current?.contains(selection.anchorNode)) {
-          const range = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
-          setSelectedText(text);
-          setSelectedRange(range.cloneRange());
-          
+      if (from !== to) {
+        const text = editor.state.doc.textBetween(from, to, ' ');
+        if (text.trim().length > 0) {
+          setSelectedText(text.trim());
+          selectedTextRef.current = text.trim();
+          aiSelectionRef.current = { from, to };
+          window.dispatchEvent(new CustomEvent('kms-editor-selection', {
+            detail: { text: text.trim(), locationType: 'Paragraph' },
+          }));
+          const view = editor.view;
+          const coords = view.coordsAtPos(from);
           setFloatingAiToolbarPos({
-            top: window.scrollY + rect.top - 42,
-            left: window.scrollX + rect.left + (rect.width / 2) - 140
+            top: coords.top - 42,
+            left: coords.left
           });
           setShowFloatingAiToolbar(true);
         } else {
           setShowFloatingAiToolbar(false);
-          setSelectedText('');
-          setSelectedRange(null);
         }
+      } else {
+        setShowFloatingAiToolbar(false);
       }
-    }, 80);
-  };
-
-  const handleSelectionAiAction = (actionType: string) => {
-    setShowFloatingAiToolbar(false);
-    setShowFloatingAiPanel(true);
-    
-    let prompt = '';
-    switch (actionType) {
-      case 'summarize':
-        prompt = `Summarize this selection: "${selectedText}"`;
-        break;
-      case 'rewrite':
-        prompt = `Rewrite this section professionally: "${selectedText}"`;
-        break;
-      case 'explain':
-        prompt = `Explain the following text: "${selectedText}"`;
-        break;
-      case 'translate':
-        prompt = `Translate this text selection to Spanish: "${selectedText}"`;
-        break;
-      case 'improve':
-        prompt = `Improve writing style and tone of: "${selectedText}"`;
-        break;
-      default:
-        prompt = `${actionType} selection: "${selectedText}"`;
     }
-    
-    triggerAiPrompt(prompt);
+  });
+
+  // Sync content when activeDoc changes
+  useEffect(() => {
+    if (!editor) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    isHydratingRef.current = true;
+    isProgrammaticUpdateRef.current = true;
+    editor.commands.setContent(resolveEditorContent(activeDoc?.content), { emitUpdate: false });
+    isProgrammaticUpdateRef.current = false;
+    setDocTitle(activeDoc?.name || 'Untitled document');
+    setSaveStatus('Saved ✓');
+
+    const hydrateTimer = setTimeout(() => {
+      isHydratingRef.current = false;
+    }, 750);
+
+    return () => {
+      clearTimeout(hydrateTimer);
+      isHydratingRef.current = true;
+    };
+  }, [docId, activeDoc?.content, editor]);
+
+  // Sync editable state when isLocked changes
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!isLocked && !previewingVersion);
+    }
+  }, [isLocked, previewingVersion, editor]);
+
+  // Broadcast document context to FloatingAIChat and handle cross-panel insert
+  useEffect(() => {
+    if (!editor) return;
+
+    window.dispatchEvent(new CustomEvent('kms-active-document-change', {
+      detail: {
+        id: docId,
+        title: docTitle,
+        fileType: activeDoc?.fileType || 'DOCX',
+        version: versionStr,
+        fullContent: editor.getText(),
+      },
+    }));
+
+    const handleAiInsert = (e: Event) => {
+      const content = (e as CustomEvent).detail?.content;
+      if (content && !isLocked && !previewingVersion) {
+        editor.chain().focus().insertContent(content).run();
+        triggerAutosave();
+      }
+    };
+
+    window.addEventListener('kms-ai-insert-content', handleAiInsert);
+    return () => window.removeEventListener('kms-ai-insert-content', handleAiInsert);
+  }, [editor, docId, docTitle, activeDoc?.fileType, versionStr, isLocked, previewingVersion]);
+
+  // ----------------- PERSIST TO BACKEND -----------------
+  const persistDocument = async (htmlContent: string): Promise<boolean> => {
+    const targetDocId = docIdRef.current;
+    const generationAtStart = saveGenerationRef.current;
+
+    if (!isRealUUID) {
+      return false;
+    }
+
+    try {
+      const payload: { content: string; name?: string } = { content: htmlContent };
+      const trimmedTitle = docTitleRef.current.trim();
+      if (trimmedTitle) {
+        payload.name = trimmedTitle;
+      }
+
+      await api.documents.update(targetDocId, payload);
+
+      if (generationAtStart !== saveGenerationRef.current) {
+        return false;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['document', targetDocId] });
+      queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
+      return true;
+    } catch (err) {
+      console.error('Document save failed:', err);
+      return false;
+    }
   };
 
-  // ----------------- AI CHAT INTEGRATION -----------------
-  const triggerAiPrompt = (prompt: string) => {
+  const handleManualSave = async () => {
+    if (!editor || isLocked) return;
+    setSaveStatus('Saving...');
+    const htmlContent = editor.getHTML();
+    const ok = await persistDocument(htmlContent);
+    if (ok) {
+      setSaveStatus('Saved ✓');
+      logActivity(user?.full_name || 'System', 'saved the document');
+      showToast('Document saved');
+    } else {
+      setSaveStatus('Save Failed');
+      customAlert('Save Failed', 'Could not save the document to the server. Please check your connection and try again.');
+    }
+  };
+
+  // ----------------- AUTOSAVE DEBOUNCE -----------------
+  const triggerAutosave = (contentToSave?: string) => {
+    setSaveStatus('Unsaved changes');
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    const generationAtStart = saveGenerationRef.current;
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      if (generationAtStart !== saveGenerationRef.current) return;
+
+      const htmlContent = contentToSave ?? editor?.getHTML() ?? '';
+      if (!htmlContent || !isRealUUID) return;
+
+      setSaveStatus('Saving...');
+      const ok = await persistDocument(htmlContent);
+
+      if (generationAtStart !== saveGenerationRef.current) return;
+
+      if (ok) {
+        setSaveStatus('Saved ✓');
+        logActivity(user?.full_name || 'System', 'edited the document content');
+        window.dispatchEvent(new CustomEvent('kms-active-document-change', {
+          detail: {
+            id: docIdRef.current,
+            title: docTitleRef.current,
+            fileType: 'DOCX',
+            version: versionStr,
+            fullContent: editor ? editor.getText() : ''
+          }
+        }));
+      } else {
+        setSaveStatus('Save Failed');
+      }
+    }, 1000);
+  };
+
+  // Keyboard shortcut: manual save + link
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        openLinkEditor();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editor, isLocked, docId]);
+
+  // Real Image Upload Flow
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+
+    if (!isRealUUID) {
+      customAlert('Upload Failed', 'Save the document to the backend before uploading images.');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    try {
+      setSaveStatus('Saving...');
+      const asset = await uploadDocumentAsset(docIdRef.current, file);
+      const mode = imageUploadModeRef.current;
+
+      if (mode === 'replace' && editor.isActive('image')) {
+        editor.chain().focus().replaceImageSrc(asset.url).run();
+      } else {
+        editor.chain().focus().setImage({ src: asset.url }).run();
+      }
+
+      showToast('Image uploaded and inserted successfully');
+      triggerAutosave();
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      customAlert('Upload Failed', 'Could not upload image to the server. Please try again.');
+    } finally {
+      imageUploadModeRef.current = 'insert';
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const openImageUpload = (mode: 'insert' | 'replace' = 'insert') => {
+    imageUploadModeRef.current = mode;
+    fileInputRef.current?.click();
+  };
+
+  const openLinkEditor = () => {
+    if (!editor) return;
+    const { from } = editor.state.selection;
+    const coords = editor.view.coordsAtPos(from);
+    setLinkPopoverPos({ top: coords.top + 24, left: coords.left });
+    setShowLinkPopover(true);
+    setShowFloatingAiToolbar(false);
+  };
+
+  // ----------------- AI ACTIONS -----------------
+  const captureAiSelection = () => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    aiSelectionRef.current = from !== to ? { from, to } : null;
+    selectedTextRef.current = selectedTextRef.current || selectedText;
+  };
+
+  const triggerAiRequest = async (
+    _action: EditorAiAction,
+    userDisplay: string,
+    apiQuestion: string,
+  ) => {
     if (isAiGenerating) return;
-    
-    setAiMessages(prev => [...prev, { sender: 'user', text: prompt }]);
+    if (!apiQuestion.trim()) {
+      customAlert('AI Document Assistant', 'Please enter a prompt.');
+      return;
+    }
+
+    captureAiSelection();
+    setAiMessages((prev) => [...prev, { sender: 'user', text: userDisplay }]);
     setIsAiGenerating(true);
 
-    setTimeout(() => {
-      const answers = [
-        "Based on corporate protocols, Section 2 requires strict auth level validations prior to document approval triggers.",
-        "Operational parameters state: 'Always check active revision history checkpoints before restoring document canvases.'",
-        "The highlighted guidelines help ensure that draft documents are verified by Administrators or Super Admins."
-      ];
-      const selectedResponse = answers[Math.floor(Math.random() * answers.length)];
-      
-      setAiMessages(prev => [...prev, { sender: 'ai', text: selectedResponse }]);
-      setIsAiGenerating(false);
+    try {
+      const response = await aiService.ask(apiQuestion, {
+        mode: isRealUUID ? 'document' : 'repository',
+        documentContext: {
+          id: docId,
+          title: docTitle,
+          fileType: activeDoc?.fileType || 'DOCX',
+          selectedText: selectedTextRef.current || undefined,
+          fullContent: editor?.getText(),
+        },
+      });
 
-      logActivity('AI Assistant', `Generated content result for query: "${prompt.substring(0, 30)}..."`);
-    }, 1200);
+      const unavailable = isAiUnavailableAnswer(response.answer);
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: response.answer,
+          isError: unavailable,
+        },
+      ]);
+
+      if (!unavailable) {
+        logActivity('AI Document Assistant', `Response for: "${userDisplay.substring(0, 40)}..."`);
+      }
+    } catch (err) {
+      setAiMessages((prev) => [
+        ...prev,
+        { sender: 'ai', text: formatAiError(err), isError: true },
+      ]);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  const handleSelectionAiAction = (action: EditorAiAction) => {
+    if (requiresSelection(action) && !selectedText.trim()) {
+      customAlert('AI Document Assistant', 'Please select text in the document first.');
+      return;
+    }
+
+    setShowFloatingAiToolbar(false);
+    setShowFloatingAiPanel(true);
+    selectedTextRef.current = selectedText;
+    captureAiSelection();
+
+    const apiQuestion = buildEditorQuestion(action, '', selectedText);
+    triggerAiRequest(action, getEditorActionLabel(action), apiQuestion);
   };
 
   const handleSendAiMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiInput.trim()) return;
-    triggerAiPrompt(aiInput.trim());
+    if (!aiInput.trim() || isAiGenerating) return;
+    const userQuestion = aiInput.trim();
     setAiInput('');
+    setShowFloatingAiPanel(true);
+    const apiQuestion = buildEditorQuestion('ask', userQuestion, selectedTextRef.current || selectedText || undefined);
+    triggerAiRequest('ask', userQuestion, apiQuestion);
   };
 
   const handleInsertAiResult = (text: string) => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    
-    if (selectedRange) {
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(selectedRange);
-        document.execCommand('insertHTML', false, `<span>${text}</span>`);
-      }
-    } else {
-      document.execCommand('insertHTML', false, `<div>${text}</div>`);
-    }
+    if (!editor) return;
+    editor.chain().focus().insertContent(` ${text} `).run();
     triggerAutosave();
   };
 
   const handleReplaceSelection = (text: string) => {
-    if (!editorRef.current || !selectedRange) return;
-    editorRef.current.focus();
-    const selection = window.getSelection();
-    if (selection) {
-      selection.removeAllRanges();
-      selection.addRange(selectedRange);
-      document.execCommand('insertHTML', false, `<span>${text}</span>`);
+    if (!editor) return;
+    const range = aiSelectionRef.current;
+    if (range && range.from !== range.to) {
+      editor.chain().focus().setTextSelection(range).insertContent(text).run();
+    } else if (!editor.state.selection.empty) {
+      editor.chain().focus().insertContent(text).run();
+    } else {
+      customAlert('AI Document Assistant', 'No text selection to replace.');
+      return;
     }
     triggerAutosave();
   };
 
-  // ----------------- AUDIT LOG WRITER -----------------
   const logActivity = (actor: string, action: string) => {
-    const newAct: ActivityItem = {
-      actor,
-      action,
-      time: 'Just now'
-    };
+    const newAct: ActivityItem = { actor, action, time: 'Just now' };
     const updated = [newAct, ...activities];
     setActivities(updated);
     localStorage.setItem(`kms-doc-activity-${docId}`, JSON.stringify(updated));
   };
 
-  // ----------------- COMMENTS SYSTEM -----------------
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCommentVal.trim()) return;
-
-    if (isRealUUID) {
-      try {
-        let createdComment: any = null;
-        if (selectedRange && selectedText.length > 0) {
-          editorRef.current?.focus();
-          const selection = window.getSelection();
-          if (selection) {
-            selection.removeAllRanges();
-            selection.addRange(selectedRange);
-            
-            createdComment = await api.comments.create(docId, { content: newCommentVal });
-            const commentId = String(createdComment.id);
-            
-            const anchorHtml = `<span class="bg-amber-100 border-b-2 border-amber-400 py-0.5 cursor-pointer hover:bg-amber-200 transition-colors comment-anchor" data-comment-id="${commentId}">${selectedText}</span>`;
-            document.execCommand('insertHTML', false, anchorHtml);
-            triggerAutosave();
-          }
-        } else {
-          createdComment = await api.comments.create(docId, { content: newCommentVal });
-        }
-
-        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
-        logActivity(user?.full_name || 'System', `Created new comment: "${newCommentVal.substring(0, 30)}..."`);
-        setNewCommentVal('');
-        setSelectedRange(null);
-        setSelectedText('');
-      } catch (err) {
-        console.error('Failed to save comment:', err);
-        alert('Could not save comment to backend.');
-      }
-    } else {
-      const commentId = `comment-${Date.now()}`;
-      const newComment: Comment = {
-        id: commentId,
-        author: user?.full_name || 'Riwitika Gupta',
-        content: newCommentVal,
-        timestamp: 'Just now',
-        resolved: false,
-        replies: []
-      };
-
-      if (selectedRange && selectedText.length > 0) {
-        editorRef.current?.focus();
-        const selection = window.getSelection();
-        if (selection) {
-          selection.removeAllRanges();
-          selection.addRange(selectedRange);
-          
-          const anchorHtml = `<span class="bg-amber-100 border-b-2 border-amber-400 py-0.5 cursor-pointer hover:bg-amber-200 transition-colors comment-anchor" data-comment-id="${commentId}">${selectedText}</span>`;
-          document.execCommand('insertHTML', false, anchorHtml);
-        }
-      }
-
-      const updated = [newComment, ...comments];
-      setComments(updated);
-      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-      logActivity(user?.full_name || 'Riwitika Gupta', `Created new comment: "${newCommentVal.substring(0, 30)}..."`);
-      setNewCommentVal('');
-      setSelectedRange(null);
-      setSelectedText('');
-      triggerAutosave();
-    }
-  };
-
-  const handleReplyComment = async (commentId: string, replyText: string) => {
-    if (!replyText.trim()) return;
-    if (isRealUUID) {
-      try {
-        await api.comments.create(docId, { content: replyText, parent_id: Number(commentId) });
-        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
-        logActivity(user?.full_name || 'System', `Replied to comment thread`);
-        setReplyInputs(prev => ({ ...prev, [commentId]: '' }));
-      } catch (err) {
-        console.error('Failed to reply comment:', err);
-      }
-    } else {
-      const updated = comments.map(c => {
-        if (c.id === commentId) {
-          return {
-            ...c,
-            replies: [...c.replies, {
-              author: user?.full_name || 'Riwitika Gupta',
-              content: replyText,
-              timestamp: 'Just now'
-            }]
-          };
-        }
-        return c;
-      });
-      setComments(updated);
-      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-      logActivity(user?.full_name || 'Riwitika Gupta', `Replied to comment thread`);
-      setReplyInputs(prev => ({ ...prev, [commentId]: '' }));
-    }
-  };
-
-  const handleResolveComment = async (commentId: string) => {
-    if (isRealUUID) {
-      try {
-        await api.comments.resolve(Number(commentId));
-        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
-        logActivity(user?.full_name || 'System', `Resolved comment thread`);
-      } catch (err) {
-        console.error('Failed to resolve comment:', err);
-      }
-    } else {
-      const target = comments.find(c => c.id === commentId);
-      const updated = comments.map(c => {
-        if (c.id === commentId) {
-          return { ...c, resolved: !c.resolved };
-        }
-        return c;
-      });
-      setComments(updated);
-      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-      logActivity(user?.full_name || 'Riwitika Gupta', `${target?.resolved ? 'Reopened' : 'Resolved'} comment thread`);
-    }
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (isRealUUID) {
-      try {
-        await api.comments.delete(Number(commentId));
-        queryClient.invalidateQueries({ queryKey: ['comments', docId] });
-        logActivity(user?.full_name || 'System', `Deleted comment thread`);
-
-        if (editorRef.current) {
-          const anchors = editorRef.current.querySelectorAll(`[data-comment-id="${commentId}"]`);
-          anchors.forEach(anchor => {
-            const parent = anchor.parentNode;
-            if (parent) {
-              while (anchor.firstChild) {
-                parent.insertBefore(anchor.firstChild, anchor);
-              }
-              parent.removeChild(anchor);
-            }
-          });
-          triggerAutosave();
-        }
-      } catch (err) {
-        console.error('Failed to delete comment:', err);
-      }
-    } else {
-      const updated = comments.filter(c => c.id !== commentId);
-      setComments(updated);
-      localStorage.setItem(`kms-doc-comments-${docId}`, JSON.stringify(updated));
-      logActivity(user?.full_name || 'Riwitika Gupta', `Deleted comment thread`);
-
-      if (!editorRef.current) return;
-      const anchors = editorRef.current.querySelectorAll(`[data-comment-id="${commentId}"]`);
-      anchors.forEach(anchor => {
-        const parent = anchor.parentNode;
-        if (parent) {
-          while (anchor.firstChild) {
-            parent.insertBefore(anchor.firstChild, anchor);
-          }
-          parent.removeChild(anchor);
-        }
-      });
-      triggerAutosave();
-    }
-  };
-
   // ----------------- CHECKPOINT REVISIONS -----------------
   const handleCreateVersionCheckpoint = async () => {
-    if (!editorRef.current) return;
-    if (isRealUUID) {
-      try {
-        setSaveStatus('Saving...');
-        const currentHtml = editorRef.current.innerHTML;
-        const blob = new Blob([currentHtml], { type: 'text/html' });
-        const formData = new FormData();
-        formData.append('file', blob, `${docTitle}.html`);
-        await api.documents.uploadVersion(docId, formData);
-        
-        queryClient.invalidateQueries({ queryKey: ['versions', docId] });
-        queryClient.invalidateQueries({ queryKey: ['document', docId] });
-        setSaveStatus('Saved');
-        alert(`Successfully registered new revision checkpoint!`);
-      } catch (err) {
-        console.error('Failed to create revision checkpoint:', err);
-        alert('Could not save version checkpoint to server.');
-      }
-    } else {
-      const newVersionNum = `v1.${versions.length + 1}`;
-      const newVersion: Version = {
-        id: `v-${Date.now()}`,
-        version: newVersionNum,
-        author: user?.full_name || 'Riwitika Gupta',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        content: editorRef.current.innerHTML
-      };
+    if (!editor || isLocked) return;
+    const currentHtml = editor.getHTML();
 
-      const updated = [newVersion, ...versions];
-      setVersions(updated);
-      localStorage.setItem(`kms-doc-versions-${docId}`, JSON.stringify(updated));
-      logActivity(user?.full_name || 'Riwitika Gupta', `Saved revision checkpoint ${newVersionNum}`);
-      alert(`Successfully registered revision checkpoint: ${newVersionNum}`);
+    if (!isRealUUID) {
+      customAlert('Error', 'Version checkpoints require a saved backend document.');
+      return;
+    }
+
+    try {
+      setSaveStatus('Saving...');
+
+      const saved = await persistDocument(currentHtml);
+      if (!saved) {
+        setSaveStatus('Save Failed');
+        customAlert('Save Failed', 'Could not save the current document before creating a checkpoint.');
+        return;
+      }
+
+      const safeName = docTitle.replace(/[^\w\s.-]/g, '_').trim() || 'document';
+      const blob = new Blob([currentHtml], { type: 'text/html' });
+      const formData = new FormData();
+      formData.append('file', blob, `${safeName}.html`);
+
+      const res = await api.documents.uploadVersion(docIdRef.current, formData);
+
+      if (res?.id) {
+        customAlert('Success', `Successfully registered revision checkpoint v${res.current_version}!`);
+        queryClient.invalidateQueries({ queryKey: ['versions', docIdRef.current] });
+        queryClient.invalidateQueries({ queryKey: ['documentVersions', docIdRef.current] });
+        queryClient.invalidateQueries({ queryKey: ['document', docIdRef.current] });
+        setSaveStatus('Saved ✓');
+        logActivity(user?.full_name || 'System', `saved revision checkpoint v${res.current_version}`);
+      } else {
+        setSaveStatus('Save Failed');
+        customAlert('Error', 'Could not save version checkpoint to server.');
+      }
+    } catch (err: any) {
+      console.error('Failed to create revision checkpoint:', err);
+      setSaveStatus('Save Failed');
+      const detail = err?.message || 'Could not save version checkpoint to server.';
+      if (err?.status === 403) {
+        customAlert('Permission Denied', detail);
+      } else {
+        customAlert('Error', detail);
+      }
     }
   };
 
   const handleRestoreVersion = async (ver: any) => {
-    if (!editorRef.current) return;
+    if (!editor) return;
     if (isRealUUID) {
       try {
-        const versionDetails = await api.documents.viewVersion(docId, ver.version_number);
-        if (editorRef.current && versionDetails && versionDetails.content) {
-          editorRef.current.innerHTML = sanitizeHtml(versionDetails.content);
-          triggerAutosave();
+        setSaveStatus('Saving...');
+        const rawVersionData = await api.documents.viewVersion(docId, ver.version_number);
+        if (rawVersionData && rawVersionData.content !== undefined) {
+          const restoredHtml = rawVersionData.content;
+          editor.commands.setContent(sanitizeHtml(restoredHtml));
+          setPreviewingVersion(null);
+          await api.documents.update(docId, { content: restoredHtml });
+          queryClient.invalidateQueries({ queryKey: ['versions', docId] });
+          queryClient.invalidateQueries({ queryKey: ['document', docId] });
           logActivity(user?.full_name || 'System', `Restored document contents to version v${ver.version_number}.0`);
-          alert(`Restored document to version v${ver.version_number}.0 successfully!`);
+          setSaveStatus('Saved ✓');
+          customAlert('Success', `Restored document to version v${ver.version_number}.0 successfully!`);
         } else {
-          alert('Could not retrieve version content from storage.');
+          customAlert('Error', 'Could not retrieve version content from storage.');
         }
-      } catch (err) {
-        console.error('Error restoring version:', err);
-        alert('Failed to restore version from server.');
+      } catch {
+        customAlert('Error', 'Failed to restore version from server.');
       }
     } else {
-      editorRef.current.innerHTML = sanitizeHtml(ver.content);
-      triggerAutosave();
+      const restoredHtml = ver.content || '';
+      editor.commands.setContent(sanitizeHtml(restoredHtml));
+      setPreviewingVersion(null);
       logActivity(user?.full_name || 'Riwitika Gupta', `Restored document contents to version ${ver.version}`);
-      alert(`Restored document to version ${ver.version} successfully!`);
+      customAlert('Success', `Restored document to version ${ver.version} successfully!`);
     }
   };
 
-  // ----------------- FAVORITES & LOCKS -----------------
   const handleToggleFavorite = () => {
     const favorites = localStorage.getItem('kms-doc-favorites');
     let favList = favorites ? JSON.parse(favorites) : [];
@@ -742,30 +701,20 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
   };
 
   const handleToggleLock = () => {
-    const locks = localStorage.getItem('kms-doc-locks');
-    let lockList = locks ? JSON.parse(locks) : [];
-    if (isLocked) {
-      lockList = lockList.filter((id: string) => id !== docId);
-      logActivity(user?.full_name || 'Riwitika Gupta', 'Unlocked document editor write protection');
-    } else {
-      lockList.push(docId);
-      logActivity(user?.full_name || 'Riwitika Gupta', 'Locked document for editing protection');
-    }
-    localStorage.setItem('kms-doc-locks', JSON.stringify(lockList));
     setIsLocked(!isLocked);
-    alert(isLocked ? 'Document unlocked.' : 'Document locked for write protection.');
+    customAlert('Security Status', isLocked ? 'Document unlocked.' : 'Document locked for write protection.');
   };
 
-  // ----------------- EXPORT ACTIONS -----------------
   const handleExportDocument = (format: 'txt' | 'html' | 'docx') => {
-    if (!editorRef.current) return;
-    const contentText = format === 'txt' ? editorRef.current.innerText : editorRef.current.innerHTML;
+    if (!editor) return;
+    const contentText = format === 'txt' ? editor.getText() : editor.getHTML();
     const blob = new Blob([contentText], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `${docTitle.replace(/\s+/g, '_')}.${format}`;
     link.click();
     logActivity(user?.full_name || 'Riwitika Gupta', `Exported document file format: .${format}`);
+    showToast(`Exported document as .${format}`);
   };
 
   const handleInviteUser = (e: React.FormEvent) => {
@@ -785,494 +734,255 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] text-slate-800 select-none overflow-hidden font-sans">
-      
-      {/* 1. GOOGLE DOCS HEADER ROW */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleImageFileSelect} 
+        accept={ACCEPTED_IMAGE_TYPES} 
+        className="hidden" 
+      />
+
+      {/* 1. TOP DOCUMENT TITLE & SAVE STATUS HEADER */}
       <header className="bg-white border-b border-slate-200 flex flex-col shrink-0 select-none z-20">
-        
-        {/* Title, cloud saved status, comments, video mock and share row */}
-        <div className="px-6 pt-2 pb-1 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Google Docs Icon */}
-            <div className="h-8 w-8 rounded bg-blue-600 text-white flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm border border-blue-500">
-              W
-            </div>
-
-            <div className="min-w-0 leading-tight">
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={docTitle}
-                  onChange={(e) => {
-                    setDocTitle(e.target.value);
-                    updateGlobalDocMeta(e.target.value);
-                    triggerAutosave();
-                  }}
-                  className="font-bold text-sm text-slate-800 bg-transparent hover:bg-slate-50 focus:bg-white focus:border-slate-300 rounded px-1 py-0.5 border border-transparent transition-all outline-none truncate block max-w-[280px]"
-                  placeholder="Untitled document"
-                />
-
-                {/* Star icon toggle */}
-                <button 
-                  type="button" 
-                  onClick={handleToggleFavorite}
-                  className={`p-0.5 rounded-full transition-colors ${isFavorite ? 'text-amber-500' : 'text-slate-330 hover:text-slate-500'}`}
-                  title="Star document"
-                >
-                  <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-amber-500' : ''}`} />
-                </button>
-
-                {/* Cloud saving status */}
-                <div 
-                  onClick={() => alert(`Auto-save checkpoint configuration`)}
-                  className="flex items-center gap-1 text-[8.5px] text-slate-400 font-bold bg-slate-50 border border-slate-200 rounded px-1.5 py-0.2 ml-1 cursor-pointer hover:bg-slate-100 shrink-0"
-                >
-                  <span className={`h-1 w-1 rounded-full ${
-                    saveStatus === 'Saving...' ? 'bg-amber-500 animate-pulse' :
-                    saveStatus === 'Failed' ? 'bg-rose-500' : 'bg-emerald-500'
-                  }`} />
-                  <span>{saveStatus}</span>
-                </div>
-              </div>
-              
-              <div className="text-[10px] text-slate-400 font-normal pl-1 mt-0.5 select-none leading-none">
-                Owner: <span className="text-slate-500 font-semibold">{ownerName}</span> &bull; Last Edited: <span className="text-slate-555 font-semibold">{lastModifiedDate}</span> &bull; Version: <span className="text-slate-500 font-semibold">{versionStr}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Back button */}
+        <div className="px-4 py-1.5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <button
               type="button"
               onClick={() => navigate('/documents')}
-              className="p-1.5 hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-lg transition-colors"
+              className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-lg transition-colors shrink-0"
               title="Back to Documents"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
 
-            {/* Print trigger */}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="p-1.5 hover:bg-slate-50 text-slate-550 hover:text-slate-850 rounded-lg transition-colors"
-              title="Print"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
+            <div className="h-6 w-6 rounded bg-blue-600 text-white flex items-center justify-center font-extrabold text-[11px] shrink-0 shadow-2xs">
+              W
+            </div>
 
-            {/* Unified Google Docs style Share button */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-bold text-slate-400">Documents /</span>
+              <input
+                type="text"
+                value={docTitle}
+                onChange={(e) => {
+                  setDocTitle(e.target.value);
+                  triggerAutosave();
+                }}
+                className="font-bold text-xs text-slate-900 bg-transparent hover:bg-slate-50 focus:bg-white focus:border-slate-300 rounded px-1 py-0.5 border border-transparent transition-all outline-none truncate block max-w-[200px]"
+                placeholder="Untitled document"
+              />
+
+              <button 
+                type="button" 
+                onClick={handleToggleFavorite}
+                className={`p-0.5 rounded-full transition-colors ${isFavorite ? 'text-amber-500' : 'text-slate-330 hover:text-slate-500'}`}
+                title="Star document"
+              >
+                <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-amber-500' : ''}`} />
+              </button>
+
+              <div 
+                onClick={() => customAlert('Auto-save Settings', 'Auto-save checkpoint configuration')}
+                className="flex items-center gap-1 text-[8.5px] text-slate-500 font-bold bg-slate-50 border border-slate-200 rounded-full px-2 py-0.2 ml-0.5 cursor-pointer hover:bg-slate-100 shrink-0"
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  saveStatus === 'Saving...' ? 'bg-amber-500 animate-pulse' :
+                  saveStatus === 'Save Failed' ? 'bg-rose-500' : 'bg-emerald-500'
+                }`} />
+                <span>{saveStatus}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowShareModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 rounded-full text-xs font-bold transition-all shadow-sm"
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-sm transition-colors"
             >
-              <Share2 className="w-3 h-3" />
-              <span>Share</span>
+              Share
             </button>
           </div>
         </div>
 
-        {/* 2. GOOGLE DOCS STYLE MENU BAR */}
-        <div className="px-6 pb-1.5 flex items-center gap-0.5 bg-white relative" ref={menuContainerRef}>
-          {[
-            {
-              name: 'File',
-              items: [
-                { label: 'New', action: () => alert('Create new template document') },
-                { label: 'Open (⌘O)', action: () => navigate('/documents') },
-                { label: 'Make a copy', action: () => alert('Make a Copy triggered') },
-                { divider: true },
-                { label: 'Share', action: () => setShowShareModal(true) },
-                { label: 'Download (.docx)', action: () => handleExportDocument('docx') },
-                { label: 'Download (.html)', action: () => handleExportDocument('html') },
-                { label: 'Download (.txt)', action: () => handleExportDocument('txt') },
-                { divider: true },
-                { label: 'Version history', action: () => { setShowRightPanel(true); setRightTab('history'); } },
-                { label: 'Lock Editor', action: () => handleToggleLock() },
-                { divider: true },
-                { label: 'Print (⌘P)', action: () => window.print() }
-              ]
-            },
-            {
-              name: 'Edit',
-              items: [
-                { label: 'Undo', action: () => executeCommand('undo') },
-                { label: 'Redo', action: () => executeCommand('redo') },
-                { divider: true },
-                { label: 'Select all', action: () => executeCommand('selectAll') },
-                { label: 'Clear format', action: () => executeCommand('removeFormat') }
-              ]
-            },
-            {
-              name: 'View',
-              items: [
-                { label: 'Toggle Outline', action: () => setShowOutline(!showOutline) },
-                { label: 'Toggle Right Panel', action: () => setShowRightPanel(!showRightPanel) },
-                { divider: true },
-                { label: 'Properties Panel', action: () => { setShowRightPanel(true); setRightTab('properties'); } },
-                { label: 'Audit Log Log', action: () => { setShowRightPanel(true); setRightTab('activity'); } },
-                { label: 'Comments List', action: () => { setShowRightPanel(true); setRightTab('comments'); } }
-              ]
-            },
-            {
-              name: 'Insert',
-              items: [
-                {
-                  label: 'Image',
-                  action: () => {
-                    const url = prompt('Enter Image URL:');
-                    if (url) executeCommand('insertImage', url);
-                  }
-                },
-                {
-                  label: 'Table',
-                  action: () => {
-                    let tableHtml = '<table class="w-full border-collapse border border-slate-200 mt-2 text-xs"><tr><td class="border border-slate-200 p-2 min-w-16">Cell</td><td class="border border-slate-200 p-2 min-w-16">Cell</td></tr></table>';
-                    executeCommand('insertHTML', tableHtml);
-                  }
-                },
-                { label: 'Link (⌘K)', action: () => { const url = prompt('Enter Link URL:'); if (url) executeCommand('createLink', url); } },
-                { label: 'Horizontal line', action: () => executeCommand('insertHorizontalRule') }
-              ]
-            },
-            {
-              name: 'Format',
-              items: [
-                { label: 'Bold', action: () => executeCommand('bold') },
-                { label: 'Italic', action: () => executeCommand('italic') },
-                { label: 'Underline', action: () => executeCommand('underline') },
-                { label: 'Strikethrough', action: () => executeCommand('strikeThrough') },
-                { divider: true },
-                { label: 'Align Left', action: () => executeCommand('justifyLeft') },
-                { label: 'Align Center', action: () => executeCommand('justifyCenter') },
-                { label: 'Align Right', action: () => executeCommand('justifyRight') }
-              ]
-            },
-            {
-              name: 'Tools',
-              items: [
-                { label: 'Word count', action: () => alert(`Document has approximately ${editorRef.current?.innerText.split(/\s+/).length || 0} words.`) },
-                { label: 'Revision Checkpoint', action: () => handleCreateVersionCheckpoint() }
-              ]
-            },
-            {
-              name: 'Extensions',
-              items: [
-                { label: 'Add-ons', action: () => alert('Add-ons management (Mock)') },
-                { label: 'Apps Script', action: () => alert('Apps Script editor (Mock)') }
-              ]
-            },
-            {
-              name: 'Help',
-              items: [
-                { label: 'Help Docs', action: () => alert('Knowledge management portal documentation.') },
-                { label: 'About', action: () => alert('Fast Trade DMS v2.0 - Premium Document Suite') }
-              ]
-            }
-          ].map((menu) => (
-            <div key={menu.name} className="relative">
-              <button
-                type="button"
-                onClick={() => setActiveMenu(activeMenu === menu.name ? null : menu.name)}
-                className={`px-2 py-0.8 text-[11px] font-medium rounded hover:bg-slate-100 transition-colors ${
-                  activeMenu === menu.name ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600'
-                }`}
-              >
-                {menu.name}
-              </button>
-              
-              {activeMenu === menu.name && (
-                <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40 select-none animate-in fade-in slide-in-from-top-1 duration-100 text-xs font-semibold text-slate-700">
-                  {menu.items.map((item, idx) => {
-                    if ('divider' in item) {
-                      return <div key={`div-${idx}`} className="my-1 border-t border-slate-100" />;
-                    }
-                    return (
-                      <button
-                        key={`item-${idx}`}
-                        type="button"
-                        onClick={() => {
-                          setActiveMenu(null);
-                          item.action();
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between"
-                      >
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* 2. GOOGLE DOCS-STYLE MENU BAR (File / Edit / View / Insert / Format / Tools / Help) */}
+        <EditorMenuBar
+          editor={editor}
+          docTitle={docTitle}
+          isLocked={isLocked}
+          showRuler={showRuler}
+          zoomLevel={zoomLevel}
+          onToggleLock={handleToggleLock}
+          onManualSave={handleManualSave}
+          onSaveCheckpoint={handleCreateVersionCheckpoint}
+          onExport={handleExportDocument}
+          onToggleRuler={() => setShowRuler(!showRuler)}
+          onSetZoom={setZoomLevel}
+          onOpenImageUpload={() => openImageUpload('insert')}
+          onOpenTableModal={() => {
+            setModalTable({
+              onSubmit: (rows, cols) => {
+                editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+              }
+            });
+          }}
+          onOpenFindReplace={() => setShowFindReplaceModal(true)}
+          onOpenWordCount={() => setShowWordCountModal(true)}
+          onOpenAiPanel={() => setShowFloatingAiPanel(true)}
+          onShowShortcuts={() => customAlert('Keyboard Shortcuts', '⌘B: Bold, ⌘I: Italic, ⌘U: Underline, ⌘Z: Undo, ⌘Y: Redo, ⌘K: Link, ⌘F: Search, ⌘Enter: Page Break')}
+        />
 
+        {/* 3. GOOGLE DOCS-STYLE FORMATTING TOOLBAR */}
+        <EditorToolbar
+          editor={editor}
+          zoomLevel={zoomLevel}
+          onSetZoom={setZoomLevel}
+          onOpenImageUpload={() => openImageUpload('insert')}
+          onOpenTableModal={() => {
+            setModalTable({
+              onSubmit: (rows, cols) => {
+                editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+              }
+            });
+          }}
+          customPrompt={customPrompt}
+          onOpenLinkEditor={openLinkEditor}
+        />
+
+        {/* SUB-TOOLBAR FOR ACTIVE TABLE OPERATIONS */}
+        {editor && editor.isActive('table') && (
+          <div className="bg-blue-50/90 border-t border-blue-200 px-4 py-1 flex items-center gap-1.5 flex-wrap shrink-0 select-none text-[11px] font-bold text-blue-800">
+            <span className="text-[10px] text-blue-600 uppercase tracking-wider">Table Actions:</span>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().addColumnBefore().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-blue-100 rounded text-blue-700 shadow-2xs flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Col Left
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().addColumnAfter().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-blue-100 rounded text-blue-700 shadow-2xs flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Col Right
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().deleteColumn().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-rose-50 text-rose-600 rounded shadow-2xs flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Delete Col
+            </button>
+            <span className="text-blue-300">|</span>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().addRowBefore().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-blue-100 rounded text-blue-700 shadow-2xs flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Row Above
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().addRowAfter().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-blue-100 rounded text-blue-700 shadow-2xs flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Row Below
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().deleteRow().run()}
+              className="px-2 py-0.5 bg-white border border-blue-200 hover:bg-rose-50 text-rose-600 rounded shadow-2xs flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Delete Row
+            </button>
+            <span className="text-blue-300">|</span>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().deleteTable().run()}
+              className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded shadow-2xs flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Remove Table
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* 3. GOOGLE DOCS STYLE STICKY FORMATTING TOOLBAR */}
-      <div className="bg-slate-50 border-b border-slate-200 px-6 py-1 flex flex-wrap items-center gap-0.5 shrink-0 select-none z-10 sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
-        
-        {/* Undo Redo */}
-        <button type="button" onClick={() => executeCommand('undo')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded transition-colors" title="Undo"><Undo2 className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('redo')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded transition-colors" title="Redo"><Redo2 className="w-4 h-4" /></button>
-        <button type="button" onClick={() => window.print()} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded transition-colors" title="Print"><Printer className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('removeFormat')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded transition-colors" title="Clear format"><RemoveFormatting className="w-4 h-4" /></button>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Font Family */}
-        <select 
-          value={fontFamily} 
-          onChange={(e) => { setFontFamily(e.target.value); triggerAutosave(); }}
-          className="bg-transparent hover:bg-slate-200 border-none rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 cursor-pointer w-24 focus:outline-none"
-        >
-          <option value="Arial">Arial</option>
-          <option value="Calibri">Calibri</option>
-          <option value="Inter">Inter</option>
-          <option value="Times New Roman">Times New</option>
-          <option value="Courier New">Courier</option>
-          <option value="Georgia">Georgia</option>
-        </select>
-
-        {/* Font Size */}
-        <select 
-          value={fontSizeVal} 
-          onChange={(e) => { setFontSizeVal(Number(e.target.value)); triggerAutosave(); }}
-          className="bg-transparent hover:bg-slate-200 border-none rounded px-1 py-0.5 text-[11px] font-semibold text-slate-700 cursor-pointer w-14 focus:outline-none"
-        >
-          <option value={9}>9</option>
-          <option value={10}>10</option>
-          <option value={11}>11</option>
-          <option value={12}>12</option>
-          <option value={14}>14</option>
-          <option value={16}>16</option>
-          <option value={18}>18</option>
-          <option value={24}>24</option>
-        </select>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Text styling buttons */}
-        <button type="button" onClick={() => executeCommand('bold')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-650 rounded font-bold transition-colors" title="Bold"><Bold className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('italic')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-650 rounded font-bold transition-colors" title="Italic"><Italic className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('underline')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-650 rounded font-bold transition-colors" title="Underline"><Underline className="w-4 h-4" /></button>
-
-        {/* Colors */}
-        <button type="button" onClick={() => {
-          const color = prompt('Enter text color hex:', '#ef4444');
-          if (color) executeCommand('foreColor', color);
-        }} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded font-bold transition-colors flex items-center justify-center" title="Text Color">
-          <span className="text-[12px] border-b-2 border-red-500 leading-none">A</span>
-        </button>
-        <button type="button" onClick={() => {
-          const color = prompt('Enter highlight color hex:', '#fef08a');
-          if (color) executeCommand('backColor', color);
-        }} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded font-bold transition-colors flex items-center justify-center" title="Highlight Color">
-          <Highlighter className="w-4 h-4" />
-        </button>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Headings */}
-        <select 
-          defaultValue="P"
-          onChange={(e) => executeCommand('formatBlock', e.target.value)}
-          className="bg-transparent hover:bg-slate-200 border-none rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 cursor-pointer w-24 focus:outline-none"
-        >
-          <option value="P">Normal text</option>
-          <option value="H1">Heading 1</option>
-          <option value="H2">Heading 2</option>
-          <option value="H3">Heading 3</option>
-          <option value="H4">Heading 4</option>
-        </select>
-
-        {/* Alignment */}
-        <button type="button" onClick={() => executeCommand('justifyLeft')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Align Left"><AlignLeft className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('justifyCenter')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Align Center"><AlignCenter className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('justifyRight')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Align Right"><AlignRight className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('justifyFull')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Justify"><AlignJustify className="w-4 h-4" /></button>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Lists & Indents */}
-        <button type="button" onClick={() => executeCommand('insertUnorderedList')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Bulleted List"><List className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('insertOrderedList')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('outdent')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Decrease Indent"><OutdentIcon className="w-4 h-4" /></button>
-        <button type="button" onClick={() => executeCommand('indent')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Increase Indent"><IndentIcon className="w-4 h-4" /></button>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Insert Elements */}
-        <button type="button" onClick={() => {
-          const rows = prompt('Enter rows count:', '3');
-          const cols = prompt('Enter cols count:', '3');
-          if (rows && cols) {
-            let tableHtml = '<table class="w-full border-collapse border border-slate-200 mt-2 text-xs">';
-            for (let r = 0; r < Number(rows); r++) {
-              tableHtml += '<tr>';
-              for (let c = 0; c < Number(cols); c++) {
-                tableHtml += '<td class="border border-slate-200 p-2 min-w-16">Cell</td>';
-              }
-              tableHtml += '</tr>';
-            }
-            tableHtml += '</table>';
-            executeCommand('insertHTML', tableHtml);
-          }
-        }} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Insert Table"><Table className="w-4 h-4" /></button>
-        
-        <button type="button" onClick={() => {
-          const url = prompt('Enter Image URL:');
-          if (url) executeCommand('insertImage', url);
-        }} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Insert Image"><Image className="w-4 h-4" /></button>
-        
-        <button type="button" onClick={() => {
-          const url = prompt('Enter Link URL:');
-          if (url) executeCommand('createLink', url);
-        }} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Insert Link"><Link2 className="w-4 h-4" /></button>
-
-        <button type="button" onClick={() => executeCommand('insertHorizontalRule')} className="p-1 hover:bg-slate-200 active:bg-slate-300 text-slate-655 rounded transition-colors" title="Horizontal Line"><Minus className="w-4 h-4" /></button>
-
-        <div className="h-4 w-[1px] bg-slate-200 mx-1.5 shrink-0" />
-
-        {/* Spacing & Export */}
-        <select 
-          value={lineSpacing} 
-          onChange={(e) => { setLineSpacing(e.target.value); triggerAutosave(); }}
-          className="bg-transparent hover:bg-slate-200 border-none rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 cursor-pointer w-14 focus:outline-none"
-          title="Line spacing"
-        >
-          <option value="1.0">1.0</option>
-          <option value="1.15">1.15</option>
-          <option value="1.5">1.5</option>
-          <option value="2.0">2.0</option>
-        </select>
-
-        <select 
-          onChange={(e) => {
-            const val = e.target.value as any;
-            if (val) {
-              handleExportDocument(val);
-              e.target.value = '';
-            }
-          }}
-          className="bg-transparent hover:bg-slate-200 border-none rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 cursor-pointer w-20 focus:outline-none"
-          title="Export Format Options"
-        >
-          <option value="">Export</option>
-          <option value="docx">Word (.docx)</option>
-          <option value="html">HTML (.html)</option>
-          <option value="txt">Text (.txt)</option>
-        </select>
-      </div>
-
-      {/* 4. GOOGLE DOCS STYLE MARGINS RULER */}
-      <div className="bg-white border-b border-slate-200 px-6 py-0.5 select-none flex items-center relative shrink-0">
-        <div className="w-[816px] mx-auto flex items-center relative h-5 select-none text-[9px] font-mono text-slate-400">
-          <div className="w-full h-[1px] bg-slate-200 absolute left-0 right-0 top-1/2" />
-          
-          {/* Blue left margin controller */}
-          <div className="absolute left-[48px] -top-0.5 z-10 cursor-pointer flex flex-col items-center group">
-            <span className="text-blue-600 font-extrabold text-[8px] leading-none select-none transition-transform group-hover:scale-110">▼</span>
-            <div className="w-2.5 h-1.5 bg-blue-600 rounded-sm shadow-sm" />
-          </div>
-
-          {/* Ruler Labels & Ticks */}
-          <div className="w-full flex justify-between px-12 text-[9px] font-semibold text-slate-400 pt-0.5 select-none pointer-events-none">
-            <span>1</span>
-            <span>2</span>
-            <span>3</span>
-            <span>4</span>
-            <span>5</span>
-            <span>6</span>
-            <span>7</span>
-            <span>8</span>
-            <span>9</span>
-            <span>10</span>
-            <span>11</span>
-            <span>12</span>
-            <span>13</span>
-            <span>14</span>
-            <span>15</span>
-            <span>16</span>
-            <span>17</span>
-            <span>18</span>
-          </div>
-
-          {/* Blue right margin controller */}
-          <div className="absolute right-[48px] -top-0.5 z-10 cursor-pointer flex flex-col items-center group">
-            <span className="text-blue-600 font-extrabold text-[8px] leading-none select-none transition-transform group-hover:scale-110">▼</span>
-            <div className="w-2.5 h-1.5 bg-blue-600 rounded-sm shadow-sm" />
-          </div>
-        </div>
-      </div>
-
-      {/* 5. THREE-PANEL LAYOUT WORKSPACE */}
+      {/* 4. WORKSPACE CONTAINER */}
       <div className="flex-1 flex overflow-hidden relative w-full overflow-x-hidden">
         
-        {/* LEFT PANEL: Document Outline */}
-        {showOutline && (
-          <aside className="w-52 border-r border-slate-200 bg-white shrink-0 overflow-y-auto p-4 custom-scrollbar select-none animate-in slide-in-from-left-4 duration-150 sticky top-0 h-full">
-            <h3 className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-3">Outline</h3>
-            
-            {headings.length === 0 ? (
-              <p className="text-[10px] text-slate-400 italic font-semibold">No outline headings found.</p>
+        {/* CENTER WORKSPACE: Tiptap Canvas */}
+        <div className="flex-1 bg-slate-100/70 overflow-y-auto flex flex-col justify-start relative select-text custom-scrollbar px-6 py-4">
+          
+          {/* Optional Ruler Bar */}
+          {showRuler && <EditorRuler />}
+
+          {previewingVersion && (
+            <div className="bg-slate-900 text-white px-6 py-3 shrink-0 flex items-center justify-between shadow-md select-none rounded-t mt-2 w-full max-w-[920px] mx-auto">
+              <div className="flex items-center gap-2">
+                <span className="bg-blue-600 text-[9px] px-2 py-0.5 rounded font-extrabold uppercase tracking-wider">Preview Mode</span>
+                <span className="text-[10px] font-semibold text-slate-300">Viewing revision: <strong className="text-white">{previewingVersion.version}</strong></span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => handleRestoreVersion(previewingVersion)}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-sm uppercase tracking-wider text-[9px]"
+                >
+                  Restore Version
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewingVersion(null)}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold rounded-lg uppercase tracking-wider text-[9px]"
+                >
+                  Exit Preview
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Centered Document Workspace Canvas */}
+          <div 
+            className="w-full max-w-[920px] mx-auto mt-2 mb-10 relative transition-all duration-200 origin-top shrink-0"
+            style={{ transform: `scale(${zoomLevel / 100})` }}
+          >
+            {editor ? (
+              <EditorContent editor={editor} className="prose max-w-none focus:outline-none" />
             ) : (
-              <div className="space-y-1">
-                {headings.map((item, idx) => {
-                  let indent = 'pl-0';
-                  if (item.tag === 'h2') indent = 'pl-3';
-                  if (item.tag === 'h3') indent = 'pl-6';
-                  
-                  const isActive = activeHeadingId === item.id;
-                  
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setActiveHeadingId(item.id);
-                        const target = document.getElementById(item.id);
-                        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }}
-                      className={`w-full text-left text-[11px] font-semibold px-2 py-1.5 rounded transition-all leading-tight block truncate ${
-                        isActive ? 'text-blue-600 bg-blue-50/50 border-l-2 border-blue-600 rounded-l-none' : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
-                      } ${indent}`}
-                    >
-                      {item.text}
-                    </button>
-                  );
-                })}
+              <div className="p-8 text-center text-slate-400 font-semibold text-xs animate-pulse">
+                Loading Tiptap editor engine...
               </div>
             )}
-          </aside>
-        )}
+          </div>
 
-        {/* CENTER PANEL: Google Docs canvas sheet */}
-        <div className="flex-1 bg-slate-100 overflow-y-auto flex flex-col justify-start relative select-text custom-scrollbar px-4">
-          
-          <div 
-            ref={editorRef}
-            contentEditable={!isLocked}
-            suppressContentEditableWarning
-            onInput={handleEditorInput}
-            onMouseUp={handleSelectionChange}
-            onKeyUp={handleSelectionChange}
-            className={`bg-white border border-slate-205 shadow-[0_4px_16px_rgba(0,0,0,0.06),_0_1px_3px_rgba(0,0,0,0.02)] w-[816px] min-h-[1056px] p-16 mx-auto mt-4 mb-12 outline-none text-slate-800 select-text leading-relaxed font-sans text-xs space-y-5 rounded transition-all duration-200 ${
-              isLocked ? 'cursor-not-allowed opacity-90 select-none' : ''
-            }`}
-            style={{ 
-              fontFamily: fontFamily,
-              fontSize: `${fontSizeVal}pt`,
-              lineHeight: lineSpacing
-            }}
-          />
+          {/* Floating image toolbar */}
+          {editor && isImageSelected && (
+            <div
+              className="fixed z-[99998] select-none"
+              style={{ top: `${imageToolbarPos.top}px`, left: `${imageToolbarPos.left}px` }}
+            >
+              <ImageToolbar
+                editor={editor}
+                onReplace={() => openImageUpload('replace')}
+              />
+            </div>
+          )}
 
-          {/* Floating selection formatting AI toolbar */}
+          {/* Floating link editor */}
+          {editor && showLinkPopover && (
+            <div
+              className="fixed z-[99998] select-none"
+              style={{ top: `${linkPopoverPos.top}px`, left: `${linkPopoverPos.left}px` }}
+            >
+              <LinkPopover editor={editor} onClose={() => setShowLinkPopover(false)} />
+            </div>
+          )}
+
+          {/* Floating selection AI toolbar */}
           {showFloatingAiToolbar && (
             <div 
-              ref={floatingToolbarAiRef}
-              className="fixed bg-white border border-slate-205 shadow-xl rounded-xl py-1 px-1.5 z-[99999] flex items-center gap-1 text-[11px] font-bold text-slate-600 select-none animate-in fade-in zoom-in-95 duration-100"
+              className="fixed bg-white border border-slate-200 shadow-xl rounded-xl py-1 px-1.5 z-[99999] flex items-center gap-1 text-[11px] font-bold text-slate-600 select-none animate-in fade-in duration-100"
               style={{ 
                 top: `${floatingAiToolbarPos.top}px`, 
                 left: `${floatingAiToolbarPos.left}px` 
@@ -1281,12 +991,15 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
               <div className="p-1 text-blue-600 bg-blue-50 rounded-lg select-none flex items-center justify-center shrink-0">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[9.5px] text-slate-400 select-none font-bold mr-1 border-r border-slate-100 pr-1.5">AI</span>
+              <span className="text-[9.5px] text-slate-400 font-bold mr-1 border-r border-slate-100 pr-1.5">AI</span>
               
-              <button type="button" onClick={() => handleSelectionAiAction('summarize')} className="px-2 py-1 hover:bg-slate-50 hover:text-slate-900 rounded transition-colors">Summarize</button>
-              <button type="button" onClick={() => handleSelectionAiAction('rewrite')} className="px-2 py-1 hover:bg-slate-50 hover:text-slate-900 rounded transition-colors">Rewrite</button>
-              <button type="button" onClick={() => handleSelectionAiAction('improve')} className="px-2 py-1 hover:bg-slate-50 hover:text-slate-900 rounded transition-colors">Improve</button>
-              <button type="button" onClick={() => handleSelectionAiAction('explain')} className="px-2 py-1 hover:bg-slate-50 hover:text-slate-900 rounded transition-colors">Explain</button>
+              <button type="button" onClick={() => handleSelectionAiAction('summarize')} className="px-2 py-1 hover:bg-slate-50 rounded">Summarize</button>
+              <button type="button" onClick={() => handleSelectionAiAction('rewrite')} className="px-2 py-1 hover:bg-slate-50 rounded">Rewrite</button>
+              <button type="button" onClick={() => handleSelectionAiAction('improve')} className="px-2 py-1 hover:bg-slate-50 rounded">Improve</button>
+              <button type="button" onClick={() => handleSelectionAiAction('explain')} className="px-2 py-1 hover:bg-slate-50 rounded">Explain</button>
+              <button type="button" onClick={() => handleSelectionAiAction('shorter')} className="px-2 py-1 hover:bg-slate-50 rounded">Shorter</button>
+              <button type="button" onClick={() => handleSelectionAiAction('longer')} className="px-2 py-1 hover:bg-slate-50 rounded">Longer</button>
+              <button type="button" onClick={() => handleSelectionAiAction('tone')} className="px-2 py-1 hover:bg-slate-50 rounded">Tone</button>
               
               <button type="button" onClick={() => setShowFloatingAiToolbar(false)} className="p-1 hover:bg-slate-100 rounded text-slate-400 ml-1"><X className="w-3.5 h-3.5" /></button>
             </div>
@@ -1297,38 +1010,62 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
             type="button"
             onClick={() => setShowFloatingAiPanel(!showFloatingAiPanel)}
             className="fixed bottom-6 right-6 h-12 w-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all border border-blue-500 z-40 select-none group"
-            title="AI Assistant Workspace"
+            title="AI Document Assistant"
           >
             <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" />
           </button>
 
-          {/* Collapsible Floating AI Assistant Workspace panel */}
+          {/* AI Document Assistant panel */}
           {showFloatingAiPanel && (
-            <div className="fixed bottom-20 right-6 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 p-4 select-none animate-in fade-in slide-in-from-bottom-4 duration-150 flex flex-col justify-between">
-              
+            <div className="fixed bottom-20 right-6 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 p-4 select-none animate-in fade-in duration-150 flex flex-col justify-between">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-bold text-slate-800">Enterprise AI Assistant</span>
+                  <span className="text-xs font-bold text-slate-800">AI Document Assistant</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowFloatingAiPanel(false)}
-                  className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-655 transition-colors"
+                  className="p-1 hover:bg-slate-100 rounded text-slate-400"
                 >
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1 mb-2">
+                {([
+                  ['summarize', 'Summarize doc'],
+                  ['improve', 'Improve'],
+                  ['rewrite', 'Rewrite'],
+                  ['explain', 'Explain'],
+                  ['shorter', 'Shorter'],
+                  ['longer', 'Longer'],
+                  ['tone', 'Professional tone'],
+                ] as const).map(([action, label]) => (
+                  <button
+                    key={action}
+                    type="button"
+                    disabled={isAiGenerating}
+                    onClick={() => handleSelectionAiAction(action)}
+                    className="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 max-h-80 pr-1 custom-scrollbar mb-3 select-text">
                 {aiMessages.map((msg, idx) => (
                   <div key={idx} className={`flex flex-col gap-1 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                     <div className={`p-3 rounded-xl max-w-[85%] text-xs font-semibold leading-relaxed shadow-sm ${
-                      msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-50 border border-slate-200 text-slate-750'
+                      msg.sender === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : msg.isError
+                          ? 'bg-red-50 border border-red-200 text-red-700'
+                          : 'bg-slate-50 border border-slate-200 text-slate-750'
                     }`}>
                       <p>{msg.text}</p>
-                      
-                      {msg.sender === 'ai' && idx > 0 && (
+                      {msg.sender === 'ai' && !msg.isError && idx > 0 && (
                         <div className="flex gap-2 mt-2 border-t border-slate-200/50 pt-2 select-none">
                           <button
                             type="button"
@@ -1352,9 +1089,9 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
                 ))}
                 {isAiGenerating && (
                   <div className="text-left">
-                    <span className="inline-flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-400 text-[11px] font-bold">
+                    <span className="inline-flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-[11px] font-bold">
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
-                      <span>Writing response...</span>
+                      <span>AI Document Assistant is generating a response...</span>
                     </span>
                   </div>
                 )}
@@ -1365,294 +1102,21 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
                   type="text"
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
-                  placeholder="Ask AI Assistant anything..."
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.8 text-xs text-slate-750 focus:outline-none focus:bg-white focus:border-slate-350 font-semibold"
+                  disabled={isAiGenerating}
+                  placeholder="Ask AI Document Assistant..."
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.8 text-xs text-slate-750 focus:outline-none focus:bg-white font-semibold disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  className="p-1.8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition-colors shadow-sm"
+                  disabled={isAiGenerating || !aiInput.trim()}
+                  className="p-1.8 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg flex items-center justify-center transition-colors shadow-sm"
                 >
                   <Send className="w-4.5 h-4.5" />
                 </button>
               </form>
-
             </div>
           )}
-
         </div>
-
-        {/* RIGHT PANEL: Collapsible Unified Sidebar */}
-        {showRightPanel && (
-          <aside className="w-80 border-l border-slate-200 bg-white shrink-0 overflow-y-auto flex flex-col justify-between custom-scrollbar select-none animate-in slide-in-from-right-4 duration-150">
-            <div>
-              {/* Tab Navigation header */}
-              <div className="flex border-b border-slate-200 bg-slate-50/50 text-[10px] uppercase font-bold text-slate-450 select-none">
-                {['properties', 'activity', 'comments', 'history'].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setRightTab(tab as any)}
-                    className={`flex-1 py-2.5 text-center border-b-2 transition-all truncate px-1 ${
-                      rightTab === tab ? 'border-blue-600 text-blue-600 bg-white font-bold' : 'border-transparent text-slate-450 hover:text-slate-700'
-                    }`}
-                  >
-                    {tab === 'history' ? 'Versions' : tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* TAB 1: Properties */}
-              {rightTab === 'properties' && (
-                <div className="p-4 space-y-4 text-xs font-semibold text-slate-700 select-none animate-in fade-in duration-100">
-                  <div>
-                    <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider block mb-1.5">Document Details</span>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-slate-655 font-bold shadow-[inset_0_1px_1px_rgba(0,0,0,0.01)]">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">File Path:</span>
-                        <span className="text-slate-750 truncate max-w-40" title={locationPath}>{locationPath}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Size:</span>
-                        <span className="text-slate-750">12.4 KB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Owner:</span>
-                        <span className="text-slate-750">{ownerName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Revision:</span>
-                        <span className="text-slate-750">{versionStr}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Last Edited:</span>
-                        <span className="text-slate-750">{lastModifiedDate}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider block mb-1.5">Approval Status</span>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-[inset_0_1px_1px_rgba(0,0,0,0.01)]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                        <span className="text-slate-800 font-bold uppercase text-[10.5px]">Draft</span>
-                      </div>
-                      <span className="text-[9.5px] text-slate-400">Review pending</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider block mb-1.5">Access Rights</span>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 shadow-[inset_0_1px_1px_rgba(0,0,0,0.01)]">
-                      <div className="flex justify-between items-center text-[10.5px]">
-                        <span className="font-bold text-slate-700">Super Admin (Arun)</span>
-                        <span className="text-[9.5px] bg-blue-50 text-blue-600 border border-blue-100 rounded px-1 font-bold">OWNER</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[10.5px]">
-                        <span className="font-bold text-slate-700">Manager (Riwitika)</span>
-                        <span className="text-[9.5px] text-slate-500 font-bold">EDITOR</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[10.5px]">
-                        <span className="font-bold text-slate-700">Employee (Paras)</span>
-                        <span className="text-[9.5px] text-slate-500 font-bold">VIEWER</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider block mb-1.5">Description & Tags</span>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 shadow-[inset_0_1px_1px_rgba(0,0,0,0.01)]">
-                      <p className="text-[10.5px] text-slate-550 leading-normal">{docDescription}</p>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {tagsList.map(tag => (
-                          <span key={tag} className="text-[9.5px] bg-slate-100 border text-slate-500 px-1.5 py-0.2 rounded font-bold">{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: Activity Log */}
-              {rightTab === 'activity' && (
-                <div className="p-4 space-y-3 select-none animate-in fade-in duration-100 text-xs font-semibold">
-                  <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider block mb-1">System Audit Log</span>
-                  
-                  <div className="space-y-3.5 overflow-y-auto max-h-[65vh] pr-1 custom-scrollbar">
-                    {activities.map((act, idx) => (
-                      <div key={idx} className="flex gap-2.5 items-start text-xs font-semibold leading-normal bg-slate-50/55 border border-slate-200/50 rounded-xl p-2.5 shadow-sm">
-                        <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-505 border text-[9.5px] shrink-0 font-bold">
-                          {act.actor.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-slate-800 text-[11px]"><strong className="font-extrabold text-slate-900">{act.actor}</strong> {act.action}</p>
-                          <span className="text-[9px] text-slate-450 block mt-0.5">{act.time}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: Comments */}
-              {rightTab === 'comments' && (
-                <div className="p-4 space-y-4 animate-in fade-in duration-100">
-                  {/* Create Comment Form */}
-                  <form onSubmit={handleAddComment} className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.01)] animate-in zoom-in-95 duration-100">
-                    <span className="text-[9.5px] uppercase font-extrabold text-slate-400 tracking-wider">New comment thread</span>
-                    
-                    {selectedText && (
-                      <div className="text-[10.5px] italic text-slate-500 bg-white border border-slate-200 rounded-lg px-2 py-1.5 mt-1 border-l-4 border-l-amber-400 truncate">
-                        Linked: "{selectedText}"
-                      </div>
-                    )}
-
-                    <textarea
-                      value={newCommentVal}
-                      onChange={(e) => setNewCommentVal(e.target.value)}
-                      placeholder="Type comment details..."
-                      className="w-full mt-2 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:border-slate-350 resize-none h-16 font-semibold"
-                    />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedRange(null); setSelectedText(''); setNewCommentVal(''); }}
-                        className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold shadow-sm"
-                      >
-                        Comment
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Comments list items */}
-                  <div className="space-y-3.5 overflow-y-auto max-h-[50vh] pr-1 custom-scrollbar">
-                    {comments.length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 italic text-[11px] font-semibold">
-                        No comment threads started.
-                      </div>
-                    ) : (
-                      comments.map((comment) => (
-                        <div key={comment.id} className={`border rounded-xl p-3 bg-white shadow-sm transition-all ${
-                          comment.resolved ? 'border-slate-100 opacity-60' : 'border-slate-200'
-                        }`}>
-                          <div className="flex items-center justify-between">
-                            <span className="font-extrabold text-slate-800 text-[11.5px]">{comment.author}</span>
-                            <span className="text-[9.5px] text-slate-400 font-bold">{comment.timestamp}</span>
-                          </div>
-                          <p className="text-[11.5px] text-slate-655 font-semibold leading-relaxed mt-1">{comment.content}</p>
-                          
-                          {comment.replies.map((reply, rid) => (
-                            <div key={rid} className="mt-2 pl-3 border-l-2 border-slate-200 text-[11px] font-semibold">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-750">{reply.author}</span>
-                                <span className="text-[8.5px] text-slate-400">{reply.timestamp}</span>
-                              </div>
-                              <p className="text-slate-555 leading-relaxed">{reply.content}</p>
-                            </div>
-                          ))}
-
-                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 select-none">
-                            <div className="flex gap-2 text-[9.5px] font-extrabold uppercase tracking-wide">
-                              <button
-                                type="button"
-                                onClick={() => handleResolveComment(comment.id)}
-                                className={comment.resolved ? 'text-slate-450 hover:text-slate-600' : 'text-emerald-600 hover:text-emerald-850'}
-                              >
-                                {comment.resolved ? 'Reopen' : 'Resolve'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteComment(comment.id)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-
-                          {!comment.resolved && (
-                            <div className="mt-2 flex gap-1.5 border-t border-slate-50 pt-2">
-                              <input
-                                type="text"
-                                value={replyInputs[comment.id] || ''}
-                                onChange={(e) => setReplyInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                                placeholder="Reply..."
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded px-2 py-0.8 text-[10.5px] font-semibold text-slate-750 focus:outline-none focus:bg-white"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleReplyComment(comment.id, replyInputs[comment.id] || '');
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleReplyComment(comment.id, replyInputs[comment.id] || '')}
-                                className="p-1 bg-slate-105 hover:bg-slate-200 rounded text-slate-650"
-                              >
-                                <CornerDownLeft className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: Versions log checkpoints */}
-              {rightTab === 'history' && (
-                <div className="p-4 space-y-3 select-none animate-in fade-in duration-100">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Revisions Log</span>
-                    <button
-                      type="button"
-                      onClick={handleCreateVersionCheckpoint}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 font-extrabold"
-                    >
-                      + Save Checkpoint
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2 overflow-y-auto max-h-[65vh] pr-1 custom-scrollbar">
-                    {versions.map((ver) => (
-                      <div key={ver.id} className="border border-slate-200 rounded-xl p-3 bg-white hover:border-slate-350 transition-colors shadow-sm flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-slate-800 text-[11.5px]">{ver.version}</span>
-                          <span className="text-[9.5px] text-slate-400 font-bold">{ver.timestamp}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10.5px] text-slate-550 font-semibold leading-none">
-                          <User className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Author: {ver.author}</span>
-                        </div>
-                        <div className="flex justify-end pt-1 border-t border-slate-100 mt-1 select-none">
-                          <button
-                            type="button"
-                            onClick={() => handleRestoreVersion(ver)}
-                            className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 text-[10.5px] font-bold text-slate-655 rounded-lg transition-colors flex items-center gap-1"
-                          >
-                            Restore Version
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-[10px] text-slate-400 font-bold select-none text-center">
-              Fast Trade KMS Secure File Server
-            </div>
-          </aside>
-        )}
-      </div>
 
       {/* SHARE MODAL OVERLAY */}
       {showShareModal && (
@@ -1672,7 +1136,6 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
               </button>
             </div>
 
-            {/* Invite Collaborator Form */}
             <form onSubmit={handleInviteUser} className="space-y-3.5">
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -1681,7 +1144,7 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="Enter email address..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.8 text-xs text-slate-705 focus:outline-none focus:bg-white focus:border-slate-350"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.8 text-xs text-slate-705 focus:outline-none focus:bg-white"
                   />
                 </div>
                 <select
@@ -1775,6 +1238,134 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
         </div>
       )}
 
+      {/* Custom Prompt Modal */}
+      {modalPrompt && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const val = (e.currentTarget.elements.namedItem('prompt-value') as HTMLInputElement).value;
+              modalPrompt.onSubmit(val);
+              setModalPrompt(null);
+            }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden flex flex-col"
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">{modalPrompt.title}</span>
+              <button type="button" onClick={() => setModalPrompt(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <input
+                type="text"
+                name="prompt-value"
+                autoFocus
+                defaultValue={modalPrompt.defaultValue}
+                placeholder={modalPrompt.placeholder}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:bg-white text-slate-855 font-semibold"
+              />
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
+              <button type="button" onClick={() => setModalPrompt(null)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">Submit</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {modalAlert && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">{modalAlert.title}</span>
+              <button type="button" onClick={() => setModalAlert(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-slate-650 leading-relaxed font-semibold">{modalAlert.message}</p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <button type="button" onClick={() => setModalAlert(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Table Modal */}
+      {modalTable && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const rows = Number((e.currentTarget.elements.namedItem('table-rows') as HTMLInputElement).value);
+              const cols = Number((e.currentTarget.elements.namedItem('table-cols') as HTMLInputElement).value);
+              modalTable.onSubmit(rows, cols);
+              setModalTable(null);
+            }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden flex flex-col"
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">Insert Table</span>
+              <button type="button" onClick={() => setModalTable(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Rows</label>
+                  <input
+                    type="number"
+                    name="table-rows"
+                    min="1"
+                    max="20"
+                    defaultValue="3"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:bg-white text-slate-855 font-semibold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Columns</label>
+                  <input
+                    type="number"
+                    name="table-cols"
+                    min="1"
+                    max="20"
+                    defaultValue="3"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:bg-white text-slate-855 font-semibold"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
+              <button type="button" onClick={() => setModalTable(null)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">Insert</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Word Count Modal */}
+      {showWordCountModal && (
+        <WordCountModal
+          text={editor ? editor.getText() : ''}
+          html={editor ? editor.getHTML() : ''}
+          onClose={() => setShowWordCountModal(false)}
+        />
+      )}
+
+      {/* Find and Replace Modal */}
+      {showFindReplaceModal && (
+        <FindReplaceModal
+          editor={editor}
+          onClose={() => setShowFindReplaceModal(false)}
+        />
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 left-6 bg-slate-900 text-white rounded-xl py-3 px-4 shadow-2xl z-[99999] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-5 duration-200 text-xs font-bold select-none border border-slate-800">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      </div>
     </div>
   );
 }

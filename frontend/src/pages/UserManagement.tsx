@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { Link } from 'react-router-dom';
 import { 
   Users, 
   UserPlus, 
@@ -34,6 +35,14 @@ export default function UserManagement() {
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptParent, setNewDeptParent] = useState<number | ''>('');
+
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [promptModal, setPromptModal] = useState<{ title: string; message: string; defaultValue: string; onSubmit: (val: string) => void } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   // Fetch real users and departments from backend
   const { data: rawUsers = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
@@ -169,14 +178,20 @@ export default function UserManagement() {
   };
 
   // Bulk operation handlers
-  const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.length} users?`)) return;
-    for (const id of selectedIds) {
-      await deleteMutation.mutateAsync(id).catch(() => null);
-    }
-    setSelectedIds([]);
-    setShowDrawer(false);
-    setActiveUser(null);
+  const handleBulkDelete = () => {
+    setConfirmModal({
+      title: 'Confirm Bulk Deletion',
+      message: `Are you sure you want to delete ${selectedIds.length} users? This action is permanent and cannot be undone.`,
+      onConfirm: async () => {
+        for (const id of selectedIds) {
+          await deleteMutation.mutateAsync(id).catch(() => null);
+        }
+        setSelectedIds([]);
+        setShowDrawer(false);
+        setActiveUser(null);
+        showToast('Selected users deleted successfully.');
+      }
+    });
   };
 
   const handleBulkDeactivate = async () => {
@@ -184,7 +199,7 @@ export default function UserManagement() {
       await updateMutation.mutateAsync({ id, data: { is_active: false } }).catch(() => null);
     }
     setSelectedIds([]);
-    alert('Selected users deactivated.');
+    showToast('Selected users deactivated.');
   };
 
   // KPI Summary Cards configuration — derived from real data
@@ -258,6 +273,12 @@ export default function UserManagement() {
 
         {/* Header Actions */}
         <div className="flex items-center gap-2.5">
+          <Link
+            to="/documents"
+            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-655 transition-all shadow-sm shrink-0"
+          >
+            ← Back to Workspace
+          </Link>
           <button
             type="button"
             onClick={() => refetchUsers()}
@@ -608,14 +629,19 @@ export default function UserManagement() {
                             <button
                               type="button"
                               onClick={() => {
-                                const pStr = prompt('Enter parent ID or "root" to clear parent:', d.parent_id || 'root');
-                                if (pStr !== null) {
-                                  const parentVal = pStr.toLowerCase() === 'root' ? null : Number(pStr);
-                                  updateDeptMutation.mutate({
-                                    id: d.id,
-                                    data: { name: d.name, parent_id: parentVal }
-                                  });
-                                }
+                                setPromptModal({
+                                  title: 'Move Department',
+                                  message: 'Enter parent ID or "root" to clear parent:',
+                                  defaultValue: String(d.parent_id || 'root'),
+                                  onSubmit: (val) => {
+                                    const parentVal = val.toLowerCase() === 'root' ? null : Number(val);
+                                    updateDeptMutation.mutate({
+                                      id: d.id,
+                                      data: { name: d.name, parent_id: parentVal }
+                                    });
+                                    showToast('Department parent updated.');
+                                  }
+                                });
                               }}
                               className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded text-[10px] font-bold shadow-sm"
                             >
@@ -624,11 +650,16 @@ export default function UserManagement() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Are you sure you want to delete the department "${d.name}"?`)) {
-                                  deleteDeptMutation.mutate(d.id);
-                                }
+                                setConfirmModal({
+                                  title: 'Delete Department',
+                                  message: `Are you sure you want to delete the department "${d.name}"?`,
+                                  onConfirm: () => {
+                                    deleteDeptMutation.mutate(d.id);
+                                    showToast('Department deletion requested.');
+                                  }
+                                });
                               }}
-                              className="px-2 py-1 text-red-650 hover:bg-red-50 rounded text-[10px] font-bold"
+                              className="px-2 py-1 text-red-655 hover:bg-red-50 rounded text-[10px] font-bold"
                             >
                               Delete
                             </button>
@@ -644,6 +675,73 @@ export default function UserManagement() {
         </div>
       )}
       
+      {confirmModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">{confirmModal.title}</span>
+              <button type="button" onClick={() => setConfirmModal(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-slate-650 leading-relaxed font-semibold">{confirmModal.message}</p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setConfirmModal(null)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }} 
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promptModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const val = (e.currentTarget.elements.namedItem('prompt-value') as HTMLInputElement).value;
+              promptModal.onSubmit(val);
+              setPromptModal(null);
+            }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-slate-900">{promptModal.title}</span>
+              <button type="button" onClick={() => setPromptModal(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-2">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{promptModal.message}</p>
+              <input
+                type="text"
+                name="prompt-value"
+                autoFocus
+                defaultValue={promptModal.defaultValue}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:bg-white text-slate-855 font-semibold"
+              />
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setPromptModal(null)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm">Submit</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 left-6 bg-slate-900 text-white rounded-xl py-3 px-4 shadow-2xl z-[99999] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-5 duration-200 text-xs font-bold select-none border border-slate-800">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
     </div>
   );
 }

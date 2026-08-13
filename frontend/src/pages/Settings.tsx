@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { Link } from 'react-router-dom';
 import { 
   User, 
   Bell, 
@@ -41,6 +42,10 @@ export default function Settings() {
   // Toggle Switches
   const [themeMode, setThemeMode] = useState<'light' | 'system'>('light');
 
+  // Confirmation Modals States
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deleteCompleted, setDeleteCompleted] = useState(false);
+
 
   // Horizontal Tab Items
   const tabs = [
@@ -56,9 +61,17 @@ export default function Settings() {
     <div className="space-y-6 max-w-7xl mx-auto font-sans text-slate-800 pb-12 select-none">
       
       {/* 1. TOP HEADER SECTION */}
-      <div className="space-y-1">
-        <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Settings</h1>
-        <p className="text-slate-500 text-[11px] font-semibold">Manage your account, preferences and system configurations</p>
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Settings</h1>
+          <p className="text-slate-500 text-[11px] font-semibold">Manage your account, preferences and system configurations</p>
+        </div>
+        <Link
+          to="/documents"
+          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-655 transition-all shadow-sm"
+        >
+          ← Back to Workspace
+        </Link>
       </div>
 
       {/* 2. HORIZONTAL NAVIGATION TAB BAR */}
@@ -288,12 +301,8 @@ export default function Settings() {
               
               <button 
                 type="button" 
-                onClick={() => {
-                  if (confirm('Are you absolutely sure you want to delete your work profile? This cannot be undone.')) {
-                    alert('Profile deletion bypass requested (Mock)');
-                  }
-                }}
-                className="px-4 py-2 border border-red-200 text-red-650 hover:bg-red-50 text-xs font-extrabold rounded-xl transition-all bg-white flex items-center justify-center gap-1.5 shadow-sm"
+                onClick={() => setShowConfirmDelete(true)}
+                className="px-4 py-2 border border-red-200 text-red-655 hover:bg-red-50 text-xs font-extrabold rounded-xl transition-all bg-white flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Trash2 className="w-3.5 h-3.5 text-red-500" />
                 <span>Delete Account</span>
@@ -453,6 +462,53 @@ export default function Settings() {
           <Info className="w-10 h-10 text-slate-400 mx-auto animate-pulse mb-3" />
           <h2 className="text-base font-extrabold text-slate-800">Billing & Licenses Center</h2>
           <p className="text-xs text-slate-455 font-semibold mt-1">View corporate DMS terms of service, active license keys validation, and app version specifications.</p>
+        </div>
+      )}
+
+      {showConfirmDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-6 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-[400px] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <span className="font-extrabold text-sm text-red-650">Confirm Deletion</span>
+              <button type="button" onClick={() => setShowConfirmDelete(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+            </div>
+            <div className="p-6">
+              {deleteCompleted ? (
+                <p className="text-xs text-emerald-600 leading-relaxed font-bold">
+                  Bypass requested: Your profile deletion request is processed. (Mock Integration)
+                </p>
+              ) : (
+                <p className="text-xs text-slate-650 leading-relaxed font-semibold">
+                  Are you absolutely sure you want to delete your work profile? This action is irreversible and cannot be undone.
+                </p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 text-xs font-bold uppercase tracking-wider">
+              {deleteCompleted ? (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setDeleteCompleted(false);
+                    setShowConfirmDelete(false);
+                  }} 
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm"
+                >
+                  Close
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setShowConfirmDelete(false)} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-600 bg-white">Cancel</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setDeleteCompleted(true)} 
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
+                  >
+                    Delete Account
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

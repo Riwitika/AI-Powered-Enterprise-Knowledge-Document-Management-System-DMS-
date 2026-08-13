@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../api/client';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -6,7 +7,8 @@ import {
   Download, 
   Search, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 
 export default function PdfViewer({ activeDoc }: { activeDoc: any }) {
@@ -14,8 +16,79 @@ export default function PdfViewer({ activeDoc }: { activeDoc: any }) {
   const [page, setPage] = useState(1);
   const totalPages = 3;
 
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const docId = activeDoc?.id;
+  const isRealUUID = typeof docId === 'string' && docId.length === 36;
+
+  useEffect(() => {
+    if (!isRealUUID) {
+      setLoading(false);
+      return;
+    }
+    
+    let active = true;
+    const loadFile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const blob = await api.documents.download(docId);
+        if (active) {
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        }
+      } catch (err: any) {
+        console.error('Failed to load PDF file:', err);
+        if (active) {
+          setError('Failed to fetch the PDF file from the secure storage server.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    loadFile();
+
+    return () => {
+      active = false;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [docId]);
+
   const handlePrint = () => {
-    alert('Initiating print flow... (Mock)');
+    if (blobUrl) {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } else {
+      window.print();
+    }
+  };
+
+  const handleDownload = () => {
+    if (blobUrl) {
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = activeDoc?.name || 'document.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      const contentText = 'Mock PDF Download Content';
+      const blob = new Blob([contentText], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${activeDoc?.name || 'document'}.pdf`;
+      link.click();
+    }
   };
 
   const getPdfContent = () => {
@@ -70,11 +143,74 @@ export default function PdfViewer({ activeDoc }: { activeDoc: any }) {
 
   const pdfData = getPdfContent();
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
+        <div className="text-center space-y-2">
+          <div className="h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Loading Secure Document File...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 text-center">
+        <div className="max-w-md space-y-3">
+          <FileText className="h-10 w-10 text-rose-500 mx-auto animate-bounce" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Secure Access Error</h3>
+          <p className="text-[10.5px] text-slate-500 font-medium leading-relaxed">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render native browser PDF preview via Blob Url
+  if (blobUrl) {
+    return (
+      <div className="flex flex-col h-full bg-[#f3f4f6]/40 relative">
+        <div className="bg-white border-b border-slate-200/80 px-6 py-2.5 flex items-center justify-between shrink-0 text-slate-600 select-none z-10 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">Secure PDF Preview</span>
+            <span className="text-xs font-bold text-slate-700 truncate max-w-sm">{activeDoc.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              type="button" 
+              onClick={handlePrint}
+              className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors"
+              title="Print Document"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button 
+              type="button" 
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+              title="Download File"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download</span>
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 w-full bg-slate-800">
+          <iframe 
+            src={`${blobUrl}#toolbar=1`} 
+            className="w-full h-full border-none" 
+            title="Secure PDF File Viewer" 
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#f3f4f6]/40 select-none">
       
       {/* 1. PDF Toolbar */}
-      <div className="bg-white border-b border-slate-200/80 px-6 py-2 flex items-center justify-between shrink-0 text-slate-650">
+      <div className="bg-white border-b border-slate-200/80 px-6 py-2 flex items-center justify-between shrink-0 text-slate-655">
         
         {/* Page Nav */}
         <div className="flex items-center gap-2">
@@ -148,7 +284,7 @@ export default function PdfViewer({ activeDoc }: { activeDoc: any }) {
 
           <button 
             type="button" 
-            onClick={() => alert(`Download triggered for: "${activeDoc?.name}"`)}
+            onClick={handleDownload}
             className="p-1.5 hover:bg-slate-100 rounded text-slate-500"
             title="Download PDF"
           >

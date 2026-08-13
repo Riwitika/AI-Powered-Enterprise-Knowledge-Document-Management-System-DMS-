@@ -195,6 +195,7 @@ class Document(Base):
     permissions = relationship("Permission", back_populates="document", cascade="all, delete-orphan")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
     conversations = relationship("AIConversation", back_populates="document", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="document", cascade="all, delete-orphan")
 
 
 class DocumentVersion(Base):
@@ -272,6 +273,7 @@ class Comment(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     replies = relationship("Comment", backref=backref("parent", remote_side=[id]), cascade="all, delete-orphan")
+    document = relationship("Document", back_populates="comments")
 
 
 class Notification(Base):

@@ -188,6 +188,10 @@ export const api = {
       method: "POST",
       body: formData,
     }),
+    uploadAsset: async (id: string, formData: FormData) => apiRequest(`/documents/${id}/assets`, {
+      method: "POST",
+      body: formData,
+    }),
     getPending: async () => apiRequest("/documents/pending"),
     getTemplates: async () => apiRequest("/documents/templates"),
     getPublic: async (id: string) => apiRequest(`/documents/public/${id}`),

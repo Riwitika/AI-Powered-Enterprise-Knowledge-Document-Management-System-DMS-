@@ -37,21 +37,27 @@ def process_document_upload(document_id: UUID, db: Session) -> None:
         logger.info(f"Extracted {len(text)} characters from {doc.name}")
 
         # 2. Generate Summary and Keywords via LLM
-        summary, keywords = llm_provider.generate_summary_and_keywords(text)
-        doc.ai_summary = summary
-        doc.ai_keywords = keywords
-        
-        # Save tags to document_tags table
-        # Delete existing tags first (in case of re-processing)
-        db.query(DocumentTag).filter(DocumentTag.document_id == doc.id).delete()
-        for tag in keywords:
-            clean_tag = tag.strip().lower()[:50]
-            if clean_tag:
-                doc_tag = DocumentTag(document_id=doc.id, tag=clean_tag)
-                db.add(doc_tag)
-                
-        db.commit()
-        logger.info(f"Generated summary and tags for document {doc.name}")
+        try:
+            summary, keywords = llm_provider.generate_summary_and_keywords(text)
+            doc.ai_summary = summary
+            doc.ai_keywords = keywords
+            
+            # Save tags to document_tags table
+            # Delete existing tags first (in case of re-processing)
+            db.query(DocumentTag).filter(DocumentTag.document_id == doc.id).delete()
+            for tag in keywords:
+                clean_tag = tag.strip().lower()[:50]
+                if clean_tag:
+                    doc_tag = DocumentTag(document_id=doc.id, tag=clean_tag)
+                    db.add(doc_tag)
+                    
+            db.commit()
+            logger.info(f"Generated summary and tags for document {doc.name}")
+        except Exception as llm_err:
+            logger.warning(f"Failed to generate LLM summary and keywords for document {doc.name}: {llm_err}")
+            doc.ai_summary = "AI service temporarily unavailable for summarization. The document content is fully indexed and searchable."
+            doc.ai_keywords = ["general"]
+            db.commit()
 
         # 3. Chunk text
         chunks = chunk_text(text)

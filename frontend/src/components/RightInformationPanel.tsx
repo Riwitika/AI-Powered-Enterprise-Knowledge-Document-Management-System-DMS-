@@ -2,200 +2,135 @@ import { useState } from 'react';
 import { 
   X, 
   Download, 
-  Share2, 
-  Folder, 
-  Calendar, 
-  Tag, 
-  Plus, 
-  ChevronDown,
-  Eye
+  FileText
 } from 'lucide-react';
-import type { DocumentRowItem } from './DocumentTable';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api/client';
 
 interface RightInformationPanelProps {
-  item: DocumentRowItem | null;
+  item: any; // The active workspace document
   onClose: () => void;
-  onOpenClick?: (item: DocumentRowItem) => void;
-  onDownloadClick?: (item: DocumentRowItem) => void;
-  onShareClick?: (item: DocumentRowItem) => void;
+  allDocs?: any[];
 }
 
 export default function RightInformationPanel({
   item,
   onClose,
-  onOpenClick,
-  onDownloadClick,
-  onShareClick
+  allDocs = []
 }: RightInformationPanelProps) {
-  const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'versions' | 'comments'>('details');
+  const queryClient = useQueryClient();
+
+  // Tab states: 'properties' | 'comments' | 'versions' | 'activity'
+  const [activeTab, setActiveTab] = useState<'properties' | 'comments' | 'versions' | 'activity'>('properties');
+
+  // State for posting new comments
+  const [commentVal, setCommentVal] = useState('');
+
+  // Fetch comments for the document from the database
+  const { data: comments = [] } = useQuery({
+    queryKey: ['documentComments', item?.id],
+    queryFn: async () => {
+      return api.comments.list(item.id);
+    },
+    enabled: !!item?.id
+  });
+
+  // Post comment mutation
+  const addCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      await api.comments.create(item.id, { content });
+    },
+    onSuccess: () => {
+      setCommentVal('');
+      queryClient.invalidateQueries({ queryKey: ['documentComments', item.id] });
+    }
+  });
+
+  // Fetch document versions from the database
+  const { data: versions = [] } = useQuery({
+    queryKey: ['documentVersions', item?.id],
+    queryFn: async () => {
+      return api.documents.versions(item.id);
+    },
+    enabled: !!item?.id
+  });
+
+  // Fetch document permissions rules
+  const { data: permissions = [] } = useQuery({
+    queryKey: ['documentPermissions', item?.id],
+    queryFn: async () => {
+      return api.permissions.list(item.id);
+    },
+    enabled: !!item?.id
+  });
 
   if (!item) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center select-none text-slate-400">
-        <Folder className="w-12 h-12 text-slate-200 mb-3" />
-        <p className="text-xs font-bold">No file selected</p>
-        <p className="text-[10px] text-slate-450 mt-1 max-w-[180px] leading-relaxed">
-          Select a file to inspect its details, version log, activity feed, and permissions.
+        <span className="text-2xl mb-3">📁</span>
+        <p className="text-xs font-bold text-slate-700">No Document Selected</p>
+        <p className="text-[11px] text-slate-400 mt-1 max-w-[200px] leading-relaxed">
+          Select an item from the workspace tree to view properties and metadata.
         </p>
       </div>
     );
   }
 
-  const getDynamicDetails = () => {
-    const name = item.name.toLowerCase();
-    
-    // Default fallback values
-    let location = `/Corporate Knowledge/${(item as any).folderId || ''}`;
-    let createdOn = '14 May 2026, 11:00 AM';
-    let tags = [item.fileType, 'Knowledge'];
-    let description = `Enterprise records and metadata details for ${item.name}`;
-    let whoCanAccess = 'All Employees';
-    let accessType = 'Can view, download, edit';
+  // Filter allDocs list for related documents (same category or folder)
+  const relatedDocs = allDocs.filter(
+    (d: any) => d.id !== item.id && d.status !== 'archived' && (d.folder_id === item.folder_id || d.category === item.category)
+  ).slice(0, 5);
 
-    // Map default documents:
-    if (item.id === 'doc-1') {
-      location = '/02_Finance/Reports';
-      createdOn = '14 May 2026, 11:00 AM';
-      tags = ['Budget', 'Q2', 'Finance'];
-      description = 'Quarter 2 budget report including departmental allocations, variances and forecasts.';
-      whoCanAccess = 'Finance Team, Managers';
-      accessType = 'Can view, download';
-    } else if (item.id === 'doc-2') {
-      location = '/02_Finance/Reports';
-      createdOn = '15 May 2026, 09:00 AM';
-      tags = ['Sales', 'April', 'Reports'];
-      description = 'Departmental sales records for April showing achievements against targets.';
-      whoCanAccess = 'Sales Team, Executive Board';
-      accessType = 'Can view, download, edit';
-    } else if (item.id === 'doc-3') {
-      location = '/05_Legal/Agreements';
-      createdOn = '10 May 2026, 02:30 PM';
-      tags = ['Legal', 'Vendor', 'Agreements'];
-      description = 'Standard services procurement vendor agreement including terms and conditions.';
-      whoCanAccess = 'Legal Team, Procurement Managers';
-      accessType = 'Can view, download';
-    } else if (item.id === 'doc-4') {
-      location = '/00_Company_Information';
-      createdOn = '12 May 2026, 10:00 AM';
-      tags = ['Roadmap', 'Product', 'Presentation'];
-      description = '2024 overview roadmap for the primary enterprise software release.';
-      whoCanAccess = 'All Employees';
-      accessType = 'Can view';
-    } else if (item.id === 'doc-5') {
-      location = '/02_Finance/Policies';
-      createdOn = '14 May 2026, 09:30 AM';
-      tags = ['Policy', 'Finance'];
-      description = 'Corporate financial policy outlining internal control parameters and review timelines.';
-      whoCanAccess = 'Finance Team, Audit Officers';
-      accessType = 'Can view, edit';
-    } else if (item.id === 'doc-6') {
-      location = '/02_Finance/Budgets';
-      createdOn = '12 May 2026, 11:00 AM';
-      tags = ['Expense', 'Analysis', 'Finance'];
-      description = 'Analytical sheet detailing departmental expense balances against initial allocations.';
-      whoCanAccess = 'Finance Managers, Directors';
-      accessType = 'Can view, download, edit';
-    } else if (item.id === 'doc-7') {
-      location = '/02_Finance/Budgets';
-      createdOn = '11 May 2026, 03:00 PM';
-      tags = ['Annual', 'Summary', 'Finance'];
-      description = 'Year-end summary covering gross sales, tax compliance parameters and margin audits.';
-      whoCanAccess = 'Audit Board, Shareholders';
-      accessType = 'Can view, download';
-    } else if (item.id === 'doc-8') {
-      location = '/02_Finance/Budgets';
-      createdOn = '10 May 2026, 04:00 PM';
-      tags = ['Presentation', 'Budget', 'Q2'];
-      description = 'Slides deck prepared for board review of the Q2 budget plans.';
-      whoCanAccess = 'Executive Board, Managers';
-      accessType = 'Can view, share';
-    } else if (item.id === 'doc-9') {
-      location = '/02_Finance';
-      createdOn = '09 May 2026, 02:00 PM';
-      tags = ['Cashflow', 'Statement'];
-      description = 'Operational, investment and financing cash flow logs.';
-      whoCanAccess = 'Finance Team';
-      accessType = 'Can view, edit';
-    } else if (item.id === 'doc-10') {
-      location = '/02_Finance';
-      createdOn = '08 May 2026, 10:00 AM';
-      tags = ['Tax', 'Compliance'];
-      description = 'Guideline rules for regional corporate taxation filing cycles.';
-      whoCanAccess = 'Finance Team, HR Officers';
-      accessType = 'Can view, download';
-    } else {
-      if (name.includes('budget') || name.includes('report')) {
-        tags = ['Budget', 'Report'];
-      } else if (name.includes('sale')) {
-        tags = ['Sales', 'Data'];
-      } else if (name.includes('agreement') || name.includes('contract')) {
-        tags = ['Legal', 'Contract'];
-      }
+  const getInitials = (name: string) => {
+    return name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U';
+  };
+
+  const handleCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (commentVal.trim()) {
+      addCommentMutation.mutate(commentVal.trim());
     }
-
-    return {
-      location,
-      createdOn,
-      tags,
-      description,
-      whoCanAccess,
-      accessType
-    };
-  };
-
-  const details = getDynamicDetails();
-
-  const getFileTypeColor = (fileType: string) => {
-    const type = fileType.toLowerCase();
-    if (type === 'docx' || type === 'doc') return 'bg-blue-50 text-blue-650 border-blue-100';
-    if (type === 'pdf') return 'bg-red-50 text-red-650 border-red-100';
-    if (type === 'xlsx' || type === 'xls' || type === 'csv') return 'bg-emerald-50 text-emerald-650 border-emerald-100';
-    if (type === 'pptx' || type === 'ppt') return 'bg-orange-50 text-orange-650 border-orange-100';
-    return 'bg-slate-50 text-slate-500 border-slate-200';
-  };
-
-  const getFileInitial = (fileType: string) => {
-    const type = fileType.toLowerCase();
-    if (type === 'docx' || type === 'doc') return 'W';
-    if (type === 'pdf') return 'P';
-    if (type === 'xlsx' || type === 'xls' || type === 'csv') return 'X';
-    if (type === 'pptx' || type === 'ppt') return 'P';
-    if (type === 'txt') return 'T';
-    return 'D';
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden select-none font-sans text-slate-800">
-      {/* 1. Header (Name + Close Button) */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-        <span className="font-extrabold text-sm text-slate-900 truncate max-w-[220px] block">
-          {item.name}
-        </span>
+    <div className="h-full flex flex-col bg-white overflow-hidden select-none font-sans text-slate-800 w-[300px]">
+      
+      {/* Inspector Top Bar */}
+      <div className="px-5 py-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
+        <div className="min-w-0 pr-2">
+          <span className="font-extrabold text-xs text-slate-900 tracking-tight block truncate" title={item.name}>
+            {item.name}
+          </span>
+          <p className="text-[10px] text-slate-400 font-bold mt-0.5 tracking-wider uppercase">
+            Document Inspector
+          </p>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+          title="Close Inspector"
         >
-          <X className="w-4.5 h-4.5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* 2. Tabs */}
-      <div className="px-3 border-b border-slate-100 flex items-center gap-1.5 shrink-0 text-slate-500 font-bold text-[10.5px] uppercase tracking-wider bg-slate-50/50">
+      {/* Notion / VS Code Style Horizontal Tabs */}
+      <div className="flex border-b border-slate-200/80 bg-slate-50/50 text-xs font-bold text-slate-500 select-none shrink-0">
         {[
-          { id: 'details', label: 'Details' },
-          { id: 'activity', label: 'Activity' },
-          { id: 'versions', label: 'Versions' },
-          { id: 'comments', label: 'Comments (3)' }
+          { id: 'properties', label: 'Properties' },
+          { id: 'comments', label: `Comments (${comments.length})` },
+          { id: 'versions', label: `Versions (${versions.length || 1})` },
+          { id: 'activity', label: 'Activity' }
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id as any)}
-            className={`py-3 px-2 border-b-2 transition-all ${
+            className={`flex-1 py-2.5 text-center border-b-2 transition-all truncate px-1 text-[11px] ${
               activeTab === tab.id
-                ? 'border-blue-600 text-blue-600 font-extrabold'
-                : 'border-transparent hover:text-slate-900'
+                ? 'border-blue-600 text-blue-600 bg-white font-extrabold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             {tab.label}
@@ -203,215 +138,258 @@ export default function RightInformationPanel({
         ))}
       </div>
 
-      {/* 3. Dynamic Tab Content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-        {activeTab === 'details' && (
-          <>
-            {/* Preview Thumbnail Card */}
-            <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.01)] flex flex-col gap-3.5">
-              <div className="flex items-center gap-3">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-extrabold text-lg border ${getFileTypeColor(item.fileType)}`}>
-                  {getFileInitial(item.fileType)}
+      {/* Single Clean Surface Content Area (No nested cards inside cards) */}
+      <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-white">
+
+        {/* ── TAB 1: PROPERTIES (Grouped by whitespace & subtle dividers) ── */}
+        {activeTab === 'properties' && (
+          <div className="space-y-5 text-xs font-semibold animate-in fade-in duration-150">
+            
+            {/* Group 1: Document Details */}
+            <div className="space-y-3">
+              <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                Document Details
+              </span>
+              <div className="space-y-2.5 text-[11.5px]">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Name</span>
+                  <span className="text-slate-900 font-bold truncate max-w-[170px]" title={item.name}>{item.name}</span>
                 </div>
-                <div className="min-w-0">
-                  <h4 className="font-extrabold text-xs text-slate-900 truncate block">{item.name}</h4>
-                  <p className="text-[10px] text-slate-455 font-bold uppercase tracking-wider mt-0.5">{item.fileType} • {item.size}</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-1 leading-normal">
-                    {item.version || 'v1.0'} &bull; Updated on {item.modifiedAt} by {item.ownerName}
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Type</span>
+                  <span className="text-slate-700 font-extrabold uppercase">{item.fileType || item.file_type || 'DOCX'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Owner</span>
+                  <span className="text-slate-900 font-bold">{item.ownerName || item.owner?.full_name || 'System'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Version</span>
+                  <span className="font-mono text-slate-800 font-bold">{item.version || 'v1.0'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Status</span>
+                  <span className="text-[9.5px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full uppercase">
+                    {item.status === 'archived' ? 'Archived' : 'Approved'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-bold">Size</span>
+                  <span className="text-slate-700 font-medium">{item.size || '12.4 KB'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100" />
+
+            {/* Group 2: Description */}
+            <div className="space-y-2">
+              <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                Description
+              </span>
+              <p className="text-[11.5px] text-slate-650 font-medium leading-relaxed">
+                {item.description || 'Standard corporate operational policy guidelines cataloged under Knowledge Management System rules.'}
+              </p>
+            </div>
+
+            <div className="border-t border-slate-100" />
+
+            {/* Group 3: Tags */}
+            <div className="space-y-2">
+              <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                Tags
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {['KMS', 'Policy', 'Enterprise', item.department || 'Operations'].map((tag) => (
+                  <span key={tag} className="text-[10px] bg-slate-100 text-slate-650 px-2 py-0.5 rounded-md font-bold">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100" />
+
+            {/* Group 4: Permissions */}
+            <div className="space-y-2.5">
+              <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                Permissions
+              </span>
+              <div className="space-y-2 text-[11.5px]">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-700">Super Admin (Arun)</span>
+                  <span className="text-[9.5px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded font-extrabold">OWNER</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-700">Manager (Riwitika)</span>
+                  <span className="text-[9.5px] text-slate-500 font-bold">EDITOR</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-700">Employee (Paras)</span>
+                  <span className="text-[9.5px] text-slate-500 font-bold">VIEWER</span>
+                </div>
+                {permissions.map((p: any) => (
+                  <div key={p.id} className="flex justify-between items-center pt-1 border-t border-slate-50">
+                    <span className="font-bold text-slate-700">{p.user?.full_name || p.department?.name || 'Custom'}</span>
+                    <span className="text-[9.5px] text-slate-500 font-bold capitalize">{p.role || 'Viewer'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Summary (if present) */}
+            {item.ai_summary && (
+              <>
+                <div className="border-t border-slate-100" />
+                <div className="space-y-2">
+                  <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                    ✨ AI Summary
+                  </span>
+                  <p className="text-[11px] text-slate-700 leading-relaxed font-medium bg-blue-50/40 border border-blue-100/60 rounded-xl p-3">
+                    {item.ai_summary}
                   </p>
                 </div>
-              </div>
+              </>
+            )}
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => onOpenClick?.(item)}
-                  className="glow-btn bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1.5 text-[10.5px] font-bold flex items-center justify-center gap-1 border border-blue-500"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Open</span>
-                  <ChevronDown className="w-3 h-3 text-blue-200" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => onDownloadClick?.(item)}
-                  className="border border-slate-200 hover:bg-slate-50 text-slate-650 rounded-lg py-1.5 text-[10.5px] font-bold flex items-center justify-center gap-1 bg-white"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Download</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onShareClick?.(item)}
-                  className="border border-slate-200 hover:bg-slate-50 text-slate-650 rounded-lg py-1.5 text-[10.5px] font-bold flex items-center justify-center gap-1 bg-white"
-                >
-                  <Share2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Share</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Properties Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h4 className="font-extrabold text-xs text-slate-900">Properties</h4>
-                <button
-                  type="button"
-                  onClick={() => alert('Properties editing triggered (Mock)')}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 font-extrabold hover:underline"
-                >
-                  Edit
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-y-3.5 text-xs font-semibold text-slate-700">
-                <span className="text-slate-400 text-[10.5px] font-bold">Location</span>
-                <span className="col-span-2 text-slate-650 font-mono text-[10.5px] select-all">{details.location}</span>
-
-                <span className="text-slate-400 text-[10.5px] font-bold">Owner</span>
-                <span className="col-span-2 text-slate-800 font-bold">{item.ownerName}</span>
-
-                <span className="text-slate-400 text-[10.5px] font-bold">Created on</span>
-                <span className="col-span-2 text-slate-500 font-medium flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-slate-350 shrink-0" />
-                  <span>{details.createdOn}</span>
-                </span>
-
-                <span className="text-slate-400 text-[10.5px] font-bold">Last modified</span>
-                <span className="col-span-2 text-slate-500 font-medium flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-slate-350 shrink-0" />
-                  <span>{item.modifiedAt}</span>
-                </span>
-
-                <span className="text-slate-400 text-[10.5px] font-bold">Tags</span>
-                <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
-                  {details.tags.map(t => (
-                    <span key={t} className="px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-[9px] font-bold text-blue-600 flex items-center gap-0.5">
-                      <Tag className="w-2.5 h-2.5" />
-                      <span>{t}</span>
-                    </span>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => alert('Add tag clicked (Mock)')}
-                    className="px-1.5 py-0.5 border border-dashed border-slate-300 hover:border-slate-400 rounded text-[9px] font-bold text-slate-500 hover:text-slate-700 bg-white flex items-center gap-0.5"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Add tag</span>
-                  </button>
-                </div>
-
-                <span className="text-slate-400 text-[10.5px] font-bold self-start mt-0.5">Description</span>
-                <p className="col-span-2 text-[11px] text-slate-650 leading-relaxed font-medium">
-                  {details.description}
-                </p>
-              </div>
-            </div>
-
-            {/* Permissions Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h4 className="font-extrabold text-xs text-slate-900">Permissions</h4>
-                <button
-                  type="button"
-                  onClick={() => alert('Permissions manager triggered (Mock)')}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 font-extrabold hover:underline"
-                >
-                  Manage
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-y-3.5 text-xs font-semibold text-slate-700">
-                <span className="text-slate-400 text-[10.5px] font-bold">Who can access</span>
-                <span className="col-span-2 text-slate-800 font-bold">{details.whoCanAccess}</span>
-
-                <span className="text-slate-400 text-[10.5px] font-bold">Access type</span>
-                <span className="col-span-2 text-slate-500 font-medium">{details.accessType}</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'activity' && (
-          <div className="relative pl-4 border-l border-slate-200 space-y-5 py-2">
-            {[
-              { text: `${item.ownerName} modified version`, time: `${item.modifiedAt}` },
-              { text: 'System indexed file properties', time: `${details.createdOn}` }
-            ].map((act, idx) => (
-              <div key={idx} className="relative text-xs font-semibold">
-                <div className="absolute -left-[22.5px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border border-slate-200 shrink-0">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                </div>
-                <p className="text-slate-750 font-extrabold leading-normal">{act.text}</p>
-                <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">{act.time}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'versions' && (
-          <div className="space-y-4">
-            {[
-              { ver: item.version || 'v1.0', time: item.modifiedAt, author: item.ownerName, size: item.size, current: true }
-            ].map((v, idx) => (
-              <div key={idx} className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-150/60 rounded-xl">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-xs text-slate-900">{v.ver}</span>
-                    {v.current && (
-                      <span className="px-1.5 py-0.2 rounded border text-[8px] font-extrabold bg-blue-50 text-blue-600 border-blue-100 uppercase">Current</span>
-                    )}
+            {/* Related Documents */}
+            {relatedDocs.length > 0 && (
+              <>
+                <div className="border-t border-slate-100" />
+                <div className="space-y-2">
+                  <span className="text-[10.5px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                    Related Documents
+                  </span>
+                  <div className="space-y-1">
+                    {relatedDocs.map((doc: any) => (
+                      <a
+                        key={doc.id}
+                        href={`/documents/${doc.id}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.location.href = `/documents/${doc.id}`;
+                        }}
+                        className="flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 rounded-lg select-none group text-xs font-bold text-slate-700 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                        <span className="truncate flex-1 group-hover:text-blue-600 transition-colors">{doc.name}</span>
+                      </a>
+                    ))}
                   </div>
-                  <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">{v.time} &bull; by {v.author}</span>
                 </div>
-                
-                <span className="text-[10px] text-slate-500 font-bold select-none">{v.size}</span>
-              </div>
-            ))}
+              </>
+            )}
           </div>
         )}
 
+        {/* ── TAB 2: COMMENTS ── */}
         {activeTab === 'comments' && (
-          <div className="space-y-4">
-            <div className="space-y-3.5">
-              {[
-                { author: 'Paras Jain', initials: 'PJ', comment: 'Please review the updated variance figures in Section 3.', time: 'Today, 10:35 AM' },
-                { author: 'Yukti Gupta', initials: 'YG', comment: 'Looks solid. Checked the compliance checklist too.', time: 'Yesterday, 05:20 PM' }
-              ].map((c, idx) => (
-                <div key={idx} className="flex gap-2.5 text-xs p-2 border border-slate-100 rounded-xl bg-slate-50/50">
-                  <div className="w-6.5 h-6.5 rounded-full bg-slate-200 flex items-center justify-center shrink-0 font-extrabold text-[9px] text-slate-700">
-                    {c.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-extrabold text-slate-800">{c.author}</span>
-                      <span className="text-[9px] text-slate-400 font-medium">{c.time}</span>
+          <div className="space-y-4 animate-in fade-in duration-150 flex flex-col h-full justify-between">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+              {comments.length === 0 ? (
+                <div className="text-center py-10 text-xs text-slate-400 font-bold uppercase">No comments posted yet</div>
+              ) : (
+                comments.map((c: any) => (
+                  <div key={c.id} className="flex gap-2.5 p-3 border border-slate-100 rounded-xl bg-slate-50/50 text-xs">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center font-extrabold text-[9px] text-blue-700 shrink-0">
+                      {getInitials(c.user?.full_name)}
                     </div>
-                    <p className="text-slate-650 leading-relaxed font-medium mt-1 text-[11px]">{c.comment}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center select-none">
+                        <span className="font-extrabold text-slate-900">{c.user?.full_name || 'User'}</span>
+                        <span className="text-[9px] text-slate-400 font-semibold">
+                          {new Date(c.created_at).toLocaleDateString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-slate-655 font-medium text-xs mt-1 leading-normal break-words">{c.content}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
-            {/* Comment Form */}
-            <form onSubmit={(e) => { e.preventDefault(); alert('Add comment (Mock)'); }} className="flex items-center gap-2 pt-2 border-t border-slate-100">
+            <form onSubmit={handleCommentSubmit} className="flex gap-2 pt-3 border-t border-slate-100">
               <input
                 type="text"
-                placeholder="Add a comment..."
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:bg-white text-slate-800 font-medium"
+                value={commentVal}
+                onChange={(e) => setCommentVal(e.target.value)}
+                placeholder="Type a comment..."
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 font-medium"
               />
               <button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 text-[10.5px] font-bold shadow-sm"
+                disabled={!commentVal.trim() || addCommentMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm transition-all disabled:opacity-50"
               >
                 Send
               </button>
             </form>
           </div>
         )}
+
+        {/* ── TAB 3: VERSIONS ── */}
+        {activeTab === 'versions' && (
+          <div className="space-y-2.5 animate-in fade-in duration-150">
+            {versions.length === 0 ? (
+              <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl flex justify-between items-center text-xs">
+                <div>
+                  <span className="font-extrabold text-slate-900">v1.0</span>
+                  <span className="text-[9.5px] text-slate-400 font-medium block mt-0.5">Initial version upload</span>
+                </div>
+                <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full font-extrabold uppercase">Active</span>
+              </div>
+            ) : (
+              versions.map((v: any, index: number) => (
+                <div key={v.id} className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl flex justify-between items-center text-xs">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-900">v{v.version_number || index + 1}.0</span>
+                      {index === 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[8px] font-extrabold bg-blue-50 text-blue-600 border border-blue-100 uppercase select-none">Latest</span>
+                      )}
+                    </div>
+                    <span className="text-[9.5px] text-slate-400 font-semibold block mt-0.5">
+                      {v.uploaded_at ? new Date(v.uploaded_at).toLocaleDateString() : 'Unknown date'} &bull; by {v.uploader?.full_name || 'Owner'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => alert('Downloading version file...')}
+                    className="p-1.5 border border-slate-200 bg-white rounded-lg hover:bg-slate-100 transition-colors"
+                    title="Download version file"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 4: ACTIVITY ── */}
+        {activeTab === 'activity' && (
+          <div className="relative pl-3.5 border-l border-slate-200 ml-2 space-y-4 py-2 animate-in fade-in duration-150">
+            <div className="relative text-xs font-semibold select-none">
+              <div className="absolute -left-[20.5px] top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-white border border-blue-500 shrink-0">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              </div>
+              <p className="text-slate-900 font-bold text-xs">Document updated</p>
+              <span className="text-[9.5px] text-slate-400 font-semibold block mt-0.5">
+                {item.updated_at ? new Date(item.updated_at).toLocaleString() : 'Today'}
+              </span>
+            </div>
+            <div className="relative text-xs font-semibold select-none">
+              <div className="absolute -left-[20.5px] top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-white border border-slate-300 shrink-0">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+              </div>
+              <p className="text-slate-900 font-bold text-xs">Document cataloged in KMS</p>
+              <span className="text-[9.5px] text-slate-400 font-semibold block mt-0.5">
+                {item.created_at ? new Date(item.created_at).toLocaleString() : 'Recently'}
+              </span>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

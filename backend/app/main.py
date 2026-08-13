@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +10,7 @@ from app.api import auth, users, departments, folders, documents, permissions, s
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 # Run database creation & seed on startup
 # This acts as a robust fallback to ensure the DB works immediately.
 try:
@@ -22,6 +24,15 @@ try:
     init_db(db)
     db.close()
     logger.info("Database initialized successfully.")
+    
+    # Eager load SentenceTransformer model to prevent first-load delay
+    try:
+        logger.info("Pre-loading local SentenceTransformer model...")
+        from app.services.embeddings import embedding_service
+        _ = embedding_service.model
+        logger.info("Local SentenceTransformer model pre-loaded successfully.")
+    except Exception as emb_err:
+        logger.error(f"Error pre-loading SentenceTransformer model: {emb_err}")
 except Exception as e:
     logger.error(f"Error during database initialization: {e}")
 

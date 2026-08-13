@@ -8,7 +8,6 @@ import Layout from './components/Layout';
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DocumentTree = lazy(() => import('./pages/DocumentTree'));
-const DocumentViewer = lazy(() => import('./pages/DocumentViewer'));
 const AIChat = lazy(() => import('./pages/AIChat'));
 const Search = lazy(() => import('./pages/Search'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
@@ -129,7 +128,7 @@ export default function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="documents" element={<DocumentTree />} />
-              <Route path="documents/:id" element={<DocumentViewer />} />
+              <Route path="documents/:id" element={<DocumentTree />} />
               <Route path="chat" element={<AIChat />} />
               <Route path="search" element={<Search />} />
               

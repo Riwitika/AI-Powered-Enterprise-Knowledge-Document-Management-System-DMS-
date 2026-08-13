@@ -37,8 +37,15 @@ export default function DocInfoSidebar({
   documentId
 }: DocInfoSidebarProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'properties' | 'activity' | 'comments'>('properties');
+  const [activeTab, setActiveTab] = useState<'properties' | 'activity' | 'comments' | 'versions'>('properties');
   const [newComment, setNewComment] = useState('');
+  
+  // Custom toast notification state
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   // Check if documentId is a valid UUID (not a temp- or doc-N style mock ID)
   const isRealDoc = !!documentId && !documentId.startsWith('temp-') && !documentId.startsWith('doc-') && documentId.length > 10;
@@ -55,7 +62,7 @@ export default function DocInfoSidebar({
   const { data: versionsData = [] } = useQuery({
     queryKey: ['versions', documentId],
     queryFn: () => api.documents.versions(documentId!),
-    enabled: isRealDoc && activeTab === 'activity',
+    enabled: isRealDoc && (activeTab === 'activity' || activeTab === 'versions'),
     staleTime: 30_000,
   });
 
@@ -65,7 +72,7 @@ export default function DocInfoSidebar({
       queryClient.invalidateQueries({ queryKey: ['comments', documentId] });
       setNewComment('');
     },
-    onError: (err: any) => alert(err.message || 'Failed to post comment'),
+    onError: (err: any) => showToast(err.message || 'Failed to post comment'),
   });
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -74,27 +81,33 @@ export default function DocInfoSidebar({
     if (isRealDoc) {
       createCommentMutation.mutate(newComment.trim());
     } else {
-      // Fallback for mock docs
       setNewComment('');
-      alert('Comment submitted (demo mode — no real document ID)');
+      showToast('Comment submitted (demo mode)');
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden border-l border-slate-200 select-none font-sans text-slate-800 w-[300px] shrink-0">
+    <div className="h-full flex flex-col bg-white overflow-hidden border-l border-slate-200 select-none font-sans text-slate-800 w-[300px] shrink-0 relative">
+      {/* Toast message popup */}
+      {toastMsg && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold shadow-xl z-50 animate-in fade-in duration-200">
+          {toastMsg}
+        </div>
+      )}
       
       {/* Tab controls */}
-      <div className="px-3 border-b border-slate-100 flex items-center gap-1.5 shrink-0 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-50/50">
+      <div className="px-1 border-b border-slate-100 flex items-center shrink-0 text-slate-500 font-bold text-[9px] uppercase tracking-wider bg-slate-50/50 overflow-x-auto custom-scrollbar">
         {[
           { id: 'properties', label: 'Properties' },
           { id: 'activity', label: 'Activity' },
-          { id: 'comments', label: `Comments (${commentsData.length})` }
+          { id: 'comments', label: `Comments (${commentsData.length})` },
+          { id: 'versions', label: 'Versions' }
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id as any)}
-            className={`py-3 px-2 border-b-2 transition-all ${
+            className={`py-3 px-2 border-b-2 transition-all shrink-0 ${
               activeTab === tab.id
                 ? 'border-blue-600 text-blue-600 font-extrabold'
                 : 'border-transparent hover:text-slate-900'
@@ -164,7 +177,7 @@ export default function DocInfoSidebar({
                 ))}
                 <button
                   type="button"
-                  onClick={() => alert('Add tag (Mock)')}
+                  onClick={() => showToast('Add tag (Mock)')}
                   className="px-1.5 py-0.5 border border-dashed border-slate-300 hover:border-slate-400 rounded text-[9px] font-bold text-slate-500 hover:text-slate-700 bg-white flex items-center gap-0.5"
                 >
                   <Plus className="w-2.5 h-2.5" />
@@ -267,6 +280,43 @@ export default function DocInfoSidebar({
                 {createCommentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageSquare className="w-3.5 h-3.5" />}
               </button>
             </form>
+          </div>
+        )}
+
+        {activeTab === 'versions' && (
+          <div className="space-y-4">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block border-b border-slate-50 pb-1">Revision History</span>
+            {isRealDoc && versionsData.length > 0 ? (
+              <div className="space-y-3">
+                {versionsData.map((v: any, idx: number) => (
+                  <div key={v.id || idx} className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-150/60 rounded-xl font-semibold">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-slate-900">v{v.version_number}.0</span>
+                        {idx === 0 && (
+                          <span className="px-1.5 py-0.2 rounded border text-[8px] font-extrabold bg-blue-50 text-blue-600 border-blue-100 uppercase">Current</span>
+                        )}
+                      </div>
+                      <span className="text-[9.5px] text-slate-450 font-medium block mt-1">
+                        {new Date(v.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-150/60 rounded-xl font-semibold">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-xs text-slate-900">v1.0</span>
+                    <span className="px-1.5 py-0.2 rounded border text-[8px] font-extrabold bg-blue-50 text-blue-600 border-blue-100 uppercase">Current</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-450 font-medium block mt-1">
+                    {lastModified} &bull; by {ownerName}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

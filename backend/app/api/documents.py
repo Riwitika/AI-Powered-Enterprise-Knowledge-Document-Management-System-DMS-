@@ -8,12 +8,22 @@ from sqlalchemy import or_
 
 from app.core.deps import get_db, get_current_active_user, get_accessible_document_ids, verify_document_access
 from app.models.models import Document, DocumentVersion, User, Folder
-from app.schemas.schemas import DocumentResponse, DocumentUpdate, DocumentVersionResponse
+from app.schemas.schemas import DocumentResponse, DocumentUpdate, DocumentVersionResponse, DocumentAssetResponse
 from app.services.storage import storage
 from app.services.document_processing import run_background_processing
 from app.services.audit import log_audit
 
 router = APIRouter()
+
+ASSET_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
+ASSET_MEDIA_TYPES = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "svg": "image/svg+xml",
+}
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 def upload_document(
@@ -200,6 +210,70 @@ def download_document(
     )
 
 
+@router.post("/{document_id}/assets", response_model=DocumentAssetResponse, status_code=status.HTTP_201_CREATED)
+def upload_document_asset(
+    document_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload an inline editor image asset for a document."""
+    verify_document_access(document_id, current_user, db, required_access="edit")
+
+    contents = file.file.read()
+    file.file.seek(0)
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    from app.core.config import settings
+    max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(contents) > max_size_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_MB}MB.",
+        )
+
+    file_ext = os.path.splitext(file.filename or "")[1].replace(".", "").lower()
+    if file_ext not in ASSET_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported image type '.{file_ext}'. Allowed: png, jpg, jpeg, gif, webp, svg.",
+        )
+
+    _, asset_filename = storage.save_document_asset(str(document_id), contents, file.filename or f"image.{file_ext}")
+    url = f"/api/documents/{document_id}/assets/{asset_filename}"
+    return DocumentAssetResponse(
+        url=url,
+        filename=asset_filename,
+        content_type=ASSET_MEDIA_TYPES.get(file_ext, "application/octet-stream"),
+    )
+
+
+@router.get("/{document_id}/assets/{asset_filename}")
+def download_document_asset(
+    document_id: UUID,
+    asset_filename: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    verify_document_access(document_id, current_user, db, required_access="view")
+
+    safe_name = os.path.basename(asset_filename)
+    if safe_name != asset_filename or ".." in asset_filename:
+        raise HTTPException(status_code=400, detail="Invalid asset filename.")
+
+    asset_path = storage.get_document_asset_path(str(document_id), safe_name)
+    if not os.path.exists(asset_path):
+        raise HTTPException(status_code=404, detail="Asset not found.")
+
+    file_ext = os.path.splitext(safe_name)[1].replace(".", "").lower()
+    return FileResponse(
+        path=asset_path,
+        filename=safe_name,
+        media_type=ASSET_MEDIA_TYPES.get(file_ext, "application/octet-stream"),
+    )
+
+
 @router.put("/{document_id}", response_model=DocumentResponse)
 def update_document_metadata(
     document_id: UUID,
@@ -334,7 +408,9 @@ def get_document_versions(
 ):
     # Verify view permission
     verify_document_access(document_id, current_user, db, required_access="view")
-    versions = db.query(DocumentVersion).filter(DocumentVersion.document_id == document_id).order_by(DocumentVersion.version_number.desc()).all()
+    versions = db.query(DocumentVersion).options(
+        joinedload(DocumentVersion.uploader)
+    ).filter(DocumentVersion.document_id == document_id).order_by(DocumentVersion.version_number.desc()).all()
     return versions
 
 
@@ -368,11 +444,11 @@ def upload_new_version(
         )
         
     file_ext = os.path.splitext(file.filename)[1].replace(".", "").lower()
-    allowed_extensions = {"pdf", "docx", "xlsx", "pptx", "txt"}
+    allowed_extensions = {"pdf", "docx", "xlsx", "pptx", "txt", "html", "htm"}
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file extension '.{file_ext}'. Allowed types: pdf, docx, xlsx, pptx, txt."
+            detail=f"Unsupported file extension '.{file_ext}'. Allowed types: pdf, docx, xlsx, pptx, txt, html."
         )
         
     file_path = storage.save_file(contents, file.filename)
@@ -388,11 +464,13 @@ def upload_new_version(
 
     try:
         db.add(new_version)
-        # Update document main row to point to new file path, extension & version number
-        file_ext = os.path.splitext(file.filename)[1].replace(".", "").lower()
-        doc.file_path = file_path
-        doc.file_type = file_ext or "txt"
         doc.current_version = new_version_num
+        # Editor HTML checkpoints: persist content, keep original file type/path for downloads
+        if file_ext in ("html", "htm"):
+            doc.content = contents.decode("utf-8", errors="ignore")
+        else:
+            doc.file_path = file_path
+            doc.file_type = file_ext or "txt"
         db.commit()
         db.refresh(doc)
     except Exception as e:
@@ -517,5 +595,9 @@ def view_document_version(
         # Fallback if file doesn't exist (e.g. mock seed files)
         return {"content": doc.content or "No content found.", "version_number": version_number, "name": doc.name}
     file_ext = os.path.splitext(version.file_path)[1].replace(".", "").lower() or doc.file_type
-    content = extract_document_text(version.file_path, file_ext)
+    if file_ext in ("html", "htm"):
+        with open(version.file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    else:
+        content = extract_document_text(version.file_path, file_ext)
     return {"content": content, "version_number": version_number, "name": doc.name}

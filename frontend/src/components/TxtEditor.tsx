@@ -20,7 +20,7 @@ export default function TxtEditor({ activeDoc }: { activeDoc: any }) {
       `This plain text document is loaded dynamically in the KMS raw text preview editor workspace.`;
   });
 
-  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Failed' | 'Unsaved changes'>('Saved');
+  const [saveStatus, setSaveStatus] = useState<'Saved ✓' | 'Saving...' | 'Save Failed' | 'Unsaved changes'>('Saved ✓');
   const timeoutRef = useRef<any>(null);
   const isInitialMount = useRef(true);
 
@@ -41,12 +41,12 @@ export default function TxtEditor({ activeDoc }: { activeDoc: any }) {
     timeoutRef.current = setTimeout(async () => {
       try {
         await api.documents.update(docId, { content: text });
-        setSaveStatus('Saved');
+        setSaveStatus('Saved ✓');
         // Invalidate active document query to keep cache in sync
         queryClient.invalidateQueries({ queryKey: ['document', docId] });
       } catch (err) {
         console.error('Autosave failed:', err);
-        setSaveStatus('Failed');
+        setSaveStatus('Save Failed');
       }
     }, 1200);
 
@@ -66,11 +66,11 @@ export default function TxtEditor({ activeDoc }: { activeDoc: any }) {
     }
     try {
       await api.documents.update(docId, { content: text });
-      setSaveStatus('Saved');
+      setSaveStatus('Saved ✓');
       queryClient.invalidateQueries({ queryKey: ['document', docId] });
     } catch (err) {
       console.error('Manual save failed:', err);
-      setSaveStatus('Failed');
+      setSaveStatus('Save Failed');
     }
   };
 
@@ -97,9 +97,9 @@ export default function TxtEditor({ activeDoc }: { activeDoc: any }) {
         {isRealUUID && (
           <div className="flex items-center gap-2">
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-              saveStatus === 'Saved' ? 'text-emerald-600 bg-emerald-50' :
+              saveStatus === 'Saved ✓' ? 'text-emerald-600 bg-emerald-50' :
               saveStatus === 'Saving...' ? 'text-amber-600 bg-amber-50 animate-pulse' :
-              saveStatus === 'Failed' ? 'text-rose-600 bg-rose-50' : 'text-slate-500 bg-slate-50'
+              saveStatus === 'Save Failed' ? 'text-rose-600 bg-rose-50' : 'text-slate-500 bg-slate-50'
             }`}>
               {saveStatus}
             </span>

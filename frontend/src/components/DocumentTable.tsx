@@ -37,6 +37,7 @@ export interface DocumentRowItem {
   whoCanAccess?: string;
   accessType?: string;
   aiSummaryText?: string;
+  description?: string;
 }
 
 interface DocumentTableProps {

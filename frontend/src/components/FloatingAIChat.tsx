@@ -88,7 +88,12 @@ export default function FloatingAIChat() {
 
   // Route-based context checks
   const isDocumentPage = location.pathname.includes('/documents/') && !location.pathname.endsWith('/documents');
-  const hasActiveDoc = isDocumentPage && docContext.title && docContext.title !== 'General Workspace';
+  const pathParts = location.pathname.split('/');
+  const docIdx = pathParts.indexOf('documents');
+  const docIdFromUrl = docIdx !== -1 ? pathParts[docIdx + 1] : undefined;
+  const isRealUUID = !!docIdFromUrl && !docIdFromUrl.startsWith('doc-') && !docIdFromUrl.startsWith('temp-') && docIdFromUrl.length > 20;
+
+  const hasActiveDoc = isDocumentPage && ((docContext.title && docContext.title !== 'General Workspace') || isRealUUID);
   const activeMode = hasActiveDoc ? 'document' : 'repository';
 
   const [messages, setMessages] = useState<Message[]>([
@@ -181,7 +186,19 @@ export default function FloatingAIChat() {
   useEffect(() => {
     setShowNotification(null);
     const isDocPage = location.pathname.includes('/documents/') && !location.pathname.endsWith('/documents');
-    if (!isDocPage) {
+    if (isDocPage) {
+      const parts = location.pathname.split('/');
+      const docIndex = parts.indexOf('documents');
+      if (docIndex !== -1 && parts[docIndex + 1]) {
+        const docIdFromUrl = parts[docIndex + 1];
+        if (docIdFromUrl && docIdFromUrl !== docContext.id) {
+          setDocContext(prev => ({
+            ...prev,
+            id: docIdFromUrl
+          }));
+        }
+      }
+    } else {
       setDocContext({
         title: 'General Workspace',
         fileType: 'System Context',
@@ -193,7 +210,7 @@ export default function FloatingAIChat() {
         fullContent: ''
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname, docContext.id]);
 
   const [showNotification, setShowNotification] = useState<string | null>(null);
 
@@ -225,6 +242,7 @@ export default function FloatingAIChat() {
     }, 700);
 
     try {
+      console.log("[FloatingAIChat] calling aiService.ask with activeMode:", activeMode, "docContext:", docContext);
       const response = await aiService.ask(queryText, {
         provider,
         documentContext: docContext,

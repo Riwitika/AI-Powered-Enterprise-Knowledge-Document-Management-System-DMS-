@@ -126,6 +126,11 @@ class DocumentResponse(DocumentBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class DocumentAssetResponse(BaseModel):
+    url: str
+    filename: str
+    content_type: str
+
 # ----------------- FOLDER -----------------
 class FolderBase(BaseModel):
     name: str
@@ -160,6 +165,7 @@ class DocumentVersionResponse(BaseModel):
     file_path: str
     uploaded_by: Optional[UUID]
     uploaded_at: datetime
+    uploader: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
 # ----------------- PERMISSION -----------------

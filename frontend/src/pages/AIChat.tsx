@@ -18,31 +18,11 @@ import {
 } from 'lucide-react';
 
 export default function AIChat() {
-  const [messages, setMessages] = useState<any[]>([
-    {
-      id: 'm-1',
-      role: 'user',
-      content: 'Show me the key highlights from Q2 Budget Report and compare it with Q1.',
-      timestamp: '10:32 AM'
-    },
-    {
-      id: 'm-2',
-      role: 'assistant',
-      content: 'Here are the key highlights from the Q2 Budget Report and a comparison with Q1:',
-      timestamp: '10:32 AM',
-      showStructuredCard: true
-    }
-  ]);
+  const [messages, setMessages] = useState<any[]>([]);
 
   const [inputVal, setInputVal] = useState('');
   const [typingState, setTypingState] = useState(false);
-  const [recentChats, setRecentChats] = useState<{ title: string; time: string }[]>([
-    { title: 'Q2 Budget highlights', time: '10:32 AM' },
-    { title: 'Team performance overview', time: 'Yesterday' },
-    { title: 'Pending vendor contracts', time: 'Yesterday' },
-    { title: 'HR policies summary', time: '2 days ago' },
-    { title: 'Project status update', time: '3 days ago' }
-  ]);
+  const [recentChats, setRecentChats] = useState<{ title: string; time: string }[]>([]);
 
   // Load real conversations from backend
   const { data: dbConversations } = useQuery({

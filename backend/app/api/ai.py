@@ -21,11 +21,16 @@ def ask_org_wide(
     Org-wide RAG assistant.
     Retrieves information from all accessible documents.
     """
+    print(f"[STAGE 1 - ROUTER] Reached ask_org_wide with question: '{payload.question}'", flush=True)
     allowed_ids = get_accessible_document_ids(current_user, db)
+    print(f"[STAGE 1 - ROUTER] Allowed document IDs for user: {allowed_ids}", flush=True)
     if not allowed_ids:
+        print("[STAGE 1 - ROUTER] No allowed documents found. Returning early.", flush=True)
         return {"answer": "No documents uploaded or you don't have access to any documents.", "source_documents": []}
         
+    print("[STAGE 1 - ROUTER] Calling answer_query()...", flush=True)
     answer, source_docs = answer_query(db, payload.question, allowed_ids)
+    print(f"[STAGE 4 - ROUTER RETURN] answer_query() finished. Answer: '{answer[:50]}...', Source Docs: {[doc.name for doc in source_docs]}", flush=True)
     
     # Save conversation
     conversation = AIConversation(
@@ -38,6 +43,7 @@ def ask_org_wide(
     db.add(conversation)
     db.commit()
     
+    print("[STAGE 4 - ROUTER RETURN] Serializing and returning response.", flush=True)
     return {
         "answer": answer,
         "source_documents": source_docs
@@ -55,17 +61,22 @@ def ask_document_scoped(
     Document-scoped RAG assistant.
     Retrieves information only from the specified document.
     """
+    print(f"[STAGE 1 - ROUTER] Reached ask_document_scoped for doc: {document_id} with question: '{payload.question}'", flush=True)
     # Verify permission
     verify_document_access(document_id, current_user, db, required_access="view")
     
     allowed_ids = get_accessible_document_ids(current_user, db)
+    print(f"[STAGE 1 - ROUTER] Allowed document IDs for user: {allowed_ids}", flush=True)
     if document_id not in allowed_ids:
+        print("[STAGE 1 - ROUTER] Document not in allowed IDs. Raising 403.", flush=True)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this document."
         )
         
+    print("[STAGE 1 - ROUTER] Calling answer_query() scoped...", flush=True)
     answer, source_docs = answer_query(db, payload.question, allowed_ids, document_id=document_id)
+    print(f"[STAGE 4 - ROUTER RETURN] answer_query() finished. Answer: '{answer[:50]}...', Source Docs: {[doc.name for doc in source_docs]}", flush=True)
     
     # Save conversation
     conversation = AIConversation(
@@ -78,6 +89,7 @@ def ask_document_scoped(
     db.add(conversation)
     db.commit()
     
+    print("[STAGE 4 - ROUTER RETURN] Serializing and returning response.", flush=True)
     return {
         "answer": answer,
         "source_documents": source_docs

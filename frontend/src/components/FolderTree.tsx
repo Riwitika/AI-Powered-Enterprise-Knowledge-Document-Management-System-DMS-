@@ -1,11 +1,21 @@
 import { useState, memo } from 'react';
-import { Folder, ChevronRight, ChevronDown } from 'lucide-react';
+import { 
+  Folder, 
+  ChevronRight, 
+  ChevronDown, 
+  FileText, 
+  FileSpreadsheet, 
+  FileArchive, 
+  FileImage, 
+  File 
+} from 'lucide-react';
 
 export interface FolderNode {
   id: string | number;
   name: string;
   subFolders?: FolderNode[];
   sub_folders?: FolderNode[];
+  files?: any[];
 }
 
 interface FolderTreeProps {
@@ -13,13 +23,43 @@ interface FolderTreeProps {
   activeFolderId?: string | number;
   onFolderSelect?: (node: FolderNode) => void;
   defaultExpandedIds?: Record<string | number, boolean>;
+  activeFileId?: string;
+  onFileSelect?: (file: any) => void;
 }
+
+const getFileIcon = (fileName: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'docx':
+    case 'doc':
+      return <FileText className="w-4 h-4 text-blue-500 shrink-0" />;
+    case 'xlsx':
+    case 'xls':
+    case 'csv':
+      return <FileSpreadsheet className="w-4 h-4 text-emerald-500 shrink-0" />;
+    case 'pptx':
+    case 'ppt':
+      return <FileArchive className="w-4 h-4 text-orange-500 shrink-0" />;
+    case 'pdf':
+      return <FileText className="w-4 h-4 text-red-500 shrink-0" />;
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'webp':
+      return <FileImage className="w-4 h-4 text-purple-500 shrink-0" />;
+    default:
+      return <File className="w-4 h-4 text-slate-400 shrink-0" />;
+  }
+};
 
 function FolderTree({
   nodes,
   activeFolderId,
   onFolderSelect,
-  defaultExpandedIds = {}
+  defaultExpandedIds = {},
+  activeFileId,
+  onFileSelect
 }: FolderTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string | number, boolean>>({
     ...defaultExpandedIds,
@@ -35,7 +75,8 @@ function FolderTree({
   const renderTree = (items: FolderNode[], depth = 0) => {
     return items.map((node) => {
       const children = node.sub_folders || node.subFolders || [];
-      const hasChildren = children.length > 0;
+      const files = node.files || [];
+      const hasChildren = children.length > 0 || files.length > 0;
       const isExpanded = !!expandedNodes[node.id];
       const isActive = activeFolderId === node.id;
 
@@ -58,7 +99,7 @@ function FolderTree({
                   toggleExpand(node.id, e);
                 }
               }}
-              className="p-0.5 rounded hover:bg-slate-150 text-slate-400 hover:text-slate-600 transition-colors"
+              className="p-0.5 rounded hover:bg-slate-150 text-slate-400 hover:text-slate-650 transition-colors"
             >
               {hasChildren ? (
                 isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />
@@ -74,10 +115,28 @@ function FolderTree({
             <span className="truncate flex-1 pr-1">{node.name}</span>
           </div>
 
-          {/* Children subfolders container */}
+          {/* Children subfolders and files container */}
           {hasChildren && isExpanded && (
-            <div className="mt-0.5">
+            <div className="mt-0.5 space-y-0.5">
               {renderTree(children, depth + 1)}
+              {files.map((file) => {
+                const isFileActive = activeFileId === file.id;
+                return (
+                  <div
+                    key={file.id}
+                    onClick={() => onFileSelect?.(file)}
+                    style={{ paddingLeft: `${24 + depth * 14}px` }}
+                    className={`w-full flex items-center gap-1.5 py-1.5 px-2 rounded-lg transition-all text-left text-xs font-semibold cursor-pointer border-l-2 ${
+                      isFileActive
+                        ? 'bg-blue-50/70 text-blue-600 border-blue-600'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                    }`}
+                  >
+                    {getFileIcon(file.name)}
+                    <span className="truncate flex-1 pr-1">{file.name}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

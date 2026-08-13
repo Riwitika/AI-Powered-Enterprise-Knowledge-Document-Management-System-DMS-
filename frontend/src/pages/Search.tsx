@@ -70,9 +70,17 @@ export default function Search() {
   return (
     <div className="space-y-6 relative select-none">
       
-      <div className="space-y-1">
-        <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Knowledge Search</h1>
-        <p className="text-slate-500 text-[11px] font-semibold">Sift through company wisdom, filter index parameters, and identify files semantically.</p>
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Knowledge Search</h1>
+          <p className="text-slate-500 text-[11px] font-semibold">Sift through company wisdom, filter index parameters, and identify files semantically.</p>
+        </div>
+        <Link
+          to="/documents"
+          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-655 transition-all shadow-sm"
+        >
+          ← Back to Workspace
+        </Link>
       </div>
 
       {/* Filter and Search Form */}
