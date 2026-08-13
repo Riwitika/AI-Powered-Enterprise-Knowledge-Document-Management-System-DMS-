@@ -16,6 +16,31 @@ def extract_text_from_pdf(file_path: str) -> str:
         logger.error(f"Error parsing PDF {file_path}: {e}")
     return text
 
+def is_html_content(text: str) -> bool:
+    if not text or not text.strip():
+        return False
+    stripped = text.lstrip()
+    return (
+        stripped.startswith("<")
+        and ("</" in stripped or "/>" in stripped or 'data-type="page"' in stripped)
+    )
+
+
+def convert_docx_to_html(file_path: str) -> str:
+    import mammoth
+
+    try:
+        with open(file_path, "rb") as docx_file:
+            result = mammoth.convert_to_html(docx_file)
+        if result.messages:
+            for message in result.messages:
+                logger.info("DOCX conversion message for %s: %s", file_path, message)
+        return result.value or ""
+    except Exception as e:
+        logger.error(f"Error converting DOCX to HTML {file_path}: {e}")
+        return ""
+
+
 def extract_text_from_docx(file_path: str) -> str:
     import docx
     text = []
@@ -24,6 +49,11 @@ def extract_text_from_docx(file_path: str) -> str:
         for para in doc.paragraphs:
             if para.text:
                 text.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if cells:
+                    text.append(" | ".join(cells))
     except Exception as e:
         logger.error(f"Error parsing DOCX {file_path}: {e}")
     return "\n".join(text)

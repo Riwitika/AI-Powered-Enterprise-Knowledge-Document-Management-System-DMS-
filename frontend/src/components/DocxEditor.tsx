@@ -200,9 +200,16 @@ export default function DocxEditor({ activeDoc }: DocxEditorProps = {}) {
 
   const EMPTY_EDITOR_CONTENT = '<div data-type="page" class="tiptap-page-sheet"><p></p></div>';
 
+  const wrapHtmlForEditor = (html: string) => {
+    const cleaned = html.trim();
+    if (!cleaned) return EMPTY_EDITOR_CONTENT;
+    if (cleaned.includes('data-type="page"')) return cleaned;
+    return `<div data-type="page" class="tiptap-page-sheet">${cleaned}</div>`;
+  };
+
   const resolveEditorContent = (content?: string | null) => {
     if (content && content.trim()) {
-      return sanitizeHtml(content);
+      return sanitizeHtml(wrapHtmlForEditor(content));
     }
     return EMPTY_EDITOR_CONTENT;
   };

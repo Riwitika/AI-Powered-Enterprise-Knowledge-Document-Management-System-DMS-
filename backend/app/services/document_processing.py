@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.models import Document, DocumentChunk, DocumentTag
-from app.services.extraction import extract_document_text
+from app.services.extraction import extract_document_text, convert_docx_to_html, is_html_content
+from app.services.document_representation import wrap_html_for_editor
 from app.services.chunking import chunk_text
 from app.services.embeddings import embedding_service
 from app.services.rag import llm_provider
@@ -19,11 +20,23 @@ def process_document_upload(document_id: UUID, db: Session) -> None:
         return
 
     try:
-        # 1. Extract Text
-        if doc.content and doc.content.strip():
-            text = doc.content
-        else:
-            text = extract_document_text(doc.file_path, doc.file_type)
+        file_type = (doc.file_type or "").lower().strip(".")
+        has_editor_html = bool(doc.content and doc.content.strip() and is_html_content(doc.content))
+
+        # 1. Extract plain text from the original binary for search/RAG/indexing
+        text = extract_document_text(doc.file_path, doc.file_type)
+
+        # 2. Build editor representation separately — never replace binary with plain text
+        if file_type in {"docx", "doc"} and not has_editor_html:
+            html = convert_docx_to_html(doc.file_path)
+            if html.strip():
+                doc.content = wrap_html_for_editor(html)
+                db.commit()
+        elif file_type in {"txt", "md", "csv"} and not doc.content:
+            doc.content = text
+            db.commit()
+        elif file_type in {"pptx", "ppt", "xlsx", "xls"} and not doc.content and text.strip():
+            # Preview-only extracted text; original binary remains in file_path
             doc.content = text
             db.commit()
 

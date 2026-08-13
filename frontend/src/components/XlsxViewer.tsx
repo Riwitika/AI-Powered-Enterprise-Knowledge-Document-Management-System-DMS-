@@ -1,190 +1,159 @@
-import { useState } from 'react';
-import { Search, ZoomIn, ZoomOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { api } from '../api/client';
+import { Download, ZoomIn, ZoomOut, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
+type SheetData = {
+  name: string;
+  headers: string[];
+  rows: string[][];
+};
 
 export default function XlsxViewer({ activeDoc }: { activeDoc: any }) {
-  const [searchVal, setSearchVal] = useState('');
   const [zoom, setZoom] = useState(100);
+  const [sheets, setSheets] = useState<SheetData[]>([]);
+  const [activeSheetIdx, setActiveSheetIdx] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
+  const docId = activeDoc?.id;
+  const isRealUUID = typeof docId === 'string' && docId.length === 36;
 
-  // Spreadsheet cells configuration
-  const columns = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-  const getSheetContent = () => {
-    const name = activeDoc?.name || '';
-    if (name.toLowerCase().includes('expense')) {
-      return {
-        tabName: 'Expense Summary',
-        fxVal: '500000',
-        activeCellLabel: 'B2',
-        headers: ['Department', 'Budget (₹)', 'Spent (₹)', 'Remaining (₹)', 'Burn Rate %', 'Status'],
-        rows: [
-          { c1: 'Engineering', c2: '500,000', c3: '480,000', c4: '20,000', c5: '96%', c6: 'On Track' },
-          { c1: 'Marketing', c2: '200,000', c3: '210,000', c4: '-10,000', c5: '105%', c6: 'Over Budget' },
-          { c1: 'HR & Admin', c2: '150,000', c3: '120,000', c4: '30,000', c5: '80%', c6: 'Under Budget' },
-          { c1: 'Total', c2: '850,000', c3: '810,000', c4: '40,000', c5: '95.3%', c6: 'On Track' }
-        ]
-      };
-    } else if (name.toLowerCase().includes('cash')) {
-      return {
-        tabName: 'Cash Flow',
-        fxVal: '450000',
-        activeCellLabel: 'B2',
-        headers: ['Month', 'Operating (₹)', 'Investing (₹)', 'Financing (₹)', 'Net Cash (₹)', 'Closing Cash (₹)'],
-        rows: [
-          { c1: 'January', c2: '450,000', c3: '-120,000', c4: '-50,000', c5: '280,000', c6: '2.80M' },
-          { c1: 'February', c2: '520,000', c3: '-80,000', c4: '-50,000', c5: '390,000', c6: '3.19M' },
-          { c1: 'March', c2: '610,000', c3: '-150,000', c4: '-50,000', c5: '410,000', c6: '3.60M' },
-          { c1: 'Total', c2: '1,580,000', c3: '-350,000', c4: '-150,050', c5: '1,080,000', c6: '3.60M' }
-        ]
-      };
-    } else {
-      // Default to Sales Report
-      return {
-        tabName: 'April Sales',
-        fxVal: '125000',
-        activeCellLabel: 'B2',
-        headers: ['Category', 'Sales (₹)', 'Target (₹)', 'Achievement %', 'Growth %', 'Comment'],
-        rows: [
-          { c1: 'Electronics', c2: '125,000', c3: '110,000', c4: '114%', c5: '18%', c6: 'Target exceeded' },
-          { c1: 'Accessories', c2: '85,500', c3: '80,000', c4: '107%', c5: '12%', c6: 'Solid sales growth' },
-          { c1: 'Services', c2: '45,300', c3: '40,000', c4: '113%', c5: '16%', c6: 'Renewals active' },
-          { c1: 'Total', c2: '255,800', c3: '230,000', c4: '111%', c5: '15%', c6: 'Consistent Q2 start' }
-        ]
-      };
+  useEffect(() => {
+    if (!isRealUUID) {
+      setLoading(false);
+      setError('Preview requires a stored spreadsheet file.');
+      return;
     }
+
+    let active = true;
+    const loadWorkbook = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const blob = await api.documents.download(docId);
+        if (!active) return;
+
+        const url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+
+        const buffer = await blob.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const parsedSheets: SheetData[] = workbook.SheetNames.map((name) => {
+          const sheet = workbook.Sheets[name];
+          const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' }) as string[][];
+          const normalized = rows.map((row) => row.map((cell) => String(cell ?? '')));
+          const headers = normalized[0] || [];
+          const body = normalized.slice(1);
+          return { name, headers, rows: body };
+        });
+
+        setSheets(parsedSheets);
+        setActiveSheetIdx(0);
+      } catch (err) {
+        console.error('Failed to load spreadsheet:', err);
+        if (active) {
+          setError('Failed to load the original spreadsheet file.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadWorkbook();
+    return () => {
+      active = false;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [docId]);
+
+  const handleDownload = () => {
+    if (!blobUrl) return;
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${activeDoc?.name || 'spreadsheet'}.${activeDoc?.fileType?.toLowerCase() || 'xlsx'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  const sheetData = getSheetContent();
+  const activeSheet = sheets[activeSheetIdx];
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
+        <div className="text-center space-y-2">
+          <div className="h-6 w-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Loading Spreadsheet...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !activeSheet) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 text-center">
+        <div className="max-w-md space-y-3">
+          <FileSpreadsheet className="h-10 w-10 text-emerald-600 mx-auto" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Spreadsheet Preview</h3>
+          <p className="text-[10.5px] text-slate-500 font-medium leading-relaxed">{error || 'No sheet data available.'}</p>
+          {blobUrl && (
+            <button type="button" onClick={handleDownload} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold">
+              Download Original File
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const columns = activeSheet.headers.length > 0
+    ? activeSheet.headers
+    : activeSheet.rows[0]?.map((_, idx) => String.fromCharCode(65 + idx)) || ['A'];
 
   return (
     <div className="flex flex-col h-full bg-[#f3f4f6]/40 select-none">
-      
-      {/* 1. Spreadsheet Header Bar */}
-      <div className="bg-white border-b border-slate-200/80 px-6 py-2 flex items-center justify-between shrink-0 text-slate-650">
-        
-        {/* Cell Position Indicator */}
+      <div className="bg-white border-b border-slate-200/80 px-6 py-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {sheets.map((sheet, idx) => (
+            <button
+              key={sheet.name}
+              type="button"
+              onClick={() => setActiveSheetIdx(idx)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${
+                idx === activeSheetIdx ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {sheet.name}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
-          <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-0.5 text-xs font-bold text-slate-800">
-            {sheetData.activeCellLabel}
-          </div>
-          <div className="h-4 w-[1px] bg-slate-200" />
-          <div className="relative">
-            <span className="absolute left-2.5 top-1.5 text-xs font-serif font-bold text-slate-400 italic">fx</span>
-            <input
-              type="text"
-              readOnly
-              value={sheetData.fxVal}
-              className="bg-transparent border-none text-xs text-slate-700 font-bold focus:outline-none pl-6 w-32 cursor-default select-all"
-            />
-          </div>
+          <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="p-1.5 hover:bg-slate-100 rounded"><ZoomOut className="w-4 h-4" /></button>
+          <span className="text-xs font-bold w-10 text-center">{zoom}%</span>
+          <button type="button" onClick={() => setZoom((z) => Math.min(150, z + 10))} className="p-1.5 hover:bg-slate-100 rounded"><ZoomIn className="w-4 h-4" /></button>
+          <button type="button" onClick={handleDownload} className="ml-2 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50">
+            <Download className="w-3.5 h-3.5" /> Download
+          </button>
         </div>
-
-        {/* Search cells */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
-            <input
-              type="text"
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              placeholder="Search sheet..."
-              className="bg-[#f8fafc] border border-slate-200 rounded px-2 pl-7 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:bg-white focus:border-blue-600 transition-all placeholder-slate-400"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button 
-              type="button" 
-              onClick={() => setZoom(prev => Math.max(70, prev - 10))}
-              className="p-1 hover:bg-slate-100 rounded text-slate-500"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-xs font-extrabold text-slate-755 w-10 text-center">{zoom}%</span>
-            <button 
-              type="button" 
-              onClick={() => setZoom(prev => Math.min(130, prev + 10))}
-              className="p-1 hover:bg-slate-100 rounded text-slate-500"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
       </div>
 
-      {/* 2. Spreadsheet Grid Canvas */}
-      <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-        <div 
-          className="border border-slate-200 bg-white rounded-lg overflow-hidden w-fit shadow-sm animate-in fade-in duration-200"
-          style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}
-        >
-          <table className="border-collapse text-xs text-slate-700 font-medium">
-            <thead>
-              {/* Columns Header (A, B, C, D, E, F) */}
-              <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-200">
-                <th className="w-10 border-r border-slate-200 py-1 text-center bg-slate-100"></th>
-                {columns.map(col => (
-                  <th key={col} className="w-36 border-r border-slate-200 py-1.5 text-center bg-slate-50">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-              {/* Row 1 Headers (Category, Sales, Target...) */}
-              <tr className="bg-slate-50/50 text-slate-650 font-bold border-b border-slate-200">
-                <td className="border-r border-slate-200 py-1.5 text-center font-extrabold bg-slate-100/80">1</td>
-                {sheetData.headers.map(h => (
-                  <td key={h} className="border-r border-slate-200 px-3 py-1.5 font-extrabold text-slate-750">
-                    {h}
-                  </td>
+      <div className="flex-1 overflow-auto p-4">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-auto shadow-sm" style={{ zoom: zoom / 100 }}>
+          <table className="min-w-full text-xs">
+            <thead className="bg-emerald-50">
+              <tr>
+                {columns.map((header, idx) => (
+                  <th key={idx} className="px-3 py-2 text-left font-extrabold text-slate-700 border-b border-slate-200 whitespace-nowrap">{header || `Column ${idx + 1}`}</th>
                 ))}
               </tr>
             </thead>
-            
             <tbody>
-              {sheetData.rows.map((row, idx) => {
-                const rowNum = idx + 2;
-                const isTotal = row.c1 === 'Total';
-                const highlightTarget = row.c1.includes('Eng') || row.c1.includes('Elect');
-
-                return (
-                  <tr key={idx} className={`border-b border-slate-200 ${isTotal ? 'bg-slate-50/60 font-bold' : ''}`}>
-                    {/* Row Index Column */}
-                    <td className="bg-slate-100/80 border-r border-slate-200 py-2 text-center font-extrabold text-slate-500 shrink-0">
-                      {rowNum}
-                    </td>
-
-                    {/* Cell Data */}
-                    <td className="border-r border-slate-200 px-3 py-2 font-bold text-slate-800">{row.c1}</td>
-                    
-                    {/* Cell 2 (styled active in mockup) */}
-                    <td className={`border-r border-slate-200 px-3 py-2 select-text font-bold text-right ${
-                      highlightTarget && searchVal.trim() === '' ? 'bg-emerald-50 text-emerald-800 border-2 border-emerald-600' : ''
-                    }`}>
-                      {row.c2}
-                    </td>
-                    
-                    <td className="border-r border-slate-200 px-3 py-2 text-right">{row.c3}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-blue-600">{row.c4}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-right font-bold text-emerald-600">{row.c5}</td>
-                    <td className="border-r border-slate-200 px-3 py-2 text-slate-500 italic font-medium">{row.c6}</td>
-                  </tr>
-                );
-              })}
-
-              {/* Extra empty grids to look realistic */}
-              {[6, 7, 8, 9, 10].map(rowNum => (
-                <tr key={rowNum} className="border-b border-slate-100">
-                  <td className="bg-slate-100/50 border-r border-slate-200 py-2 text-center font-extrabold text-slate-400">
-                    {rowNum}
-                  </td>
-                  {columns.map(c => (
-                    <td key={c} className="border-r border-slate-150 py-2 px-3"></td>
+              {activeSheet.rows.map((row, rowIdx) => (
+                <tr key={rowIdx} className="odd:bg-white even:bg-slate-50/60">
+                  {columns.map((_, colIdx) => (
+                    <td key={colIdx} className="px-3 py-2 border-b border-slate-100 text-slate-700 whitespace-nowrap">{row[colIdx] || ''}</td>
                   ))}
                 </tr>
               ))}
@@ -192,37 +161,6 @@ export default function XlsxViewer({ activeDoc }: { activeDoc: any }) {
           </table>
         </div>
       </div>
-
-      {/* 3. Sheet Tabs Footer (Excel style) */}
-      <div className="bg-slate-50 border-t border-slate-200 px-6 py-1 select-none flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-1">
-          <button 
-            type="button" 
-            className="px-3 py-1 bg-white border-x border-t border-slate-200 text-xs font-bold text-emerald-600 border-b-2 border-b-emerald-500 flex items-center justify-center shrink-0 shadow-sm"
-          >
-            {sheetData.tabName}
-          </button>
-          
-          <button 
-            type="button" 
-            onClick={() => showToast('New sheet created (Mock)')}
-            className="p-1 hover:bg-slate-200 rounded text-slate-500 flex items-center justify-center"
-            title="Add sheet"
-          >
-            +
-          </button>
-        </div>
-        
-        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Ready</span>
-      </div>
-
-      {toastMsg && (
-        <div className="fixed bottom-6 left-6 bg-slate-900 text-white rounded-xl py-3 px-4 shadow-2xl z-[99999] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-5 duration-200 text-xs font-bold select-none border border-slate-800">
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
-
     </div>
   );
 }

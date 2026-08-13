@@ -11,6 +11,7 @@ from app.models.models import Document, DocumentVersion, User, Folder
 from app.schemas.schemas import DocumentResponse, DocumentUpdate, DocumentVersionResponse, DocumentAssetResponse
 from app.services.storage import storage
 from app.services.document_processing import run_background_processing
+from app.services.document_representation import ensure_document_editor_content
 from app.services.audit import log_audit
 
 router = APIRouter()
@@ -188,6 +189,7 @@ def get_document(
 ):
     # Verify permission
     doc = verify_document_access(document_id, current_user, db, required_access="view")
+    ensure_document_editor_content(doc, db)
     return doc
 
 
