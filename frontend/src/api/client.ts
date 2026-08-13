@@ -78,7 +78,14 @@ async function apiRequest(path: string, options: RequestInit = {}): Promise<any>
     }
 
     if (!response.ok) {
-      const errorMsg = data?.detail || response.statusText || "Request failed";
+      let errorMsg = response.statusText || "Request failed";
+      if (typeof data?.detail === "string") {
+        errorMsg = data.detail;
+      } else if (Array.isArray(data?.detail)) {
+        errorMsg = data.detail.map((item: any) => item?.msg || String(item)).join("; ");
+      } else if (data?.detail) {
+        errorMsg = String(data.detail);
+      }
       throw new ApiError(response.status, errorMsg, data);
     }
 

@@ -61,7 +61,7 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [docsNavExpanded, setDocsNavExpanded] = useState(true);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string | number, boolean>>({});
+  const [expandedFolders, setExpandedFolders] = useState<Record<string | number, boolean>>({ 0: true });
 
   // Query folder tree & documents list for sidebar hierarchy
   const { data: rawTreeData } = useQuery({
@@ -83,8 +83,24 @@ export default function Layout() {
   };
 
   const getFolderFiles = (folderId: string | number) => {
-    return allDocs ? allDocs.filter((d: any) => String(d.folder_id) === String(folderId) && d.status !== 'archived') : [];
+    if (!allDocs) return [];
+    const isRoot = folderId === 0 || folderId === '0' || folderId === 'root';
+    return allDocs.filter((d: any) => {
+      if (d.status === 'archived') return false;
+      if (isRoot) return d.folder_id == null || d.folder_id === 0;
+      return String(d.folder_id) === String(folderId);
+    });
   };
+
+  const workspaceRootNode = (rawTreeData || []).find(
+    (node: any) => node.name === 'Workspace Root' || String(node.id) === '0' || String(node.id) === 'root'
+  );
+  const rootDocuments = workspaceRootNode?.documents?.length
+    ? workspaceRootNode.documents.filter((d: any) => d.status !== 'archived')
+    : getFolderFiles(0);
+  const rootSubFolders = workspaceRootNode?.sub_folders || [];
+  const isRootExpanded = !!expandedFolders[0] || !!expandedFolders.root;
+  const rootHasChildren = rootSubFolders.length > 0 || rootDocuments.length > 0;
 
   const renderSidebarTree = (folders: any[], level = 0): React.ReactNode => {
     if (!folders || folders.length === 0) return null;
@@ -364,38 +380,84 @@ export default function Layout() {
             {docsNavExpanded && (
               <div className="pl-3.5 pr-1 py-1 space-y-1 text-[11px] font-semibold border-l border-slate-200 ml-4.5 mt-0.5 max-h-[350px] overflow-y-auto custom-scrollbar">
                 {/* Workspace Root */}
-                <div
-                  onClick={() => navigate('/documents')}
-                  className="group/srow flex items-center gap-1.5 py-1 px-1.5 text-[11px] font-extrabold rounded-md text-slate-800 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-colors"
-                >
-                  <Folder className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span className="truncate flex-1 min-w-0">Workspace Root</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        type: 'folder',
-                        target: { id: '0', name: 'Workspace Root', isRoot: true }
-                      });
-                    }}
-                    className="opacity-0 group-hover/srow:opacity-100 p-0.5 hover:bg-slate-200 rounded shrink-0 text-slate-400 hover:text-slate-700"
-                    title="Options"
+                <div className="flex flex-col">
+                  <div
+                    onClick={() => navigate('/documents')}
+                    className="group/srow flex items-center gap-1.5 py-1 px-1.5 text-[11px] font-extrabold rounded-md text-slate-800 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-colors"
                   >
-                    •••
-                  </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (!rootHasChildren) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setExpandedFolders(prev => ({ ...prev, 0: !prev[0] }));
+                      }}
+                      className="w-3.5 h-3.5 flex items-center justify-center shrink-0 text-slate-400 hover:text-slate-600"
+                    >
+                      {rootHasChildren ? (
+                        isRootExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
+                      ) : null}
+                    </button>
+                    <Folder className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="truncate flex-1 min-w-0">Workspace Root</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          type: 'folder',
+                          target: { id: '0', name: 'Workspace Root', isRoot: true }
+                        });
+                      }}
+                      className="opacity-0 group-hover/srow:opacity-100 p-0.5 hover:bg-slate-200 rounded shrink-0 text-slate-400 hover:text-slate-700"
+                      title="Options"
+                    >
+                      •••
+                    </button>
+                  </div>
+
+                  {isRootExpanded && (
+                    <div className="flex flex-col">
+                      {rootDocuments.map((file: any) => (
+                        <div
+                          key={file.id}
+                          onClick={() => navigate(`/documents/${file.id}`)}
+                          className="group/sfile flex items-center gap-1.5 py-1 px-1.5 text-[11px] font-medium rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-colors"
+                          style={{ paddingLeft: '18px' }}
+                        >
+                          <span className="text-[10px] shrink-0">📄</span>
+                          <span className="truncate flex-1 min-w-0">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                type: 'file',
+                                target: { id: String(file.id), name: file.name }
+                              });
+                            }}
+                            className="opacity-0 group-hover/sfile:opacity-100 p-0.5 hover:bg-slate-200 rounded shrink-0 text-slate-400 hover:text-slate-700"
+                            title="Options"
+                          >
+                            •••
+                          </button>
+                        </div>
+                      ))}
+                      {renderSidebarTree(rootSubFolders, 1)}
+                    </div>
+                  )}
                 </div>
 
-                {/* Folder/Document Hierarchy Tree */}
-                {renderSidebarTree(
-                  (rawTreeData || []).flatMap((node: any) =>
-                    node.name === 'Workspace Root' || String(node.id) === '0' || String(node.id) === 'root'
-                      ? (node.sub_folders || [])
-                      : node
-                  )
+                {/* Folder/Document Hierarchy Tree (skip virtual root wrapper) */}
+                {!isRootExpanded && renderSidebarTree(
+                  rootSubFolders
                 )}
               </div>
             )}

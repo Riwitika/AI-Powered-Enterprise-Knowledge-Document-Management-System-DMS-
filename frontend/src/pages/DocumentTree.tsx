@@ -591,24 +591,34 @@ export default function DocumentTree() {
     }
   };
 
+  const docBelongsToFolder = (doc: any, folderId: string | number) => {
+    if (doc.status === 'archived') return false;
+    const isRoot = folderId === 0 || folderId === '0' || folderId === 'root';
+    if (isRoot) return doc.folder_id == null || doc.folder_id === 0;
+    return String(doc.folder_id) === String(folderId);
+  };
+
   // Recursive tree mapper to inject files and subfolders, applying treeSearchVal filters
   const mapTreeNodes = (nodes: any[]): FolderNode[] => {
     return nodes.map(node => {
       const folderId = node.id;
-      // Get real document files inside this folder
-      const filesForThisFolder = allDocs 
-        ? allDocs.filter((d: any) => String(d.folder_id) === String(folderId) && d.status !== 'archived') 
+      const filesFromList = allDocs
+        ? allDocs.filter((d: any) => docBelongsToFolder(d, folderId))
         : [];
-      
+      const filesFromTree = Array.isArray(node.documents)
+        ? node.documents.filter((d: any) => d.status !== 'archived')
+        : [];
+      const filesForThisFolder = filesFromList.length > 0 ? filesFromList : filesFromTree;
+
       const subFolders = node.sub_folders ? mapTreeNodes(node.sub_folders) : [];
-      
+
       return {
         id: node.id,
         name: node.name,
         files: filesForThisFolder,
         sub_folders: node.sub_folders,
         subFolders: subFolders,
-        documents: node.documents
+        documents: filesForThisFolder,
       };
     });
   };
@@ -752,11 +762,25 @@ export default function DocumentTree() {
       return favDocs.map(mapDocToDMSItem);
     }
 
+    if (activeFolder.id === 0 || activeFolder.id === 'root') {
+      const rootNode = folderTreeNodes.find(
+        (node) => node.id === 0 || String(node.id) === '0' || String(node.id) === 'root'
+      );
+      if (rootNode) {
+        const subs = (rootNode.subFolders || []).map(mapFolderToDMSItem);
+        const files = (rootNode.files || []).map(mapDocToDMSItem);
+        return [...subs, ...files];
+      }
+      const rootDocs = allDocs?.filter((d: any) => docBelongsToFolder(d, 0)) || [];
+      const subs = (rawTreeData?.[0]?.sub_folders || []).map(mapFolderToDMSItem);
+      return [...subs, ...rootDocs.map(mapDocToDMSItem)];
+    }
+
     const activeNode = findFolderNode(folderTreeNodes, activeFolder.id);
     if (!activeNode) return [];
 
-    const subs = (activeNode.sub_folders || []).map(mapFolderToDMSItem);
-    const files = ((activeNode as any).documents || []).map(mapDocToDMSItem);
+    const subs = (activeNode.subFolders || activeNode.sub_folders || []).map(mapFolderToDMSItem);
+    const files = (activeNode.files || (activeNode as any).documents || []).map(mapDocToDMSItem);
 
     return [...subs, ...files];
   };
@@ -792,6 +816,15 @@ export default function DocumentTree() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
+  const formatUploadError = (err: any) => {
+    const detail = err?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((item: any) => item?.msg || String(item)).join('; ');
+    }
+    return err?.message || 'Upload failed';
+  };
+
   // Real Upload logic
   const uploadDocMutation = useMutation({
     mutationFn: api.documents.upload,
@@ -800,25 +833,35 @@ export default function DocumentTree() {
       queryClient.invalidateQueries({ queryKey: ['documents-list-workspace'] });
       showToast(`Uploaded file "${data.name}" successfully`);
     },
-    onError: (err: any) => showToast(`Upload failed: ${err.message}`)
+    onError: (err: any) => showToast(`Upload failed: ${formatUploadError(err)}`)
   });
 
   const handleRealUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const targetFolderId = explorerTargetFolderId !== null
+      ? explorerTargetFolderId
+      : (activeFolder.id === 0 || activeFolder.id === 'root' ? null : Number(activeFolder.id));
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const formData = new FormData();
       formData.append('file', file);
       formData.append('name', file.name.split('.')[0]);
-      const parentId = explorerTargetFolderId !== null
-        ? String(explorerTargetFolderId)
-        : (activeFolder.id === 0 || activeFolder.id === 'root' ? '' : String(activeFolder.id));
-      formData.append('folder_id', parentId);
+      formData.append('folder_id', targetFolderId != null ? String(targetFolderId) : '');
       formData.append('access_level', 'organization');
-      uploadDocMutation.mutate(formData);
+      uploadDocMutation.mutate(formData, {
+        onSuccess: (data) => {
+          if (files.length === 1) {
+            navigate(`/documents/${data.id}`);
+          }
+        },
+      });
     }
+
+    setExplorerTargetFolderId(null);
+    e.target.value = '';
   };
 
   // Drag & drop file upload
@@ -1098,6 +1141,7 @@ export default function DocumentTree() {
         type="file"
         id="kms-file-upload-input"
         multiple
+        accept=".pdf,.docx,.xlsx,.pptx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
         onChange={handleRealUpload}
         style={{ display: 'none' }}
       />
@@ -1114,7 +1158,11 @@ export default function DocumentTree() {
         onToggleTemplates={() => { setShowTemplatesDropdown(!showTemplatesDropdown); setShowNewDropdown(false); setShowUploadDropdown(false); }}
         onNewDocument={() => { handleCreateBlankFile('docx'); }}
         onNewFolder={() => { setNewFolderVal({ name: '', description: '', color: '#3b82f6', department: 'Operations', owner: user?.full_name || 'System', permissions: 'Editor' }); setShowNewFolderModal(true); }}
-        onUploadFile={() => document.getElementById('kms-file-upload-input')?.click()}
+        onUploadFile={() => {
+          setExplorerTargetFolderId(null);
+          setShowUploadDropdown(false);
+          document.getElementById('kms-file-upload-input')?.click();
+        }}
         onBrowseTemplates={() => setShowTemplatesModal(true)}
         onUseTemplate={handleUseSeedTemplate}
       />
