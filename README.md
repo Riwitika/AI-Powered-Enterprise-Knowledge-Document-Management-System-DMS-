@@ -495,7 +495,7 @@ Application: [http://localhost:5173](http://localhost:5173)
 | `DATABASE_URL` | `sqlite:///./kms.db` for local dev |
 | `SECRET_KEY` | JWT signing secret |
 | `GEMINI_API_KEY` | Google Gemini API key |
-| `GEMINI_MODEL` | Default: `gemini-1.5-flash` |
+| `GEMINI_MODEL` | Default: `gemini-flash-latest` |
 | `EMBEDDING_MODEL` | Default: `all-MiniLM-L6-v2` |
 
 **Frontend** (`frontend/.env`)
